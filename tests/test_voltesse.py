@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import QApplication
 
 from src.database import DatabaseManager, TelemetryRecord
 from src.telemetry_source import MockTelemetryStream
-from src.dashboard_gui import VoltesseDashboard
+from src.dashboard_gui import VoltesseDashboard, TPMSWidget, AwdTorqueVectorWidget
 
 
 class TestDatabaseManager(unittest.TestCase):
@@ -134,6 +134,11 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertEqual(gui.trip_dist_val.text(), "14.25 km")
         self.assertEqual(gui.mode_badge.text(), "SPORT")
         self.assertIn("HIGH SPEED", gui.status_badge.text())
+
+        # Test TPMS & AWD widgets
+        self.assertGreater(gui.tpms_widget.fl_bar, 2.0)
+        self.assertEqual(gui.awd_widget.bias_mode, "RWD BIAS")
+        self.assertEqual(gui.awd_widget.rear_pct, 70.0)
 
 
 if __name__ == "__main__":

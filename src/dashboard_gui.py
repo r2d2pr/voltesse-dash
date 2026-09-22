@@ -398,6 +398,246 @@ class BatteryStatusWidget(QWidget):
         painter.end()
 
 
+class TPMSWidget(QWidget):
+    """
+    4-Wheel Tire Pressure and Temperature Monitor (TPMS) Pod.
+    Renders a top-down EV chassis schematic flanked by real-time corner readouts.
+    """
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.fl_bar = 2.40
+        self.fr_bar = 2.40
+        self.rl_bar = 2.38
+        self.rr_bar = 2.38
+        self.fl_temp = 31.0
+        self.fr_temp = 31.0
+        self.rl_temp = 30.0
+        self.rr_temp = 30.0
+        self.setFixedHeight(78)
+
+    def set_tpms(
+        self,
+        fl_bar: float,
+        fr_bar: float,
+        rl_bar: float,
+        rr_bar: float,
+        fl_temp: float,
+        fr_temp: float,
+        rl_temp: float,
+        rr_temp: float,
+    ) -> None:
+        self.fl_bar = fl_bar
+        self.fr_bar = fr_bar
+        self.rl_bar = rl_bar
+        self.rr_bar = rr_bar
+        self.fl_temp = fl_temp
+        self.fr_temp = fr_temp
+        self.rl_temp = rl_temp
+        self.rr_temp = rr_temp
+        self.update()
+
+    def _color_for_bar(self, bar: float) -> QColor:
+        if bar < 2.0 or bar > 2.85:
+            return COLOR_RED
+        elif bar < 2.2 or bar > 2.65:
+            return COLOR_AMBER
+        return COLOR_MINT
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+
+        w = self.width()
+        h = self.height()
+
+        # Smoked Card Container
+        painter.setBrush(QBrush(COLOR_PANEL_BG))
+        painter.setPen(QPen(COLOR_PANEL_BORDER, 1))
+        painter.drawRoundedRect(QRectF(0, 0, w - 1, h - 1), 5, 5)
+
+        # Header Strip
+        painter.setPen(COLOR_TEXT_MUTED)
+        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        painter.drawText(QRectF(10, 4, w - 20, 14), Qt.AlignmentFlag.AlignLeft, "TIRE PRESSURE & TPMS")
+
+        painter.setPen(COLOR_MINT)
+        painter.drawText(QRectF(10, 4, w - 20, 14), Qt.AlignmentFlag.AlignRight, "● ALL NOMINAL")
+
+        # Center Vehicle Chassis Silhouette
+        cx = w / 2.0
+        cy = 44.0
+
+        # Chassis outline
+        cw, ch = 24.0, 40.0
+        chassis_rect = QRectF(cx - cw / 2.0, cy - ch / 2.0, cw, ch)
+        painter.setBrush(QBrush(QColor(12, 30, 22, 220)))
+        painter.setPen(QPen(COLOR_PANEL_BORDER, 1.2))
+        painter.drawRoundedRect(chassis_rect, 6, 6)
+
+        # Windshield accent
+        painter.setPen(QPen(QColor(0, 245, 160, 60), 1))
+        painter.drawLine(int(cx - 8), int(cy - 6), int(cx + 8), int(cy - 6))
+
+        # 4 Wheels (Small rounded glowing blocks)
+        tw, th = 5.0, 10.0
+        wheel_coords = [
+            (cx - 15.0, cy - 15.0, self.fl_bar),  # FL
+            (cx + 10.0, cy - 15.0, self.fr_bar),  # FR
+            (cx - 15.0, cy + 5.0, self.rl_bar),   # RL
+            (cx + 10.0, cy + 5.0, self.rr_bar),   # RR
+        ]
+        for wx, wy, p_val in wheel_coords:
+            painter.setBrush(QBrush(self._color_for_bar(p_val)))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(QRectF(wx, wy, tw, th), 1.5, 1.5)
+
+        # Tire Readouts (Left Side: FL & RL)
+        painter.setFont(QFont("Consolas", 8, QFont.Weight.Bold))
+        left_col_w = cx - 22.0
+
+        # FL Readout
+        painter.setPen(self._color_for_bar(self.fl_bar))
+        painter.drawText(QRectF(8, cy - 18, left_col_w, 14), Qt.AlignmentFlag.AlignLeft, f"FL {self.fl_bar:.2f} bar")
+        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Normal))
+        painter.setPen(COLOR_TEXT_MUTED)
+        painter.drawText(QRectF(8, cy - 6, left_col_w, 12), Qt.AlignmentFlag.AlignLeft, f"{self.fl_temp:.0f}°C")
+
+        # RL Readout
+        painter.setFont(QFont("Consolas", 8, QFont.Weight.Bold))
+        painter.setPen(self._color_for_bar(self.rl_bar))
+        painter.drawText(QRectF(8, cy + 8, left_col_w, 14), Qt.AlignmentFlag.AlignLeft, f"RL {self.rl_bar:.2f} bar")
+        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Normal))
+        painter.setPen(COLOR_TEXT_MUTED)
+        painter.drawText(QRectF(8, cy + 20, left_col_w, 12), Qt.AlignmentFlag.AlignLeft, f"{self.rl_temp:.0f}°C")
+
+        # Tire Readouts (Right Side: FR & RR)
+        right_x = cx + 22.0
+        right_col_w = w - right_x - 8.0
+
+        # FR Readout
+        painter.setFont(QFont("Consolas", 8, QFont.Weight.Bold))
+        painter.setPen(self._color_for_bar(self.fr_bar))
+        painter.drawText(QRectF(right_x, cy - 18, right_col_w, 14), Qt.AlignmentFlag.AlignRight, f"{self.fr_bar:.2f} bar FR")
+        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Normal))
+        painter.setPen(COLOR_TEXT_MUTED)
+        painter.drawText(QRectF(right_x, cy - 6, right_col_w, 12), Qt.AlignmentFlag.AlignRight, f"{self.fr_temp:.0f}°C")
+
+        # RR Readout
+        painter.setFont(QFont("Consolas", 8, QFont.Weight.Bold))
+        painter.setPen(self._color_for_bar(self.rr_bar))
+        painter.drawText(QRectF(right_x, cy + 8, right_col_w, 14), Qt.AlignmentFlag.AlignRight, f"{self.rr_bar:.2f} bar RR")
+        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Normal))
+        painter.setPen(COLOR_TEXT_MUTED)
+        painter.drawText(QRectF(right_x, cy + 20, right_col_w, 12), Qt.AlignmentFlag.AlignRight, f"{self.rr_temp:.0f}°C")
+
+        painter.end()
+
+
+class AwdTorqueVectorWidget(QWidget):
+    """
+    Dual-Motor AWD Dynamic Torque Split & Vectoring Pod.
+    Displays dynamic front/rear motor torque proportion bars and torque readouts in Nm.
+    """
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.front_pct = 45.0
+        self.rear_pct = 55.0
+        self.front_nm = 0.0
+        self.rear_nm = 0.0
+        self.bias_mode = "AWD BALANCED"
+        self.setFixedHeight(78)
+
+    def set_torque_split(
+        self,
+        front_pct: float,
+        rear_pct: float,
+        front_nm: float,
+        rear_nm: float,
+        bias_mode: str = "AWD BALANCED",
+    ) -> None:
+        self.front_pct = front_pct
+        self.rear_pct = rear_pct
+        self.front_nm = front_nm
+        self.rear_nm = rear_nm
+        self.bias_mode = bias_mode
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+
+        w = self.width()
+        h = self.height()
+
+        # Smoked Card Container
+        painter.setBrush(QBrush(COLOR_PANEL_BG))
+        painter.setPen(QPen(COLOR_PANEL_BORDER, 1))
+        painter.drawRoundedRect(QRectF(0, 0, w - 1, h - 1), 5, 5)
+
+        # Header Strip
+        painter.setPen(COLOR_TEXT_MUTED)
+        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        painter.drawText(QRectF(10, 4, w - 20, 14), Qt.AlignmentFlag.AlignLeft, "AWD TORQUE VECTORING")
+
+        painter.setPen(COLOR_MINT_BRIGHT)
+        painter.drawText(QRectF(10, 4, w - 20, 14), Qt.AlignmentFlag.AlignRight, f"● {self.bias_mode}")
+
+        # Geometry for Dual Motor Split Bars
+        bar_left = 68.0
+        bar_right = w - 85.0
+        bar_w = max(40.0, bar_right - bar_left)
+        bar_h = 7.0
+
+        # Row 1: Front Motor (F-AXLE)
+        y1 = 26.0
+        painter.setPen(COLOR_TEXT_SECONDARY)
+        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        painter.drawText(QRectF(10, y1 - 4, 52, 14), Qt.AlignmentFlag.AlignLeft, "F-AXLE")
+
+        # Track 1
+        painter.setBrush(QBrush(COLOR_GAUGE_TRACK))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(QRectF(bar_left, y1, bar_w, bar_h), 2.5, 2.5)
+
+        # Fill 1
+        f_fill = bar_w * (self.front_pct / 100.0)
+        painter.setBrush(QBrush(COLOR_MINT))
+        painter.drawRoundedRect(QRectF(bar_left, y1, f_fill, bar_h), 2.5, 2.5)
+
+        # Values 1
+        painter.setPen(COLOR_TEXT_PRIMARY)
+        painter.setFont(QFont("Consolas", 8, QFont.Weight.Bold))
+        painter.drawText(QRectF(w - 80, y1 - 4, 72, 14), Qt.AlignmentFlag.AlignRight, f"{int(self.front_pct)}% {int(self.front_nm)}Nm")
+
+        # Row 2: Rear Motor (R-AXLE)
+        y2 = 49.0
+        painter.setPen(COLOR_TEXT_SECONDARY)
+        painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+        painter.drawText(QRectF(10, y2 - 4, 52, 14), Qt.AlignmentFlag.AlignLeft, "R-AXLE")
+
+        # Track 2
+        painter.setBrush(QBrush(COLOR_GAUGE_TRACK))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(QRectF(bar_left, y2, bar_w, bar_h), 2.5, 2.5)
+
+        # Fill 2
+        r_fill = bar_w * (self.rear_pct / 100.0)
+        r_color = COLOR_MINT_BRIGHT if self.rear_pct < 65.0 else COLOR_AMBER
+        painter.setBrush(QBrush(r_color))
+        painter.drawRoundedRect(QRectF(bar_left, y2, r_fill, bar_h), 2.5, 2.5)
+
+        # Values 2
+        painter.setPen(COLOR_TEXT_PRIMARY)
+        painter.setFont(QFont("Consolas", 8, QFont.Weight.Bold))
+        painter.drawText(QRectF(w - 80, y2 - 4, 72, 14), Qt.AlignmentFlag.AlignRight, f"{int(self.rear_pct)}% {int(self.rear_nm)}Nm")
+
+        painter.end()
+
+
 class PowerBarWidget(QWidget):
     """
     Sleek bidirectional power bar meter in Cyber-Mint theme.
@@ -730,7 +970,7 @@ class VoltesseDashboard(QMainWindow):
         stage_layout.setSpacing(16)
 
         # =============================================================
-        # --- LEFT WING: Energy & Battery ---
+        # --- LEFT WING: Energy & Battery + TPMS ---
         # =============================================================
         left_wing = QFrame()
         left_wing.setStyleSheet("background: transparent;")
@@ -787,7 +1027,7 @@ class VoltesseDashboard(QMainWindow):
 
         left_wing_layout.addWidget(volt_curr_pod)
 
-        # 4. Energy Efficiency Deck Pod (Mirrors sparkline container height)
+        # 4. Energy Efficiency Deck Pod
         energy_pod = QFrame()
         energy_pod.setFixedHeight(46)
         energy_pod.setStyleSheet(
@@ -823,6 +1063,10 @@ class VoltesseDashboard(QMainWindow):
         ep_layout.addLayout(ep_bot)
 
         left_wing_layout.addWidget(energy_pod)
+
+        # 5. 4-Wheel TPMS Monitoring Widget (Occupies lower left wing space)
+        self.tpms_widget = TPMSWidget()
+        left_wing_layout.addWidget(self.tpms_widget)
         left_wing_layout.addStretch(1)
 
         stage_layout.addWidget(left_wing, stretch=3)
@@ -841,7 +1085,7 @@ class VoltesseDashboard(QMainWindow):
         stage_layout.addWidget(center_stage, stretch=4)
 
         # =============================================================
-        # --- RIGHT WING: Powertrain Dynamics ---
+        # --- RIGHT WING: Powertrain Dynamics + AWD Vectoring ---
         # =============================================================
         right_wing = QFrame()
         right_wing.setStyleSheet("background: transparent;")
@@ -901,6 +1145,10 @@ class VoltesseDashboard(QMainWindow):
         # 5. Live Waveform inside Right Wing
         self.sparkline_widget = LiveSparklineWidget(max_points=50)
         right_wing_layout.addWidget(self.sparkline_widget)
+
+        # 6. AWD Dual-Motor Dynamic Torque Vectoring Pod (Occupies lower right wing space)
+        self.awd_widget = AwdTorqueVectorWidget()
+        right_wing_layout.addWidget(self.awd_widget)
         right_wing_layout.addStretch(1)
 
         stage_layout.addWidget(right_wing, stretch=3)
@@ -1033,6 +1281,49 @@ class VoltesseDashboard(QMainWindow):
 
         # Sparkline trace
         self.sparkline_widget.add_data_point(record.speed_kmh, record.battery_power_kw)
+
+        # Dynamic AWD Dual-Motor Torque Calculation
+        if record.battery_power_kw < -0.5:
+            # Under regenerative braking: front bias
+            f_ratio = 0.60
+            r_ratio = 0.40
+            bias_str = "REGEN AWD"
+            total_nm = abs(record.battery_power_kw) * 3.5
+        elif record.drive_mode == "SPORT":
+            f_ratio = 0.30
+            r_ratio = 0.70
+            bias_str = "RWD BIAS"
+            total_nm = (record.throttle_pct / 100.0) * 480.0
+        elif record.drive_mode == "ECO":
+            f_ratio = 0.75
+            r_ratio = 0.25
+            bias_str = "FWD ECO"
+            total_nm = (record.throttle_pct / 100.0) * 260.0
+        else:
+            f_ratio = 0.45
+            r_ratio = 0.55
+            bias_str = "AWD DUAL"
+            total_nm = (record.throttle_pct / 100.0) * 380.0
+
+        f_pct = round(f_ratio * 100.0)
+        r_pct = 100.0 - f_pct
+        f_nm = total_nm * f_ratio
+        r_nm = total_nm * r_ratio
+        self.awd_widget.set_torque_split(f_pct, r_pct, f_nm, r_nm, bias_str)
+
+        # Dynamic TPMS (Warms up slightly with speed and continuous driving)
+        temp_base = 28.0 + min(12.0, (record.speed_kmh / 180.0) * 7.0 + (record.trip_distance_km * 0.08))
+        fl_t = temp_base + 1.2
+        fr_t = temp_base + 0.8
+        rl_t = temp_base - 0.4
+        rr_t = temp_base - 0.6
+
+        # Ideal pressure 2.40 bar + gentle thermal inflation
+        fl_p = 2.40 + (fl_t - 25.0) * 0.004
+        fr_p = 2.40 + (fr_t - 25.0) * 0.004
+        rl_p = 2.38 + (rl_t - 25.0) * 0.004
+        rr_p = 2.38 + (rr_t - 25.0) * 0.004
+        self.tpms_widget.set_tpms(fl_p, fr_p, rl_p, rr_p, fl_t, fr_t, rl_t, rr_t)
 
     def keyPressEvent(self, event) -> None:
         """Keyboard controls for bench testing on development workstations."""

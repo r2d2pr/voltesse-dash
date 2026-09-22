@@ -10,6 +10,8 @@ A high-performance digital cockpit instrument cluster and local telemetry loggin
   - **Dynamic Arc Speedometer**: Antialiased radial gauge showing vehicle speed (km/h) and real-time motor RPM.
   - **Bidirectional Power / Regen Meter**: Instantaneous power delivery (kW) and regenerative braking recapture indicators.
   - **Battery State of Charge (SoC)**: Segmented high-visibility battery gauge, pack voltage (V), current draw (A), and estimated range.
+  - **4-Wheel TPMS Monitoring**: Top-down chassis schematic tracking individual tire pressure (bar) and temperatures (°C).
+  - **AWD Torque Vectoring Pod**: Real-time Front / Rear motor torque distribution bars (Nm) with dynamic drive mode bias.
   - **Thermal Diagnostics**: Live temperature monitoring for motor, inverter, and battery pack with threshold alert badges.
   - **Rolling Telemetry Trace**: Real-time sparkline graph plotting speed and power curves.
 - **Asynchronous Telemetry Engine**: Physics-based simulated EV powertrain running on a dedicated `QThread` (20 Hz default).
