@@ -20,5 +20,9 @@ data/*.db-shm
 *.db-wal
 *.db-shm
 
+# Exports
+data/exports/
+exports/
+
 # Project specific exclusions
 AGENTS.md

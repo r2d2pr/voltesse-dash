@@ -1,16 +1,19 @@
 """
 Unit and integration tests for Voltesse Dash components:
-- SQLite Database & Asynchronous Batch Writer
+- SQLite Database & Asynchronous Batch Writer with Granular Write Access & Exports
 - CAN Bus Race Mode Telemetry Source & Frame Decoding
 - Interactive Video Game Simulation Telemetry Stream
 - Autonomous Mock Telemetry Stream (Test Mode)
 - PyQt6 Cockpit GUI initialization, mode switching, and auto-scaling
 - Automatic (PRNDB with dynamic D1-D6 gear display) and Manual Transmission
-- Application Mode Orchestrator
+- Application Mode Orchestrator & Logging Controls
 """
 
 import argparse
+import csv
+import json
 import os
+from pathlib import Path
 import shutil
 import struct
 import tempfile
@@ -75,7 +78,7 @@ class TestDatabaseManager(unittest.TestCase):
                 gear="3" if i >= 6 else "D2",
                 transmission_mode="MANUAL" if i >= 6 else "AUTO",
             )
-            self.db.log_telemetry(rec)
+            self.assertTrue(self.db.log_telemetry(rec))
 
         time.sleep(0.6)
 
@@ -96,6 +99,128 @@ class TestDatabaseManager(unittest.TestCase):
             distance_km=5.5,
             energy_kwh=1.2,
         )
+
+    def test_write_access_controls(self):
+        # 1. Verify initially enabled
+        self.assertTrue(self.db.is_write_enabled())
+
+        rec = TelemetryRecord(
+            timestamp=time.time(),
+            speed_kmh=60.0,
+            motor_rpm=4500,
+            battery_soc=85.0,
+            battery_voltage=395.0,
+            battery_current=30.0,
+            battery_power_kw=11.8,
+            battery_temp_c=30.0,
+            motor_temp_c=42.0,
+            inverter_temp_c=38.0,
+            throttle_pct=25.0,
+            brake_pct=0.0,
+            drive_mode="DRIVE",
+            trip_distance_km=1.0,
+            warnings=[],
+        )
+
+        # 2. Disable write access dynamically
+        self.assertFalse(self.db.set_write_access(False))
+        self.assertFalse(self.db.is_write_enabled())
+
+        # Writes must be rejected
+        self.assertFalse(self.db.log_telemetry(rec))
+
+        # 3. Re-enable write access
+        self.assertTrue(self.db.set_write_access(True))
+        self.assertTrue(self.db.is_write_enabled())
+        self.assertTrue(self.db.log_telemetry(rec))
+
+    def test_read_only_mode_enforcement(self):
+        ro_db = DatabaseManager(db_path=self.db_path, read_only=True)
+        self.assertTrue(ro_db.read_only)
+        self.assertFalse(ro_db.is_write_enabled())
+
+        # Attempting session creation returns None
+        self.assertIsNone(ro_db.start_session(95.0))
+
+        # Attempting write returns False
+        rec = TelemetryRecord(
+            timestamp=time.time(),
+            speed_kmh=20.0,
+            motor_rpm=1500,
+            battery_soc=90.0,
+            battery_voltage=400.0,
+            battery_current=5.0,
+            battery_power_kw=2.0,
+            battery_temp_c=25.0,
+            motor_temp_c=30.0,
+            inverter_temp_c=28.0,
+            throttle_pct=10.0,
+            brake_pct=0.0,
+            drive_mode="DRIVE",
+            trip_distance_km=0.1,
+            warnings=[],
+        )
+        self.assertFalse(ro_db.log_telemetry(rec))
+
+        # Cannot force enable write access in read_only mode
+        self.assertFalse(ro_db.set_write_access(True))
+        self.assertFalse(ro_db.is_write_enabled())
+
+        ro_db.close()
+
+    def test_export_csv_and_json(self):
+        session_id = self.db.start_session(initial_soc=89.0)
+        rec = TelemetryRecord(
+            timestamp=time.time(),
+            speed_kmh=75.5,
+            motor_rpm=5800,
+            battery_soc=88.5,
+            battery_voltage=394.0,
+            battery_current=42.0,
+            battery_power_kw=16.5,
+            battery_temp_c=31.5,
+            motor_temp_c=47.0,
+            inverter_temp_c=39.0,
+            throttle_pct=45.0,
+            brake_pct=0.0,
+            drive_mode="SPORT",
+            trip_distance_km=2.5,
+            warnings=["HIGH SPEED"],
+            gear="D3",
+            transmission_mode="AUTO",
+        )
+        self.db.log_telemetry(rec)
+        time.sleep(0.4)
+        self.db.end_session(88.0, 75.5, 70.0, 2.5, 0.4)
+
+        # 1. Export CSV
+        csv_file = os.path.join(self.test_dir, "export_session.csv")
+        out_csv = self.db.export_session_to_csv(session_id, output_path=csv_file)
+        self.assertTrue(os.path.exists(out_csv))
+        with open(out_csv, "r", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            header = next(reader)
+            self.assertIn("speed_kmh", header)
+            self.assertIn("battery_soc", header)
+            self.assertIn("gear", header)
+            row = next(reader)
+            self.assertGreater(len(row), 5)
+
+        # 2. Export JSON
+        json_file = os.path.join(self.test_dir, "export_session.json")
+        out_json = self.db.export_session_to_json(session_id, output_path=json_file)
+        self.assertTrue(os.path.exists(out_json))
+        with open(out_json, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            self.assertIn("session", data)
+            self.assertIn("telemetry", data)
+            self.assertEqual(data["record_count"], 1)
+            self.assertEqual(data["telemetry"][0]["drive_mode"], "SPORT")
+
+        # 3. Export all sessions summary
+        summary_csv = os.path.join(self.test_dir, "all_summary.csv")
+        out_sum = self.db.export_all_sessions_summary_csv(output_path=summary_csv)
+        self.assertTrue(os.path.exists(out_sum))
 
 
 class TestCANTelemetrySource(unittest.TestCase):
@@ -413,6 +538,24 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertGreater(gui.top_bar.height(), 36)
         self.assertGreater(gui.brand_label.font().pointSize(), 10)
 
+    def test_gui_logging_badge_and_toggle(self):
+        gui = VoltesseDashboard()
+        gui.set_logging_state(write_enabled=True, read_only=False)
+        self.assertEqual(gui.logging_badge.text(), "REC")
+
+        gui.set_logging_state(write_enabled=False, read_only=False)
+        self.assertEqual(gui.logging_badge.text(), "LOG OFF")
+
+        gui.set_logging_state(write_enabled=False, read_only=True)
+        self.assertEqual(gui.logging_badge.text(), "R/O")
+
+        # Test 'L' key triggers logging_toggle_requested
+        emitted = []
+        gui.logging_toggle_requested.connect(lambda: emitted.append(True))
+        event_l = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_L, Qt.KeyboardModifier.NoModifier)
+        gui.keyPressEvent(event_l)
+        self.assertEqual(len(emitted), 1)
+
     def test_transmission_toggle_restriction(self):
         gui = VoltesseDashboard()
         signals_received = []
@@ -484,11 +627,22 @@ class TestVoltesseAppModes(unittest.TestCase):
             batch_size=5,
             flush_interval=0.2,
             windowed=True,
+            read_only=False,
+            no_logging=False,
         )
         app = VoltesseApp(args)
 
         self.assertEqual(app.current_mode, "RACE")
         self.assertEqual(app.gui.current_mode, "RACE")
+        self.assertTrue(app.db_manager.is_write_enabled())
+
+        # Test runtime logging toggle
+        app._toggle_logging()
+        self.assertFalse(app.db_manager.is_write_enabled())
+        self.assertEqual(app.gui.logging_badge.text(), "LOG OFF")
+        app._toggle_logging()
+        self.assertTrue(app.db_manager.is_write_enabled())
+        self.assertEqual(app.gui.logging_badge.text(), "REC")
 
         # Test transmission toggle in RACE mode
         self.assertEqual(app.can_stream.transmission_mode, "AUTO")
@@ -529,6 +683,49 @@ class TestVoltesseAppModes(unittest.TestCase):
         self.assertEqual(app.test_stream.current_gear, "D1")
 
         app.shutdown()
+
+    def test_app_read_only_and_no_logging_flags(self):
+        # 1. Test --no-logging flag
+        args_nl = argparse.Namespace(
+            mode="TEST",
+            can_interface=None,
+            can_channel=None,
+            can_mock=False,
+            db_path=self.db_path,
+            interval_ms=10,
+            batch_size=5,
+            flush_interval=0.2,
+            windowed=True,
+            read_only=False,
+            no_logging=True,
+        )
+        app_nl = VoltesseApp(args_nl)
+        self.assertFalse(app_nl.db_manager.is_write_enabled())
+        self.assertEqual(app_nl.gui.logging_badge.text(), "LOG OFF")
+        app_nl.shutdown()
+
+        # 2. Test --read-only flag
+        args_ro = argparse.Namespace(
+            mode="TEST",
+            can_interface=None,
+            can_channel=None,
+            can_mock=False,
+            db_path=self.db_path,
+            interval_ms=10,
+            batch_size=5,
+            flush_interval=0.2,
+            windowed=True,
+            read_only=True,
+            no_logging=False,
+        )
+        app_ro = VoltesseApp(args_ro)
+        self.assertTrue(app_ro.db_manager.read_only)
+        self.assertFalse(app_ro.db_manager.is_write_enabled())
+        self.assertEqual(app_ro.gui.logging_badge.text(), "R/O")
+        # Trying to toggle logging in read-only mode is blocked
+        app_ro._toggle_logging()
+        self.assertFalse(app_ro.db_manager.is_write_enabled())
+        app_ro.shutdown()
 
 
 if __name__ == "__main__":

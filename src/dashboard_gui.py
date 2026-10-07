@@ -990,6 +990,7 @@ class VoltesseDashboard(QMainWindow):
     gear_up_requested = pyqtSignal()             # Shift Up (Manual or Auto)
     gear_down_requested = pyqtSignal()           # Shift Down (Manual or Auto)
     gear_shift_requested = pyqtSignal()          # Cycle gear (G key)
+    logging_toggle_requested = pyqtSignal()      # Toggle DB logging (L key)
     pause_requested = pyqtSignal()
 
     def __init__(self):
@@ -1057,6 +1058,12 @@ class VoltesseDashboard(QMainWindow):
             "color: #00F5A0; background-color: rgba(0, 245, 160, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4);"
         )
 
+        # Database Logging Status Badge (REC / LOG OFF / R/O)
+        self.logging_badge = QLabel("REC")
+        self.logging_badge.setStyleSheet(
+            "color: #00F5A0; background-color: rgba(0, 245, 160, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4); font-weight: bold;"
+        )
+
         # Operating Mode Ribbon Badge
         self.op_mode_badge = QLabel("RACE [CAN]")
 
@@ -1103,6 +1110,8 @@ class VoltesseDashboard(QMainWindow):
         self.top_layout.addWidget(self.brand_label)
         self.top_layout.addSpacing(8)
         self.top_layout.addWidget(self.ready_badge)
+        self.top_layout.addSpacing(6)
+        self.top_layout.addWidget(self.logging_badge)
         self.top_layout.addStretch(1)
         self.top_layout.addWidget(self.op_mode_badge)
         self.top_layout.addSpacing(6)
@@ -1354,19 +1363,37 @@ class VoltesseDashboard(QMainWindow):
             self.op_mode_badge.setStyleSheet(
                 "background-color: rgba(0, 245, 160, 0.22); color: #00F5A0; padding: 2px 10px; border-radius: 4px; border: 1px solid #00F5A0; font-weight: bold;"
             )
-            self.controls_hint.setText("[KEYS: 1:RACE | 2:SIM | 3:TEST | T:TRANS | E/C:SHIFT]")
+            self.controls_hint.setText("[KEYS: 1:RACE | 2:SIM | 3:TEST | T:TRANS | E/C:SHIFT | L:LOG]")
         elif mode == "SIMULATION":
             self.op_mode_badge.setText("SIMULATION [GAME]")
             self.op_mode_badge.setStyleSheet(
                 "background-color: rgba(0, 229, 255, 0.22); color: #00E5FF; padding: 2px 10px; border-radius: 4px; border: 1px solid #00E5FF; font-weight: bold;"
             )
-            self.controls_hint.setText("[T:TRANS | W/S:PEDALS | A/D:STEER | E/C:SHIFT | M:MODE]")
+            self.controls_hint.setText("[T:TRANS | W/S:PEDALS | A/D:STEER | E/C:SHIFT | L:LOG | M:MODE]")
         elif mode == "TEST":
             self.op_mode_badge.setText("TEST [MOCK]")
             self.op_mode_badge.setStyleSheet(
                 "background-color: rgba(154, 230, 180, 0.20); color: #5CFFC7; padding: 2px 10px; border-radius: 4px; border: 1px solid #5CFFC7; font-weight: bold;"
             )
-            self.controls_hint.setText("[TEST: AUTO ONLY | 1:RACE | 2:SIM | SPACE:PAUSE]")
+            self.controls_hint.setText("[TEST: AUTO ONLY | 1:RACE | 2:SIM | L:LOG | SPACE:PAUSE]")
+
+    def set_logging_state(self, write_enabled: bool, read_only: bool = False) -> None:
+        """Updates top ribbon database logging badge."""
+        if read_only:
+            self.logging_badge.setText("R/O")
+            self.logging_badge.setStyleSheet(
+                "color: #00E5FF; background-color: rgba(0, 229, 255, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 229, 255, 0.4); font-weight: bold;"
+            )
+        elif write_enabled:
+            self.logging_badge.setText("REC")
+            self.logging_badge.setStyleSheet(
+                "color: #00F5A0; background-color: rgba(0, 245, 160, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4); font-weight: bold;"
+            )
+        else:
+            self.logging_badge.setText("LOG OFF")
+            self.logging_badge.setStyleSheet(
+                "color: #FFB800; background-color: rgba(255, 184, 0, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(255, 184, 0, 0.4); font-weight: bold;"
+            )
 
     def update_telemetry(self, record: TelemetryRecord) -> None:
         """
@@ -1579,6 +1606,9 @@ class VoltesseDashboard(QMainWindow):
             return
         elif key == Qt.Key.Key_G:
             self.gear_shift_requested.emit()
+            return
+        elif key == Qt.Key.Key_L:
+            self.logging_toggle_requested.emit()
             return
         elif key == Qt.Key.Key_Space:
             self.pause_requested.emit()

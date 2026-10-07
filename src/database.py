@@ -1,8 +1,11 @@
 """
 Voltesse Dash - SQLite Database Module
 Handles telemetry logging and trip session management with thread-safe batched asynchronous writes.
+Provides granular write access controls, pre-flight verification, read-only enforcement,
+and session export capabilities (CSV / JSON).
 """
 
+import csv
 from dataclasses import dataclass, asdict
 import json
 import logging
@@ -68,6 +71,8 @@ class DatabaseManager:
     Manages SQLite database storage for telemetry and trip logs.
     Runs an asynchronous background worker thread with batched commits to prevent
     I/O bottlenecks on embedded systems like the Raspberry Pi.
+    Includes granular write access controls, pre-flight permission checks,
+    read-only enforcement, and session export capabilities.
     """
 
     def __init__(
@@ -75,48 +80,149 @@ class DatabaseManager:
         db_path: str = "data/voltesse_telemetry.db",
         batch_size: int = 25,
         flush_interval_sec: float = 1.0,
+        write_enabled: bool = True,
+        read_only: bool = False,
     ):
         self.db_path = Path(db_path)
         self.batch_size = batch_size
         self.flush_interval_sec = flush_interval_sec
+        self.read_only = read_only
+        self.write_enabled = (not read_only) and write_enabled
 
-        # Ensure directory exists
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        # Internal verification flags
+        self._write_verified = False
+        self._write_error_reason: Optional[str] = None
 
         self._queue: queue.Queue = queue.Queue(maxsize=10000)
         self._stop_event = threading.Event()
         self._current_session_id: Optional[int] = None
         self._writer_thread: Optional[threading.Thread] = None
 
-        # Initialize tables on caller thread
-        self._init_database()
+        if not self.read_only:
+            # Ensure target directory exists and verify write permissions
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            self.verify_write_access()
+            # Initialize tables on caller thread
+            self._init_database()
+            # Start writer worker thread if write logging is enabled
+            self._start_writer()
+        else:
+            logger.info("DatabaseManager initialized in strict READ-ONLY mode for: %s", self.db_path)
+            # If database exists, verify readability
+            if self.db_path.exists():
+                self._verify_read_access()
 
-        # Start writer worker thread
-        self._start_writer()
+    def _get_connection(self, read_only: Optional[bool] = None) -> sqlite3.Connection:
+        use_ro = self.read_only if read_only is None else read_only
+        if use_ro and self.db_path.exists():
+            # Open using SQLite URI read-only flag
+            uri_path = f"file:{self.db_path.resolve().as_posix()}?mode=ro"
+            conn = sqlite3.connect(
+                uri_path,
+                uri=True,
+                timeout=30.0,
+                check_same_thread=False,
+            )
+        else:
+            conn = sqlite3.connect(
+                str(self.db_path),
+                timeout=30.0,
+                check_same_thread=False,
+            )
 
-    def _get_connection(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(
-            str(self.db_path),
-            timeout=30.0,
-            check_same_thread=False,
-        )
         conn.row_factory = sqlite3.Row
-        # Configure WAL mode and synchronous settings optimized for embedded SD card / flash storage
-        conn.execute("PRAGMA journal_mode = WAL;")
-        conn.execute("PRAGMA synchronous = NORMAL;")
-        conn.execute("PRAGMA temp_store = MEMORY;")
-        conn.execute("PRAGMA cache_size = -8000;")  # 8MB memory cache
+        if not use_ro:
+            # Configure WAL mode and synchronous settings optimized for embedded SD card / flash storage
+            conn.execute("PRAGMA journal_mode = WAL;")
+            conn.execute("PRAGMA synchronous = NORMAL;")
+            conn.execute("PRAGMA temp_store = MEMORY;")
+            conn.execute("PRAGMA cache_size = -8000;")  # 8MB memory cache
         return conn
+
+    def _verify_read_access(self) -> bool:
+        """Verifies that the database is readable in read-only mode."""
+        try:
+            conn = self._get_connection(read_only=True)
+            conn.execute("SELECT 1 FROM sqlite_master LIMIT 1;")
+            conn.close()
+            return True
+        except Exception as e:
+            logger.warning("Read-only verification failed for %s: %s", self.db_path, e)
+            return False
+
+    def verify_write_access(self) -> bool:
+        """
+        Pre-flight test verifying whether write operations can be performed
+        on the SQLite file and destination directory.
+        """
+        if self.read_only:
+            self._write_verified = False
+            self._write_error_reason = "Database opened in strict read-only mode."
+            return False
+
+        try:
+            parent_dir = self.db_path.parent
+            if not parent_dir.exists():
+                parent_dir.mkdir(parents=True, exist_ok=True)
+
+            # Test directory write permission by writing a micro temp file
+            test_file = parent_dir / f".write_test_{os.getpid()}_{int(time.time() * 1000)}.tmp"
+            with open(test_file, "w") as f:
+                f.write("ok")
+            test_file.unlink(missing_ok=True)
+
+            # Test database file writability if it already exists
+            if self.db_path.exists() and not os.access(self.db_path, os.W_OK):
+                self._write_verified = False
+                self._write_error_reason = f"Database file {self.db_path} is write-protected."
+                logger.warning(self._write_error_reason)
+                return False
+
+            self._write_verified = True
+            self._write_error_reason = None
+            return True
+        except Exception as e:
+            self._write_verified = False
+            self._write_error_reason = str(e)
+            logger.warning("Database write access verification failed: %s", e)
+            return False
+
+    def is_write_enabled(self) -> bool:
+        """Returns True if database write logging is currently active."""
+        return self.write_enabled and not self.read_only and self._write_verified
+
+    def set_write_access(self, enabled: bool) -> bool:
+        """
+        Dynamically enables or disables write access to the database at runtime.
+        Returns the resulting effective write state.
+        """
+        if self.read_only:
+            logger.warning("Cannot enable write access: Database is in strict READ-ONLY mode.")
+            return False
+
+        if enabled:
+            if not self._write_verified:
+                if not self.verify_write_access():
+                    logger.warning("Cannot enable write access: %s", self._write_error_reason)
+                    return False
+            self.write_enabled = True
+        else:
+            self.write_enabled = False
+
+        logger.info("Database write access %s", "ENABLED" if self.write_enabled else "DISABLED")
+        return self.write_enabled
 
     def _init_database(self) -> None:
         """Create tables and indexes if they do not exist."""
-        conn = self._get_connection()
+        if self.read_only:
+            return
+
+        conn = self._get_connection(read_only=False)
         try:
             with conn:
                 conn.execute(
                     """
-                    CREATE TABLE IF NOT EXISTS trip_sessions (
-                        session_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    CREATE TABLE IF NOT EXISTS trip_sessions (\n                        session_id INTEGER PRIMARY KEY AUTOINCREMENT,
                         start_time REAL NOT NULL,
                         end_time REAL,
                         start_soc REAL,
@@ -180,9 +286,13 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def start_session(self, initial_soc: float = 100.0) -> int:
-        """Creates a new trip session."""
-        conn = self._get_connection()
+    def start_session(self, initial_soc: float = 100.0) -> Optional[int]:
+        """Creates a new trip session. Returns session_id or None if writes disabled."""
+        if not self.is_write_enabled():
+            logger.info("Skipping start_session: Database write access is disabled.")
+            return None
+
+        conn = self._get_connection(read_only=False)
         try:
             with conn:
                 cursor = conn.execute(
@@ -207,10 +317,10 @@ class DatabaseManager:
         energy_kwh: float,
     ) -> None:
         """Closes the current trip session with summary statistics."""
-        if self._current_session_id is None:
+        if self._current_session_id is None or not self.is_write_enabled():
             return
 
-        conn = self._get_connection()
+        conn = self._get_connection(read_only=False)
         try:
             with conn:
                 conn.execute(
@@ -240,17 +350,24 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def log_telemetry(self, record: TelemetryRecord) -> None:
+    def log_telemetry(self, record: TelemetryRecord) -> bool:
         """
         Enqueues a telemetry record for asynchronous batched persistence.
-        Non-blocking to ensure GUI / telemetry stream never stalls.
+        Returns True if queued, False if write access is disabled or queue is full.
         """
+        if not self.is_write_enabled():
+            return False
+
         try:
             self._queue.put_nowait((record, self._current_session_id))
+            return True
         except queue.Full:
             logger.warning("Telemetry log queue full, dropping record to protect main thread.")
+            return False
 
     def _start_writer(self) -> None:
+        if self.read_only:
+            return
         self._stop_event.clear()
         self._writer_thread = threading.Thread(
             target=self._worker_loop,
@@ -261,7 +378,7 @@ class DatabaseManager:
 
     def _worker_loop(self) -> None:
         """Background thread loop that drains the queue and writes in batches."""
-        conn = self._get_connection()
+        conn = self._get_connection(read_only=False)
         batch: List[Tuple] = []
         last_flush_time = time.time()
 
@@ -276,7 +393,6 @@ class DatabaseManager:
 
         while not self._stop_event.is_set() or not self._queue.empty():
             try:
-                # Wait for items with short timeout
                 try:
                     record, session_id = self._queue.get(timeout=0.2)
                     batch.append(record.to_row(session_id))
@@ -314,7 +430,7 @@ class DatabaseManager:
 
     def get_recent_telemetry(self, limit: int = 100) -> List[Dict[str, Any]]:
         """Retrieves recent telemetry entries for analysis or diagnostics."""
-        conn = self._get_connection()
+        conn = self._get_connection(read_only=True)
         try:
             cursor = conn.execute(
                 """
@@ -335,7 +451,7 @@ class DatabaseManager:
         if target_id is None:
             return None
 
-        conn = self._get_connection()
+        conn = self._get_connection(read_only=True)
         try:
             cursor = conn.execute(
                 """
@@ -355,6 +471,154 @@ class DatabaseManager:
             )
             row = cursor.fetchone()
             return dict(row) if row else None
+        finally:
+            conn.close()
+
+    def get_all_sessions(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Retrieves all trip sessions."""
+        conn = self._get_connection(read_only=True)
+        try:
+            cursor = conn.execute(
+                """
+                SELECT * FROM trip_sessions
+                ORDER BY session_id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+            return [dict(r) for r in cursor.fetchall()]
+        finally:
+            conn.close()
+
+    # -----------------------------------------------------------------
+    # Data Export and Dump Capabilities
+    # -----------------------------------------------------------------
+
+    def export_session_to_csv(self, session_id: int, output_path: Optional[str] = None) -> str:
+        """
+        Exports all telemetry rows for a given trip session to a CSV file.
+        Returns the output file path.
+        """
+        conn = self._get_connection(read_only=True)
+        try:
+            cursor = conn.execute(
+                """
+                SELECT * FROM telemetry_logs
+                WHERE session_id = ?
+                ORDER BY timestamp ASC
+                """,
+                (session_id,),
+            )
+            rows = cursor.fetchall()
+            if not rows:
+                raise ValueError(f"No telemetry logs found for session ID {session_id}")
+
+            columns = [desc[0] for desc in cursor.description]
+
+            if not output_path:
+                export_dir = self.db_path.parent / "exports"
+                export_dir.mkdir(parents=True, exist_ok=True)
+                output_path = str(export_dir / f"session_{session_id}_{int(time.time())}.csv")
+            else:
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+            with open(output_path, "w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow(columns)
+                for row in rows:
+                    writer.writerow(list(row))
+
+            logger.info("Exported session %d (%d rows) to %s", session_id, len(rows), output_path)
+            return output_path
+        finally:
+            conn.close()
+
+    def export_session_to_json(
+        self,
+        session_id: int,
+        output_path: Optional[str] = None,
+        indent: int = 2,
+    ) -> str:
+        """
+        Exports trip session metadata and its telemetry logs to a structured JSON file.
+        Returns the output file path.
+        """
+        conn = self._get_connection(read_only=True)
+        try:
+            # Session metadata
+            cur_sess = conn.execute(
+                "SELECT * FROM trip_sessions WHERE session_id = ?",
+                (session_id,),
+            )
+            sess_row = cur_sess.fetchone()
+            session_meta = dict(sess_row) if sess_row else {"session_id": session_id}
+
+            # Telemetry records
+            cur_logs = conn.execute(
+                """
+                SELECT * FROM telemetry_logs
+                WHERE session_id = ?
+                ORDER BY timestamp ASC
+                """,
+                (session_id,),
+            )
+            logs = []
+            for r in cur_logs.fetchall():
+                d = dict(r)
+                if "warnings" in d and isinstance(d["warnings"], str):
+                    try:
+                        d["warnings"] = json.loads(d["warnings"])
+                    except Exception:
+                        pass
+                logs.append(d)
+
+            export_data = {
+                "session": session_meta,
+                "record_count": len(logs),
+                "telemetry": logs,
+            }
+
+            if not output_path:
+                export_dir = self.db_path.parent / "exports"
+                export_dir.mkdir(parents=True, exist_ok=True)
+                output_path = str(export_dir / f"session_{session_id}_{int(time.time())}.json")
+            else:
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(export_data, f, indent=indent)
+
+            logger.info("Exported session %d JSON to %s", session_id, output_path)
+            return output_path
+        finally:
+            conn.close()
+
+    def export_all_sessions_summary_csv(self, output_path: Optional[str] = None) -> str:
+        """
+        Exports a summary of all trip sessions to a CSV file.
+        Returns the output file path.
+        """
+        conn = self._get_connection(read_only=True)
+        try:
+            cursor = conn.execute("SELECT * FROM trip_sessions ORDER BY session_id ASC")
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description] if cursor.description else []
+
+            if not output_path:
+                export_dir = self.db_path.parent / "exports"
+                export_dir.mkdir(parents=True, exist_ok=True)
+                output_path = str(export_dir / f"all_sessions_{int(time.time())}.csv")
+            else:
+                Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+            with open(output_path, "w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow(columns)
+                for row in rows:
+                    writer.writerow(list(row))
+
+            logger.info("Exported %d sessions to %s", len(rows), output_path)
+            return output_path
         finally:
             conn.close()
 

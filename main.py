@@ -3,7 +3,8 @@ Voltesse Dash - Main Application Entrypoint
 Orchestrates the SQLite database logger, multi-mode telemetry streams
 (CAN Bus Race Mode, Keyboard Game Simulation Mode, Autonomous Test Mode),
 and the PyQt6 driver cockpit GUI.
-Supports Automatic and Sequential Manual transmission switching.
+Supports Automatic and Sequential Manual transmission switching,
+as well as runtime write access controls and session export capabilities.
 """
 
 import argparse
@@ -38,18 +39,30 @@ class VoltesseApp:
         self.app = QApplication.instance() or QApplication(sys.argv)
         self.app.setApplicationName("Voltesse Dash")
 
-        # 1. Initialize SQLite Database Manager with asynchronous batched writes
+        # 1. Initialize SQLite Database Manager with write access controls
         logger.info("Initializing Database Manager at %s...", args.db_path)
+        read_only = getattr(args, "read_only", False)
+        no_logging = getattr(args, "no_logging", False)
+        write_enabled = (not read_only) and (not no_logging)
+
         self.db_manager = DatabaseManager(
             db_path=args.db_path,
             batch_size=args.batch_size,
             flush_interval_sec=args.flush_interval,
+            write_enabled=write_enabled,
+            read_only=read_only,
         )
         self.session_id = self.db_manager.start_session(initial_soc=88.5)
 
         # 2. Initialize Distraction-Free Cockpit GUI
         logger.info("Initializing Cockpit GUI...")
         self.gui = VoltesseDashboard()
+
+        # Reflect database write logging state on top HUD ribbon
+        self.gui.set_logging_state(
+            write_enabled=self.db_manager.is_write_enabled(),
+            read_only=self.db_manager.read_only,
+        )
 
         # Fullscreen by default as specified in design requirements
         if args.windowed:
@@ -88,6 +101,7 @@ class VoltesseApp:
         self.gui.transmission_toggle_requested.connect(self._toggle_transmission)
         self.gui.gear_up_requested.connect(self._shift_up)
         self.gui.gear_down_requested.connect(self._shift_down)
+        self.gui.logging_toggle_requested.connect(self._toggle_logging)
         self.gui.pause_requested.connect(self._toggle_pause)
 
         # Connect window close / application quit
@@ -168,77 +182,102 @@ class VoltesseApp:
             if not self.test_stream.isRunning():
                 self.test_stream.start()
 
-        # Update GUI mode badge & hotkey hints
+        # Inform GUI of operating mode change
         self.gui.set_operating_mode(mode)
 
     def _handle_sim_inputs(self, throttle: bool, brake: bool, steer_l: bool, steer_r: bool) -> None:
-        """Passes driver keyboard inputs to the simulation engine."""
+        """Dispatches active driving controls to simulation stream."""
         if self.current_mode == "SIMULATION":
-            self.sim_stream.set_inputs(throttle, brake, steer_l, steer_r)
+            self.sim_stream.set_inputs(
+                throttle=throttle,
+                brake=brake,
+                steer_left=steer_l,
+                steer_right=steer_r,
+            )
 
     def _cycle_drive_mode(self) -> None:
-        """Cycles vehicle drive modes (M key)."""
-        if self.current_mode == "SIMULATION":
+        """Cycles vehicle drive modes (ECO -> DRIVE -> SPORT)."""
+        if self.current_mode == "RACE":
+            new_mode = self.can_stream.cycle_drive_mode()
+            logger.info("Race CAN drive mode set to: %s", new_mode)
+        elif self.current_mode == "SIMULATION":
             new_mode = self.sim_stream.cycle_drive_mode()
-            logger.info("Sim drive mode changed to: %s", new_mode)
+            logger.info("Simulation drive mode set to: %s", new_mode)
         elif self.current_mode == "TEST":
             new_mode = self.test_stream.cycle_drive_mode()
-            logger.info("Test drive mode changed to: %s", new_mode)
-        elif self.current_mode == "RACE":
-            new_mode = self.can_stream.cycle_drive_mode()
-            logger.info("Race CAN drive mode changed to: %s", new_mode)
+            logger.info("Test drive mode set to: %s", new_mode)
 
     def _toggle_transmission(self) -> None:
-        """
-        Switches between AUTO and MANUAL transmission on all modes except TEST mode.
-        (Test mode is restricted to AUTO only).
-        """
-        if self.current_mode == "TEST":
+        """Toggles between AUTO and MANUAL transmission (restricted to Race and Sim modes)."""
+        if self.current_mode == "RACE":
+            new_mode = self.can_stream.toggle_transmission_mode()
+            logger.info("Race CAN transmission mode toggled to: %s", new_mode)
+        elif self.current_mode == "SIMULATION":
+            new_mode = self.sim_stream.toggle_transmission_mode()
+            logger.info("Simulation transmission mode toggled to: %s", new_mode)
+        elif self.current_mode == "TEST":
             logger.warning("Transmission toggle rejected: TEST mode is restricted to AUTO.")
-            return
-
-        if self.current_mode == "SIMULATION":
-            mode = self.sim_stream.toggle_transmission_mode()
-            logger.info("Simulation transmission mode toggled to: %s", mode)
-        elif self.current_mode == "RACE":
-            mode = self.can_stream.toggle_transmission_mode()
-            logger.info("Race CAN transmission mode toggled to: %s", mode)
 
     def _shift_up(self) -> None:
-        """Sequential upshift (E key)."""
-        if self.current_mode == "SIMULATION":
-            new_gear = self.sim_stream.shift_up()
-            logger.info("Sim shifted up to: %s", new_gear)
-        elif self.current_mode == "RACE":
+        """Shifts up sequentially in manual mode, or advances selector in auto mode."""
+        if self.current_mode == "RACE":
             new_gear = self.can_stream.shift_up()
             logger.info("Race CAN shifted up to: %s", new_gear)
+        elif self.current_mode == "SIMULATION":
+            new_gear = self.sim_stream.shift_up()
+            logger.info("Sim shifted up to: %s", new_gear)
         elif self.current_mode == "TEST":
             new_gear = self.test_stream.shift_up()
             logger.info("Test shifted up to: %s", new_gear)
 
     def _shift_down(self) -> None:
-        """Sequential downshift (C key)."""
-        if self.current_mode == "SIMULATION":
-            new_gear = self.sim_stream.shift_down()
-            logger.info("Sim shifted down to: %s", new_gear)
-        elif self.current_mode == "RACE":
+        """Shifts down sequentially in manual mode, or reverses selector in auto mode."""
+        if self.current_mode == "RACE":
             new_gear = self.can_stream.shift_down()
             logger.info("Race CAN shifted down to: %s", new_gear)
+        elif self.current_mode == "SIMULATION":
+            new_gear = self.sim_stream.shift_down()
+            logger.info("Sim shifted down to: %s", new_gear)
         elif self.current_mode == "TEST":
             new_gear = self.test_stream.shift_down()
             logger.info("Test shifted down to: %s", new_gear)
 
     def _shift_gear(self) -> None:
-        """Cycles gear forward (G key)."""
-        if self.current_mode == "SIMULATION":
-            new_gear = self.sim_stream.shift_gear()
-            logger.info("Sim gear shifted to: %s", new_gear)
-        elif self.current_mode == "RACE":
+        """Cycles gears forward (G key)."""
+        if self.current_mode == "RACE":
             new_gear = self.can_stream.shift_gear()
             logger.info("Race CAN gear shifted to: %s", new_gear)
+        elif self.current_mode == "SIMULATION":
+            new_gear = self.sim_stream.shift_gear()
+            logger.info("Sim gear shifted to: %s", new_gear)
         elif self.current_mode == "TEST":
             new_gear = self.test_stream.shift_gear()
             logger.info("Test gear shifted to: %s", new_gear)
+
+    def _toggle_logging(self) -> None:
+        """Toggles database write access on and off at runtime via hotkey L."""
+        if self.db_manager.read_only:
+            self.gui.status_badge.setText("⚠️ DATABASE IN READ-ONLY MODE")
+            self.gui.status_badge.setStyleSheet(
+                "background-color: rgba(255, 184, 0, 0.25); color: #FFB800; padding: 2px 8px; border-radius: 4px; font-weight: bold;"
+            )
+            return
+
+        current_state = self.db_manager.is_write_enabled()
+        new_state = self.db_manager.set_write_access(not current_state)
+        self.gui.set_logging_state(new_state, self.db_manager.read_only)
+        if new_state:
+            if self.db_manager._current_session_id is None:
+                self.session_id = self.db_manager.start_session(initial_soc=self._final_soc)
+            self.gui.status_badge.setText("DATABASE LOGGING ACTIVE")
+            self.gui.status_badge.setStyleSheet(
+                "background-color: rgba(0, 245, 160, 0.20); color: #00F5A0; padding: 2px 8px; border-radius: 4px; font-weight: bold;"
+            )
+        else:
+            self.gui.status_badge.setText("DATABASE LOGGING PAUSED")
+            self.gui.status_badge.setStyleSheet(
+                "background-color: rgba(255, 184, 0, 0.20); color: #FFB800; padding: 2px 8px; border-radius: 4px; font-weight: bold;"
+            )
 
     def _toggle_pause(self) -> None:
         """Pauses or resumes the active stream (Space key)."""
@@ -318,6 +357,35 @@ def parse_args() -> argparse.Namespace:
         help="Path to SQLite database file",
     )
     parser.add_argument(
+        "--read-only",
+        action="store_true",
+        help="Open SQLite database in strict read-only mode (disables session and telemetry writes)",
+    )
+    parser.add_argument(
+        "--no-logging",
+        action="store_true",
+        help="Launch with telemetry database logging disabled initially (toggleable via key L)",
+    )
+    parser.add_argument(
+        "--export-csv",
+        type=int,
+        metavar="SESSION_ID",
+        default=None,
+        help="Export a specific trip session to CSV and exit",
+    )
+    parser.add_argument(
+        "--export-json",
+        type=int,
+        metavar="SESSION_ID",
+        default=None,
+        help="Export a specific trip session to JSON and exit",
+    )
+    parser.add_argument(
+        "--export-summary",
+        action="store_true",
+        help="Export summary of all trip sessions to CSV and exit",
+    )
+    parser.add_argument(
         "--interval-ms",
         type=int,
         default=40,
@@ -348,6 +416,27 @@ def main() -> None:
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
     args = parse_args()
+
+    # Handle direct database export commands if requested
+    if args.export_csv is not None or args.export_json is not None or args.export_summary:
+        db = DatabaseManager(db_path=args.db_path, read_only=True)
+        try:
+            if args.export_csv is not None:
+                path = db.export_session_to_csv(args.export_csv)
+                print(f"Exported session {args.export_csv} to CSV: {path}")
+            if args.export_json is not None:
+                path = db.export_session_to_json(args.export_json)
+                print(f"Exported session {args.export_json} to JSON: {path}")
+            if args.export_summary:
+                path = db.export_all_sessions_summary_csv()
+                print(f"Exported all sessions summary to CSV: {path}")
+        except Exception as e:
+            print(f"Export failed: {e}")
+            sys.exit(1)
+        finally:
+            db.close()
+        sys.exit(0)
+
     voltesse_app = VoltesseApp(args)
     sys.exit(voltesse_app.start())
 

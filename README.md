@@ -15,8 +15,8 @@ A modern, high-contrast automotive digital cockpit instrument cluster and local 
 - 🏎️ **Tri-Mode Operating Architecture**: Instant switching between **Race Mode** (CAN bus), **Simulation Mode** (interactive keyboard video-game controls), and **Test Mode** (autonomous mock telemetry).
 - ⚙️ **Dynamic Automatic Gear Display (`D1`–`D6`)**: In Auto mode, vehicle speed dynamically drives active gear calculation across 6 EV gear ratios (`D1` to `D6`) displayed on the central capsule, gear status hub, and HUD ribbon.
 - 🕹️ **6-Speed Sequential Manual Transmission**: Driver-controlled shifting (`E` for upshift, `C` for downshift) covering gears `1`–`6`, `N`, and `R` in both Race and Simulation modes.
+- 💾 **Granular Database Write Access Controls**: Pre-flight write permission verification, runtime logging toggle (`L` key), strict read-only execution mode (`--read-only`), and direct session export to CSV and JSON.
 - 🖥️ **Variable Fullscreen Auto-Scaling Engine**: Native launch in borderless fullscreen with dynamic proportional scaling that adapts flawlessly across any aspect ratio and resolution (1024x600 RPi, 720p, 1080p, 1440p, 4K).
-- ⌨️ **Refined Keyboard Input Engine**: OS auto-repeat filtering (`isAutoRepeat`) on action keys to eliminate toggle bouncing, unified keypad/numpad and function key mappings, and synchronized CAN frame transmission.
 
 ---
 
@@ -46,11 +46,12 @@ A modern, high-contrast automotive digital cockpit instrument cluster and local 
     - Speedometer capsule dynamically reflects the active ratio: `[P] [R] [N] [D3] [B]`.
     - Prominent status hub pill: `AUTO • D3 (GEAR 3)`, `AUTO • PARK [P]`, `AUTO • REGEN [B]`, or `MANUAL • M4 (GEAR 4)`.
     - Top HUD Ribbon: Live `AUTO [D3]` or `MANUAL [M4]` mode badge.
-- **Robust Keyboard Handling & Input Responsiveness**:
-  - OS auto-repeat filtering (`event.isAutoRepeat()`) prevents rapid toggling/debouncing on action keys (`T`, `M`, `G`, `E`, `C`, `1`, `2`, `3`, `Tab`).
-  - Standard number row, function keys (`F1`–`F3`), and numeric keypad (`Numpad 1`–`3`) supported for instant mode switching.
-  - Synchronized CAN loopback mock transmitter ensures keyboard gear and transmission changes are not overwritten by background CAN frames in Race mode.
-  - Strong window focus policy and mouse click focus reclamation.
+- **Granular Database Write Access & Storage Controls**:
+  - **Pre-flight Write Verification**: Verifies directory existence and write permissions before logging.
+  - **Runtime Write Toggle (`L` key)**: Drivers can pause and resume database logging on the fly without stopping vehicle telemetry or restarting the dashboard.
+  - **Top Ribbon Status Indicator**: Live status badge shows `REC` (active writing), `LOG OFF` (writing paused), or `R/O` (strict read-only).
+  - **Strict Read-Only Enforcement (`--read-only`)**: Safe post-race diagnostics without modifying existing trip sessions or records.
+  - **Session Data Export**: Export trip sessions directly to CSV or structured JSON via CLI flags (`--export-csv`, `--export-json`, `--export-summary`).
 - **Fullscreen & Dynamic Auto-Scaling**:
   - Runs in **fullscreen mode by default** on launch.
   - All dial gauges, cards, fonts, battery arcs, TPMS silhouettes, and HUD ribbons dynamically auto-scale to fit any display resolution (1024x600, 720p, 1080p, 1440p, 4K) without vertical stretching.
@@ -72,17 +73,18 @@ A modern, high-contrast automotive digital cockpit instrument cluster and local 
 
 ```
 voltesse-dash/
-├── data/                      # Local SQLite databases (auto-created)
+├── data/                      # Local SQLite databases and session exports (auto-created)
+│   └── exports/               # Generated CSV & JSON trip session dumps
 ├── src/
 │   ├── __init__.py
 │   ├── can_bus_source.py      # CAN Bus interface, frame decoders, and synchronized mock transmitter
 │   ├── simulation_source.py   # Video-game interactive EV dynamics engine (W/A/S/D, 6-speed manual, D1-D6 auto)
 │   ├── telemetry_source.py    # Autonomous EV driving cycle telemetry stream (Test Mode, D1-D6 auto)
 │   ├── dashboard_gui.py       # PyQt6 digital cluster interface & auto-scaling widgets
-│   └── database.py            # SQLite schema, migrations, and batched async writer
+│   └── database.py            # SQLite schema, write access controls, and session export engine
 ├── tests/
-│   └── test_voltesse.py       # Comprehensive unit and integration test suite (11 tests)
-├── main.py                    # Application lifecycle, transmission, keyboard router, and mode controller
+│   └── test_voltesse.py       # Comprehensive unit and integration test suite (16 tests)
+├── main.py                    # Application lifecycle, transmission, and mode controller
 ├── requirements.txt           # Python dependencies (PyQt6, python-can)
 ├── AGENTS.md                  # Embedded developer rules, architecture contracts & specifications
 └── README.md                  # Project documentation
@@ -102,6 +104,7 @@ voltesse-dash/
 | `E` | **Upshift** (`1` ➔ `6` in Manual, or selector in Auto) | Global |
 | `C` | **Downshift** (`6` ➔ `1` ➔ `N` ➔ `R` in Manual, or selector in Auto) | Global |
 | `G` | Cycle Gear (`P-R-N-D-B` in Auto, Upshift in Manual) | Global |
+| `L` | **Toggle Database Logging / Write Access** (`REC` ⮂ `LOG OFF`) | Global |
 | `W` / `Up Arrow` | Accelerate (Throttle ramp-up) | Simulation Mode |
 | `S` / `Down Arrow` | Brake (Regen & Friction brake) | Simulation Mode |
 | `A` / `Left Arrow` | Steer Left | Simulation Mode |
@@ -144,12 +147,38 @@ python main.py
 # Launch in windowed development mode with interactive simulation
 python main.py --windowed --mode SIMULATION
 
-# Launch in Race Mode with synchronized mock CAN frame transmitter
+# Launch with database logging initially paused (toggle on with key L)
+python main.py --no-logging
+
+# Launch in strict read-only database mode (disables session and telemetry writes)
+python main.py --read-only
+
+# Launch in Race Mode with mock CAN frame transmitter
 python main.py --can-mock
 
 # Launch with custom CAN interface (e.g., Linux SocketCAN)
 python main.py --can-interface socketcan --can-channel can0
 ```
+
+### 4. Database Export & Inspection Tools
+
+You can export session logs directly from the command-line without launching the GUI:
+
+```bash
+# Export summary of all trip sessions to CSV
+python main.py --export-summary
+
+# Export specific trip session (e.g. Session 1) to CSV
+python main.py --export-csv 1
+
+# Export specific trip session to structured JSON
+python main.py --export-json 1
+
+# Export from a custom database location
+python main.py --db-path data/voltesse_telemetry.db --export-csv 1
+```
+
+Generated files are saved directly to `data/exports/`.
 
 #### Command-Line Options
 
@@ -157,6 +186,11 @@ python main.py --can-interface socketcan --can-channel can0
 | :--- | :--- | :--- |
 | `--mode` | `RACE` | Initial telemetry mode (`RACE`, `SIMULATION`, `TEST`) |
 | `--windowed` | `False` | Run in windowed mode (default is fullscreen) |
+| `--read-only` | `False` | Open SQLite database in strict read-only mode |
+| `--no-logging`| `False` | Launch with database writing paused (toggleable with `L`) |
+| `--export-csv` | `None` | Export a specific trip session ID to CSV and exit |
+| `--export-json`| `None` | Export a specific trip session ID to JSON and exit |
+| `--export-summary`| `False` | Export summary of all trip sessions to CSV and exit |
 | `--can-interface` | `None` | CAN driver (`socketcan`, `virtual`, `pcan`, etc.) |
 | `--can-channel` | `None` | CAN channel name (e.g., `can0`, `vcan0`) |
 | `--can-mock` | `False` | Enable background mock CAN frame broadcaster for bench testing |
