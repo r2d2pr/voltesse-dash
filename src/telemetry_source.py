@@ -1,7 +1,8 @@
 """
-Voltesse Dash - Mock Telemetry Stream
-Asynchronous telemetry generator with realistic EV powertrain dynamics simulation.
-Runs on a dedicated QThread to prevent any blocking of the GUI main thread.
+Voltesse Dash - Autonomous Mock Telemetry Stream (Test Mode)
+Simulates dynamic in-vehicle EV sensor metrics across acceleration,
+braking, cruising, and thermal stress scenarios without hardware dependencies.
+Operates exclusively in Automatic transmission mode.
 """
 
 import math
@@ -16,20 +17,19 @@ from src.database import TelemetryRecord
 
 class MockTelemetryStream(QThread):
     """
-    Simulates real-time EV telemetry data asynchronously.
-    Emits TelemetryRecord objects over Qt signals at a specified frequency.
+    Background QThread emitting realistic simulated EV telemetry records
+    at a fixed update frequency (default: 25 Hz / 40ms).
     """
 
-    # Signal emitted on every new telemetry packet
     telemetry_received = pyqtSignal(TelemetryRecord)
     status_changed = pyqtSignal(str)
 
-    # Simulation modes
-    MODES = ["ECO", "DRIVE", "SPORT"]
+    MODES = ["DRIVE", "SPORT", "ECO"]
+    GEARS_AUTO = ["P", "R", "N", "D", "B"]
 
     def __init__(
         self,
-        update_interval_ms: int = 50,  # 20 Hz
+        update_interval_ms: int = 40,
         parent: Optional[QObject] = None,
     ):
         super().__init__(parent)
@@ -37,7 +37,7 @@ class MockTelemetryStream(QThread):
         self._running = False
         self._paused = False
 
-        # Vehicle State Variables
+        # Internal state machine variables
         self.speed_kmh = 0.0
         self.target_speed = 0.0
         self.motor_rpm = 0
@@ -50,8 +50,11 @@ class MockTelemetryStream(QThread):
         self.inverter_temp_c = 33.8  # °C
         self.throttle_pct = 0.0  # %
         self.brake_pct = 0.0  # %
+        self.steering_angle = 0.0  # deg
         self.drive_mode = "DRIVE"
         self.trip_distance_km = 0.0
+        self.current_gear = "D1"
+        self.transmission_mode = "AUTO"
 
         # State machine for dynamic driving cycle simulation
         self._sim_state = "ACCELERATING"
@@ -105,6 +108,53 @@ class MockTelemetryStream(QThread):
         self.drive_mode = self.MODES[next_idx]
         return self.drive_mode
 
+    def get_auto_gear_for_speed(self, speed_kmh: float) -> int:
+        """Computes active automatic gear (1-6) from vehicle velocity."""
+        if speed_kmh < 25.0:
+            return 1
+        elif speed_kmh < 50.0:
+            return 2
+        elif speed_kmh < 78.0:
+            return 3
+        elif speed_kmh < 110.0:
+            return 4
+        elif speed_kmh < 145.0:
+            return 5
+        else:
+            return 6
+
+    def shift_gear(self, gear: Optional[str] = None) -> str:
+        """Cycles forward through automatic gear positions or sets specific gear."""
+        if gear:
+            if gear == "D":
+                self.current_gear = f"D{self.get_auto_gear_for_speed(self.speed_kmh)}"
+            else:
+                self.current_gear = gear
+            return self.current_gear
+        base_g = self.current_gear[0] if self.current_gear else "D"
+        curr_idx = self.GEARS_AUTO.index(base_g) if base_g in self.GEARS_AUTO else 3
+        next_g = self.GEARS_AUTO[(curr_idx + 1) % len(self.GEARS_AUTO)]
+        self.current_gear = f"D{self.get_auto_gear_for_speed(self.speed_kmh)}" if next_g == "D" else next_g
+        return self.current_gear
+
+    def shift_up(self) -> str:
+        """Upshifts / advances selector in automatic mode."""
+        base_g = self.current_gear[0] if self.current_gear else "D"
+        curr_idx = self.GEARS_AUTO.index(base_g) if base_g in self.GEARS_AUTO else 3
+        if curr_idx < len(self.GEARS_AUTO) - 1:
+            next_g = self.GEARS_AUTO[curr_idx + 1]
+            self.current_gear = f"D{self.get_auto_gear_for_speed(self.speed_kmh)}" if next_g == "D" else next_g
+        return self.current_gear
+
+    def shift_down(self) -> str:
+        """Downshifts / reverses selector in automatic mode."""
+        base_g = self.current_gear[0] if self.current_gear else "D"
+        curr_idx = self.GEARS_AUTO.index(base_g) if base_g in self.GEARS_AUTO else 3
+        if curr_idx > 0:
+            prev_g = self.GEARS_AUTO[curr_idx - 1]
+            self.current_gear = f"D{self.get_auto_gear_for_speed(self.speed_kmh)}" if prev_g == "D" else prev_g
+        return self.current_gear
+
     def _step_simulation(self, dt: float) -> None:
         """Simulates physical EV dynamics for elapsed time dt."""
         self._cycle_time += dt
@@ -121,29 +171,36 @@ class MockTelemetryStream(QThread):
             target_brake = 0.0
             max_spd = 95.0 if self.drive_mode == "ECO" else 135.0
             self.target_speed = min(max_spd, self.target_speed + 25.0 * dt)
+            self.steering_angle = 3.0 * math.sin(self._cycle_time * 0.5)
         elif self._sim_state == "HARD_ACCEL":
             target_throttle = 98.0
             target_brake = 0.0
             self.target_speed = 155.0
+            self.steering_angle = 1.0 * math.sin(self._cycle_time * 0.3)
         elif self._sim_state == "CRUISING":
             target_throttle = 18.0 + 3.0 * math.sin(self._cycle_time * 0.8)
             target_brake = 0.0
             self.target_speed = 75.0 + 10.0 * math.sin(self._cycle_time * 0.4)
+            self.steering_angle = 7.0 * math.sin(self._cycle_time * 0.4)
         elif self._sim_state == "REGEN_BRAKING":
             target_throttle = 0.0
             target_brake = 45.0
             self.target_speed = max(0.0, self.target_speed - 35.0 * dt)
+            self.steering_angle = 2.0 * math.sin(self._cycle_time * 0.6)
         elif self._sim_state == "COASTING":
             target_throttle = 0.0
             target_brake = 0.0
             self.target_speed = max(0.0, self.target_speed - 8.0 * dt)
+            self.steering_angle = 4.0 * math.sin(self._cycle_time * 0.3)
         elif self._sim_state == "STOPPED":
             target_throttle = 0.0
             target_brake = 15.0
             self.target_speed = 0.0
+            self.steering_angle = 0.0
         else:
             target_throttle = 10.0
             target_brake = 0.0
+            self.steering_angle = 0.0
 
         # Smooth throttle / brake response
         smooth_rate = 6.0 * dt
@@ -159,7 +216,7 @@ class MockTelemetryStream(QThread):
         net_accel = drive_force - brake_force - drag_force
         self.speed_kmh = max(0.0, self.speed_kmh + net_accel * dt)
 
-        # Motor RPM calculation (assuming 8.5:1 reduction gear ratio and ~0.55m wheel)
+        # Motor RPM calculation
         rpm_factor = 78.5
         self.motor_rpm = int(self.speed_kmh * rpm_factor + random.uniform(-15, 15))
         if self.speed_kmh < 0.5:
@@ -167,46 +224,35 @@ class MockTelemetryStream(QThread):
 
         # Current & Power calculations
         if self.throttle_pct > 2.0:
-            # Drawing power from battery (discharge)
             base_draw = (self.throttle_pct / 100.0) * 260.0 * accel_multiplier
             self.battery_current = base_draw + random.uniform(-1.5, 1.5)
         elif self.brake_pct > 2.0 and self.speed_kmh > 5.0:
-            # Regenerative braking (recharging battery)
             regen_max = -75.0 if self.drive_mode != "ECO" else -95.0
             self.battery_current = (self.brake_pct / 100.0) * regen_max + random.uniform(-1.0, 1.0)
         else:
-            # Idle / auxiliary electronics draw (HVAC, pumps, Dash)
             self.battery_current = 2.4 + random.uniform(-0.3, 0.3)
 
-        # Voltage sag under load
         nominal_pack_v = 400.0
-        internal_resistance = 0.045  # Ohms
-        soc_factor = (self.battery_soc / 100.0) * 25.0  # Voltage drops as SoC drops
+        internal_resistance = 0.045
+        soc_factor = (self.battery_soc / 100.0) * 25.0
         self.battery_voltage = (nominal_pack_v - 25.0 + soc_factor) - (self.battery_current * internal_resistance)
-
-        # Instantaneous Power (kW)
         self.battery_power_kw = (self.battery_voltage * self.battery_current) / 1000.0
 
-        # SoC Depletion / Regen Integration
-        # Energy = Power * dt hours
         energy_kwh = (self.battery_power_kw * (dt / 3600.0))
-        pack_capacity_kwh = 60.0  # 60 kWh pack
+        pack_capacity_kwh = 60.0
         soc_delta = (energy_kwh / pack_capacity_kwh) * 100.0
         self.battery_soc = max(1.0, min(100.0, self.battery_soc - soc_delta))
 
-        # Thermal dynamics (gradual thermal inertia)
+        # Thermals
         ambient_temp = 24.0
-        # Inverter heats with current magnitude
         inverter_heat = (abs(self.battery_current) / 250.0) ** 1.8 * 8.0 * dt
         inverter_cool = (self.inverter_temp_c - ambient_temp) * 0.015 * dt
         self.inverter_temp_c = max(ambient_temp, self.inverter_temp_c + inverter_heat - inverter_cool)
 
-        # Motor heats with RPM & torque
         motor_heat = ((self.motor_rpm / 9000.0) * 3.0 + (self.throttle_pct / 100.0) * 6.0) * dt
         motor_cool = (self.motor_temp_c - ambient_temp) * 0.02 * (1.0 + self.speed_kmh / 60.0) * dt
         self.motor_temp_c = max(ambient_temp, self.motor_temp_c + motor_heat - motor_cool)
 
-        # Battery temp changes slowly
         batt_heat = ((abs(self.battery_current) / 200.0) ** 2) * 1.5 * dt
         batt_cool = (self.battery_temp_c - ambient_temp) * 0.005 * dt
         self.battery_temp_c = max(ambient_temp, self.battery_temp_c + batt_heat - batt_cool)
@@ -215,12 +261,20 @@ class MockTelemetryStream(QThread):
         dist_delta_km = (self.speed_kmh * dt) / 3600.0
         self.trip_distance_km += dist_delta_km
 
+        # Determine automatic gear (e.g. P, B, or D1 through D6)
+        if self.speed_kmh < 0.2 and self.brake_pct > 10.0:
+            self.current_gear = "P"
+        elif self.speed_kmh > 0.5 and self.battery_power_kw < -15.0:
+            self.current_gear = "B"
+        elif self.current_gear.startswith("D") or self.current_gear == "D":
+            auto_gear = self.get_auto_gear_for_speed(self.speed_kmh)
+            self.current_gear = f"D{auto_gear}"
+
     def _transition_state(self) -> None:
         """Cycle through realistic drive phases."""
         states = ["ACCELERATING", "CRUISING", "HARD_ACCEL", "COASTING", "REGEN_BRAKING", "STOPPED"]
         weights = [0.30, 0.30, 0.10, 0.12, 0.13, 0.05]
 
-        # Prevent stopping if we just stopped
         if self._sim_state == "STOPPED":
             self._sim_state = "ACCELERATING"
             self._state_duration = random.uniform(5.0, 9.0)
@@ -259,4 +313,7 @@ class MockTelemetryStream(QThread):
             drive_mode=self.drive_mode,
             trip_distance_km=round(self.trip_distance_km, 2),
             warnings=warnings,
+            steering_angle=round(self.steering_angle, 1),
+            gear=self.current_gear,
+            transmission_mode="AUTO",
         )

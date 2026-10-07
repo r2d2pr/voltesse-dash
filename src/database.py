@@ -34,6 +34,9 @@ class TelemetryRecord:
     drive_mode: str
     trip_distance_km: float
     warnings: List[str]
+    steering_angle: float = 0.0
+    gear: str = "D"
+    transmission_mode: str = "AUTO"
 
     def to_row(self, session_id: Optional[int] = None) -> Tuple:
         warnings_json = json.dumps(self.warnings)
@@ -54,6 +57,9 @@ class TelemetryRecord:
             self.drive_mode,
             self.trip_distance_km,
             warnings_json,
+            self.steering_angle,
+            self.gear,
+            self.transmission_mode,
         )
 
 
@@ -144,10 +150,24 @@ class DatabaseManager:
                         drive_mode TEXT NOT NULL,
                         trip_distance_km REAL NOT NULL,
                         warnings TEXT,
+                        steering_angle REAL DEFAULT 0.0,
+                        gear TEXT DEFAULT 'D',
+                        transmission_mode TEXT DEFAULT 'AUTO',
                         FOREIGN KEY(session_id) REFERENCES trip_sessions(session_id) ON DELETE SET NULL
                     );
                     """
                 )
+
+                # Migration checks for existing databases
+                for col_name, col_type in [
+                    ("steering_angle", "REAL DEFAULT 0.0"),
+                    ("gear", "TEXT DEFAULT 'D'"),
+                    ("transmission_mode", "TEXT DEFAULT 'AUTO'"),
+                ]:
+                    try:
+                        conn.execute(f"ALTER TABLE telemetry_logs ADD COLUMN {col_name} {col_type};")
+                    except sqlite3.OperationalError:
+                        pass
 
                 # Indexes for fast querying and time-range filtering
                 conn.execute(
@@ -250,8 +270,8 @@ class DatabaseManager:
                 timestamp, session_id, speed_kmh, motor_rpm, battery_soc,
                 battery_voltage, battery_current, battery_power_kw, battery_temp_c,
                 motor_temp_c, inverter_temp_c, throttle_pct, brake_pct,
-                drive_mode, trip_distance_km, warnings
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                drive_mode, trip_distance_km, warnings, steering_angle, gear, transmission_mode
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         while not self._stop_event.is_set() or not self._queue.empty():

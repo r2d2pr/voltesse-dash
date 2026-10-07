@@ -1,7 +1,9 @@
 """
 Voltesse Dash - Main Application Entrypoint
-Orchestrates the SQLite database logger, asynchronous mock telemetry stream,
+Orchestrates the SQLite database logger, multi-mode telemetry streams
+(CAN Bus Race Mode, Keyboard Game Simulation Mode, Autonomous Test Mode),
 and the PyQt6 driver cockpit GUI.
+Supports Automatic and Sequential Manual transmission switching.
 """
 
 import argparse
@@ -13,8 +15,10 @@ from typing import Optional
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
 
+from src.can_bus_source import CANTelemetrySource
 from src.dashboard_gui import VoltesseDashboard
 from src.database import DatabaseManager
+from src.simulation_source import SimulationTelemetryStream
 from src.telemetry_source import MockTelemetryStream
 
 # Configure structured logging
@@ -27,15 +31,15 @@ logger = logging.getLogger("voltesse.main")
 
 
 class VoltesseApp:
-    """Application Controller managing lifecycle and signal connections."""
+    """Application Controller managing lifecycle, operating modes, and signal routing."""
 
     def __init__(self, args: argparse.Namespace):
         self.args = args
-        self.app = QApplication(sys.argv)
+        self.app = QApplication.instance() or QApplication(sys.argv)
         self.app.setApplicationName("Voltesse Dash")
 
         # 1. Initialize SQLite Database Manager with asynchronous batched writes
-        logger.info("Initializing Database Manager...")
+        logger.info("Initializing Database Manager at %s...", args.db_path)
         self.db_manager = DatabaseManager(
             db_path=args.db_path,
             batch_size=args.batch_size,
@@ -46,26 +50,44 @@ class VoltesseApp:
         # 2. Initialize Distraction-Free Cockpit GUI
         logger.info("Initializing Cockpit GUI...")
         self.gui = VoltesseDashboard()
-        if args.fullscreen:
-            self.gui.showFullScreen()
-        else:
-            self.gui.show()
 
-        # 3. Initialize Asynchronous Mock Telemetry Stream (QThread)
-        logger.info("Initializing Mock Telemetry Stream...")
-        self.telemetry_stream = MockTelemetryStream(
+        # Fullscreen by default as specified in design requirements
+        if args.windowed:
+            logger.info("Launching in windowed development mode...")
+            self.gui.show()
+        else:
+            logger.info("Launching in fullscreen cockpit mode...")
+            self.gui.showFullScreen()
+
+        # 3. Initialize Three Telemetry Sources
+        logger.info("Initializing Telemetry Sources (Race CAN, Game Sim, Test Autonomous)...")
+        # Mode 1: Default Race Mode (CAN Bus only)
+        self.can_stream = CANTelemetrySource(
+            interface=args.can_interface,
+            channel=args.can_channel,
+            enable_mock_bus=args.can_mock,
+        )
+
+        # Mode 2: Interactive Video-Game Simulation Mode
+        self.sim_stream = SimulationTelemetryStream(
             update_interval_ms=args.interval_ms
         )
 
-        # 4. Wire Signals & Slots
-        # Connect telemetry stream to GUI (runs on UI thread via Qt signal-slot)
-        self.telemetry_stream.telemetry_received.connect(self.gui.update_telemetry)
+        # Mode 3: Test Mode (Autonomous mock telemetry stream)
+        self.test_stream = MockTelemetryStream(
+            update_interval_ms=args.interval_ms
+        )
 
-        # Connect telemetry stream to SQLite batched logger
-        self.telemetry_stream.telemetry_received.connect(self.db_manager.log_telemetry)
+        self.current_mode: Optional[str] = None
 
-        # Connect bench-test interactive signals
+        # 4. Wire Interactive Signals from GUI
+        self.gui.mode_switch_requested.connect(self.switch_mode)
+        self.gui.simulation_input_changed.connect(self._handle_sim_inputs)
         self.gui.drive_mode_requested.connect(self._cycle_drive_mode)
+        self.gui.gear_shift_requested.connect(self._shift_gear)
+        self.gui.transmission_toggle_requested.connect(self._toggle_transmission)
+        self.gui.gear_up_requested.connect(self._shift_up)
+        self.gui.gear_down_requested.connect(self._shift_down)
         self.gui.pause_requested.connect(self._toggle_pause)
 
         # Connect window close / application quit
@@ -75,15 +97,160 @@ class VoltesseApp:
         self._max_speed = 0.0
         self._total_distance = 0.0
         self._final_soc = 88.5
-        self.telemetry_stream.telemetry_received.connect(self._track_stats)
+
+        # 5. Activate Default Mode (Default: RACE)
+        initial_mode = args.mode.upper() if args.mode else "RACE"
+        self.switch_mode(initial_mode)
+
+    def switch_mode(self, mode: str) -> None:
+        """
+        Dynamically transitions between the three telemetry modes:
+        - RACE: CAN Bus direct
+        - SIMULATION: Interactive video game controls
+        - TEST: Autonomous mock stream
+        """
+        if mode == self.current_mode:
+            return
+
+        logger.info("Switching operating mode to: %s", mode)
+
+        # Disconnect and pause previous active stream
+        if self.current_mode == "RACE":
+            try:
+                self.can_stream.telemetry_received.disconnect(self.gui.update_telemetry)
+                self.can_stream.telemetry_received.disconnect(self.db_manager.log_telemetry)
+                self.can_stream.telemetry_received.disconnect(self._track_stats)
+            except Exception:
+                pass
+            if self.can_stream.isRunning():
+                self.can_stream.stop()
+
+        elif self.current_mode == "SIMULATION":
+            try:
+                self.sim_stream.telemetry_received.disconnect(self.gui.update_telemetry)
+                self.sim_stream.telemetry_received.disconnect(self.db_manager.log_telemetry)
+                self.sim_stream.telemetry_received.disconnect(self._track_stats)
+            except Exception:
+                pass
+            if self.sim_stream.isRunning():
+                self.sim_stream.stop()
+
+        elif self.current_mode == "TEST":
+            try:
+                self.test_stream.telemetry_received.disconnect(self.gui.update_telemetry)
+                self.test_stream.telemetry_received.disconnect(self.db_manager.log_telemetry)
+                self.test_stream.telemetry_received.disconnect(self._track_stats)
+            except Exception:
+                pass
+            if self.test_stream.isRunning():
+                self.test_stream.stop()
+
+        # Connect and start the new active stream
+        self.current_mode = mode
+        if mode == "RACE":
+            self.can_stream.telemetry_received.connect(self.gui.update_telemetry)
+            self.can_stream.telemetry_received.connect(self.db_manager.log_telemetry)
+            self.can_stream.telemetry_received.connect(self._track_stats)
+            if not self.can_stream.isRunning():
+                self.can_stream.start()
+
+        elif mode == "SIMULATION":
+            self.sim_stream.telemetry_received.connect(self.gui.update_telemetry)
+            self.sim_stream.telemetry_received.connect(self.db_manager.log_telemetry)
+            self.sim_stream.telemetry_received.connect(self._track_stats)
+            if not self.sim_stream.isRunning():
+                self.sim_stream.start()
+
+        elif mode == "TEST":
+            self.test_stream.telemetry_received.connect(self.gui.update_telemetry)
+            self.test_stream.telemetry_received.connect(self.db_manager.log_telemetry)
+            self.test_stream.telemetry_received.connect(self._track_stats)
+            if not self.test_stream.isRunning():
+                self.test_stream.start()
+
+        # Update GUI mode badge & hotkey hints
+        self.gui.set_operating_mode(mode)
+
+    def _handle_sim_inputs(self, throttle: bool, brake: bool, steer_l: bool, steer_r: bool) -> None:
+        """Passes driver keyboard inputs to the simulation engine."""
+        if self.current_mode == "SIMULATION":
+            self.sim_stream.set_inputs(throttle, brake, steer_l, steer_r)
 
     def _cycle_drive_mode(self) -> None:
-        new_mode = self.telemetry_stream.cycle_drive_mode()
-        logger.info("Drive mode changed to: %s", new_mode)
+        """Cycles vehicle drive modes (M key)."""
+        if self.current_mode == "SIMULATION":
+            new_mode = self.sim_stream.cycle_drive_mode()
+            logger.info("Sim drive mode changed to: %s", new_mode)
+        elif self.current_mode == "TEST":
+            new_mode = self.test_stream.cycle_drive_mode()
+            logger.info("Test drive mode changed to: %s", new_mode)
+        elif self.current_mode == "RACE":
+            new_mode = self.can_stream.cycle_drive_mode()
+            logger.info("Race CAN drive mode changed to: %s", new_mode)
+
+    def _toggle_transmission(self) -> None:
+        """
+        Switches between AUTO and MANUAL transmission on all modes except TEST mode.
+        (Test mode is restricted to AUTO only).
+        """
+        if self.current_mode == "TEST":
+            logger.warning("Transmission toggle rejected: TEST mode is restricted to AUTO.")
+            return
+
+        if self.current_mode == "SIMULATION":
+            mode = self.sim_stream.toggle_transmission_mode()
+            logger.info("Simulation transmission mode toggled to: %s", mode)
+        elif self.current_mode == "RACE":
+            mode = self.can_stream.toggle_transmission_mode()
+            logger.info("Race CAN transmission mode toggled to: %s", mode)
+
+    def _shift_up(self) -> None:
+        """Sequential upshift (E key)."""
+        if self.current_mode == "SIMULATION":
+            new_gear = self.sim_stream.shift_up()
+            logger.info("Sim shifted up to: %s", new_gear)
+        elif self.current_mode == "RACE":
+            new_gear = self.can_stream.shift_up()
+            logger.info("Race CAN shifted up to: %s", new_gear)
+        elif self.current_mode == "TEST":
+            new_gear = self.test_stream.shift_up()
+            logger.info("Test shifted up to: %s", new_gear)
+
+    def _shift_down(self) -> None:
+        """Sequential downshift (C key)."""
+        if self.current_mode == "SIMULATION":
+            new_gear = self.sim_stream.shift_down()
+            logger.info("Sim shifted down to: %s", new_gear)
+        elif self.current_mode == "RACE":
+            new_gear = self.can_stream.shift_down()
+            logger.info("Race CAN shifted down to: %s", new_gear)
+        elif self.current_mode == "TEST":
+            new_gear = self.test_stream.shift_down()
+            logger.info("Test shifted down to: %s", new_gear)
+
+    def _shift_gear(self) -> None:
+        """Cycles gear forward (G key)."""
+        if self.current_mode == "SIMULATION":
+            new_gear = self.sim_stream.shift_gear()
+            logger.info("Sim gear shifted to: %s", new_gear)
+        elif self.current_mode == "RACE":
+            new_gear = self.can_stream.shift_gear()
+            logger.info("Race CAN gear shifted to: %s", new_gear)
+        elif self.current_mode == "TEST":
+            new_gear = self.test_stream.shift_gear()
+            logger.info("Test gear shifted to: %s", new_gear)
 
     def _toggle_pause(self) -> None:
-        is_paused = self.telemetry_stream.toggle_pause()
-        logger.info("Telemetry stream paused: %s", is_paused)
+        """Pauses or resumes the active stream (Space key)."""
+        if self.current_mode == "RACE":
+            p = self.can_stream.toggle_pause()
+            logger.info("CAN stream paused: %s", p)
+        elif self.current_mode == "SIMULATION":
+            p = self.sim_stream.toggle_pause()
+            logger.info("Simulation stream paused: %s", p)
+        elif self.current_mode == "TEST":
+            p = self.test_stream.toggle_pause()
+            logger.info("Test stream paused: %s", p)
 
     def _track_stats(self, record) -> None:
         if record.speed_kmh > self._max_speed:
@@ -92,19 +259,17 @@ class VoltesseApp:
         self._final_soc = record.battery_soc
 
     def start(self) -> int:
-        """Starts background telemetry stream and enters Qt event loop."""
-        logger.info("Starting telemetry stream QThread...")
-        self.telemetry_stream.start()
-
-        logger.info("Voltesse Dash started successfully.")
+        """Enters Qt event loop."""
+        logger.info("Voltesse Dash started successfully in %s mode.", self.current_mode)
         return self.app.exec()
 
     def shutdown(self) -> None:
         """Clean shutdown handler ensuring threads and DB connections flush."""
         logger.info("Shutting down Voltesse Dash...")
 
-        if self.telemetry_stream.isRunning():
-            self.telemetry_stream.stop()
+        for stream in (self.can_stream, self.sim_stream, self.test_stream):
+            if stream.isRunning():
+                stream.stop()
 
         # Complete trip session in database
         self.db_manager.end_session(
@@ -123,6 +288,30 @@ class VoltesseApp:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Voltesse Dash Embedded Telemetry Cockpit")
     parser.add_argument(
+        "--mode",
+        type=str,
+        default="RACE",
+        choices=["RACE", "SIMULATION", "TEST"],
+        help="Initial telemetry operating mode (default: RACE - CAN Bus)",
+    )
+    parser.add_argument(
+        "--can-interface",
+        type=str,
+        default=None,
+        help="CAN interface driver (e.g. socketcan, virtual, pcan)",
+    )
+    parser.add_argument(
+        "--can-channel",
+        type=str,
+        default=None,
+        help="CAN channel name (e.g. can0, vcan0)",
+    )
+    parser.add_argument(
+        "--can-mock",
+        action="store_true",
+        help="Enable mock CAN transmitter for bench testing without live vehicle ECU",
+    )
+    parser.add_argument(
         "--db-path",
         type=str,
         default="data/voltesse_telemetry.db",
@@ -131,8 +320,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--interval-ms",
         type=int,
-        default=50,
-        help="Telemetry poll interval in milliseconds (default: 50ms = 20Hz)",
+        default=40,
+        help="Telemetry poll interval in milliseconds (default: 40ms = 25Hz)",
     )
     parser.add_argument(
         "--batch-size",
@@ -147,9 +336,9 @@ def parse_args() -> argparse.Namespace:
         help="Max time in seconds between database batch commits",
     )
     parser.add_argument(
-        "--fullscreen",
+        "--windowed",
         action="store_true",
-        help="Launch in fullscreen mode (recommended for embedded display)",
+        help="Launch in windowed mode rather than fullscreen (default: fullscreen)",
     )
     return parser.parse_args()
 
