@@ -1,6 +1,6 @@
-# Voltesse Dash ⚡ v2.0.1
+# Voltesse Dash ⚡ v2.0.2
 
-[![Version](https://img.shields.io/badge/version-2.0.1-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
+[![Version](https://img.shields.io/badge/version-2.0.2-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/PyQt-6-green.svg)](https://riverbankcomputing.com/software/pyqt/)
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
@@ -10,7 +10,10 @@ A modern, high-contrast automotive digital cockpit instrument cluster and local 
 
 ---
 
-## What's New in Version 2.0.1 🚀
+## What's New in Version 2.0.2 🚀
+
+- 🌐 **Dual Metric & Imperial Unit System**: Seamless runtime switching between **Metric** (`km/h`, `km`, `°C`, `bar`, `Nm`) and **Imperial** (`mph`, `mi`, `°F`, `psi`, `lb-ft`) across all modes via hotkey `U` or CLI flag `--imperial`.
+- 🕒 **12-Hour AM/PM Automotive Clock**: High-visibility digital clock in the top HUD ribbon formatted in 12-hour AM/PM (`hh:mm:ss AM/PM`) with live 1-second precision across all modes.
 
 - 🏎️ **Tri-Mode Operating Architecture**: Instant switching between **Race Mode** (CAN bus), **Simulation Mode** (interactive keyboard video-game controls), and **Test Mode** (autonomous mock telemetry).
 - ⚙️ **Dynamic Automatic Gear Display (`D1`–`D6`)**: In Auto mode, vehicle speed dynamically drives active gear calculation across 6 EV gear ratios (`D1` to `D6`) displayed on the central capsule, gear status hub, and HUD ribbon.
@@ -46,6 +49,16 @@ A modern, high-contrast automotive digital cockpit instrument cluster and local 
     - Speedometer capsule dynamically reflects the active ratio: `[P] [R] [N] [D3] [B]`.
     - Prominent status hub pill: `AUTO • D3 (GEAR 3)`, `AUTO • PARK [P]`, `AUTO • REGEN [B]`, or `MANUAL • M4 (GEAR 4)`.
     - Top HUD Ribbon: Live `AUTO [D3]` or `MANUAL [M4]` mode badge.
+- **Dual Metric & Imperial Unit Architecture**:
+  - Global runtime switching via hotkey `U` dynamically transforms all cluster telemetry readouts across Race, Sim, and Test modes:
+    - **Speed**: `KM/H` (0–180 scale) ⇄ `MPH` (0–120 scale)
+    - **Estimated Range & Trip Odometer**: `km` ⇄ `mi`
+    - **Thermal Temperatures (Motor, Inverter, Battery Pack)**: `°C` ⇄ `°F`
+    - **4-Wheel Tire Pressure (TPMS)**: `bar` ⇄ `psi`
+    - **Dual-Motor Torque Vectoring**: `Nm` ⇄ `lb-ft`
+  - Top HUD ribbon features a dedicated `[METRIC]` / `[IMPERIAL]` badge for instantaneous driver awareness.
+- **12-Hour AM/PM Precision Cockpit Clock**:
+  - Top HUD ribbon clock upgraded to 12-hour AM/PM format with live second tracking, synchronized across all operating modes.
 - **Granular Database Write Access & Storage Controls**:
   - **Pre-flight Write Verification**: Verifies directory existence and write permissions before logging.
   - **Runtime Write Toggle (`L` key)**: Drivers can pause and resume database logging on the fly without stopping vehicle telemetry or restarting the dashboard.

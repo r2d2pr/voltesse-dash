@@ -95,6 +95,11 @@ class SpeedometerDialWidget(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumSize(240, 240)
 
+    def set_units(self, unit: str = "KM/H", max_val: float = 180.0) -> None:
+        self.unit = unit
+        self.max_val = max_val
+        self.update()
+
     def set_value(self, value: float, sub_val: str = "") -> None:
         self.current_val = max(self.min_val, min(self.max_val, value))
         if sub_val:
@@ -159,14 +164,14 @@ class SpeedometerDialWidget(QWidget):
         painter.drawArc(gauge_rect, int(start_angle_deg * 16), int(total_span_deg * 16))
 
         # 4. Precision Graduation Ticks & Numbers
-        num_ticks = 19
+        num_ticks = 19 if self.max_val >= 150.0 else 13
         for i in range(num_ticks):
-            val = i * 10
+            val = int(round(i * (self.max_val / (num_ticks - 1))))
             fraction = i / (num_ticks - 1)
             angle_deg = start_angle_deg + (total_span_deg * fraction)
             rad = math.radians(-angle_deg)
 
-            is_major = (i % 3 == 0)
+            is_major = (i % 3 == 0) if num_ticks == 19 else (i % 2 == 0)
             tick_len = side * (0.038 if is_major else 0.020)
             tick_width = max(1.0, side * (0.005 if is_major else 0.003))
 
@@ -408,8 +413,13 @@ class BatteryStatusWidget(QWidget):
         self.voltage = 400.0
         self.current = 0.0
         self.est_range_km = 340.0
+        self.unit_system = "METRIC"
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(140)
+
+    def set_unit_system(self, unit_system: str) -> None:
+        self.unit_system = unit_system
+        self.update()
 
     def set_battery_data(self, soc: float, voltage: float, current: float) -> None:
         self.soc = max(0.0, min(100.0, soc))
@@ -491,10 +501,15 @@ class BatteryStatusWidget(QWidget):
         font_range_sz = max(13, min(26, int(card_content_h * 0.20)))
         font_range = QFont("Segoe UI", font_range_sz, QFont.Weight.Bold)
         painter.setFont(font_range)
+        if getattr(self, "unit_system", "METRIC") == "IMPERIAL":
+            range_val = int(round(self.est_range_km * 0.621371))
+            range_text = f"{range_val} mi"
+        else:
+            range_text = f"{int(round(self.est_range_km))} km"
         painter.drawText(
             QRectF(range_x, arc_cy - (card_content_h * 0.05), range_w, card_content_h * 0.32),
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-            f"{int(self.est_range_km)} km",
+            range_text,
         )
 
         sub_y = h - max(32.0, h * 0.24)
@@ -544,8 +559,13 @@ class TPMSWidget(QWidget):
         self.fr_temp = 31.0
         self.rl_temp = 30.0
         self.rr_temp = 30.0
+        self.unit_system = "METRIC"
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(140)
+
+    def set_unit_system(self, unit_system: str) -> None:
+        self.unit_system = unit_system
+        self.update()
 
     def set_tpms(
         self,
@@ -629,36 +649,56 @@ class TPMSWidget(QWidget):
         font_temp_sz = max(6, min(11, int(content_h * 0.08)))
         left_col_w = max(40.0, cx - wheel_dx - tw - 16.0)
 
+        is_imp = (getattr(self, "unit_system", "METRIC") == "IMPERIAL")
+        if is_imp:
+            fl_p_str = f"FL {self.fl_bar * 14.5038:.1f}psi"
+            rl_p_str = f"RL {self.rl_bar * 14.5038:.1f}psi"
+            fr_p_str = f"{self.fr_bar * 14.5038:.1f}psi FR"
+            rr_p_str = f"{self.rr_bar * 14.5038:.1f}psi RR"
+            fl_t_str = f"{self.fl_temp * 9.0 / 5.0 + 32.0:.0f}°F"
+            rl_t_str = f"{self.rl_temp * 9.0 / 5.0 + 32.0:.0f}°F"
+            fr_t_str = f"{self.fr_temp * 9.0 / 5.0 + 32.0:.0f}°F"
+            rr_t_str = f"{self.rr_temp * 9.0 / 5.0 + 32.0:.0f}°F"
+        else:
+            fl_p_str = f"FL {self.fl_bar:.2f}b"
+            rl_p_str = f"RL {self.rl_bar:.2f}b"
+            fr_p_str = f"{self.fr_bar:.2f}b FR"
+            rr_p_str = f"{self.rr_bar:.2f}b RR"
+            fl_t_str = f"{self.fl_temp:.0f}°C"
+            rl_t_str = f"{self.rl_temp:.0f}°C"
+            fr_t_str = f"{self.fr_temp:.0f}°C"
+            rr_t_str = f"{self.rr_temp:.0f}°C"
+
         painter.setFont(QFont("Consolas", font_bar_sz, QFont.Weight.Bold))
         painter.setPen(self._color_for_bar(self.fl_bar))
-        painter.drawText(QRectF(10, cy - wheel_dy - 12, left_col_w, 16), Qt.AlignmentFlag.AlignLeft, f"FL {self.fl_bar:.2f}b")
+        painter.drawText(QRectF(10, cy - wheel_dy - 12, left_col_w, 16), Qt.AlignmentFlag.AlignLeft, fl_p_str)
         painter.setFont(QFont("Segoe UI", font_temp_sz, QFont.Weight.Normal))
         painter.setPen(COLOR_TEXT_MUTED)
-        painter.drawText(QRectF(10, cy - wheel_dy + 4, left_col_w, 14), Qt.AlignmentFlag.AlignLeft, f"{self.fl_temp:.0f}°C")
+        painter.drawText(QRectF(10, cy - wheel_dy + 4, left_col_w, 14), Qt.AlignmentFlag.AlignLeft, fl_t_str)
 
         painter.setFont(QFont("Consolas", font_bar_sz, QFont.Weight.Bold))
         painter.setPen(self._color_for_bar(self.rl_bar))
-        painter.drawText(QRectF(10, cy + wheel_dy - 10, left_col_w, 16), Qt.AlignmentFlag.AlignLeft, f"RL {self.rl_bar:.2f}b")
+        painter.drawText(QRectF(10, cy + wheel_dy - 10, left_col_w, 16), Qt.AlignmentFlag.AlignLeft, rl_p_str)
         painter.setFont(QFont("Segoe UI", font_temp_sz, QFont.Weight.Normal))
         painter.setPen(COLOR_TEXT_MUTED)
-        painter.drawText(QRectF(10, cy + wheel_dy + 6, left_col_w, 14), Qt.AlignmentFlag.AlignLeft, f"{self.rl_temp:.0f}°C")
+        painter.drawText(QRectF(10, cy + wheel_dy + 6, left_col_w, 14), Qt.AlignmentFlag.AlignLeft, rl_t_str)
 
         right_x = cx + wheel_dx + tw + 10.0
         right_col_w = max(40.0, w - right_x - 10.0)
 
         painter.setFont(QFont("Consolas", font_bar_sz, QFont.Weight.Bold))
         painter.setPen(self._color_for_bar(self.fr_bar))
-        painter.drawText(QRectF(right_x, cy - wheel_dy - 12, right_col_w, 16), Qt.AlignmentFlag.AlignRight, f"{self.fr_bar:.2f}b FR")
+        painter.drawText(QRectF(right_x, cy - wheel_dy - 12, right_col_w, 16), Qt.AlignmentFlag.AlignRight, fr_p_str)
         painter.setFont(QFont("Segoe UI", font_temp_sz, QFont.Weight.Normal))
         painter.setPen(COLOR_TEXT_MUTED)
-        painter.drawText(QRectF(right_x, cy - wheel_dy + 4, right_col_w, 14), Qt.AlignmentFlag.AlignRight, f"{self.fr_temp:.0f}°C")
+        painter.drawText(QRectF(right_x, cy - wheel_dy + 4, right_col_w, 14), Qt.AlignmentFlag.AlignRight, fr_t_str)
 
         painter.setFont(QFont("Consolas", font_bar_sz, QFont.Weight.Bold))
         painter.setPen(self._color_for_bar(self.rr_bar))
-        painter.drawText(QRectF(right_x, cy + wheel_dy - 10, right_col_w, 16), Qt.AlignmentFlag.AlignRight, f"{self.rr_bar:.2f}b RR")
+        painter.drawText(QRectF(right_x, cy + wheel_dy - 10, right_col_w, 16), Qt.AlignmentFlag.AlignRight, rr_p_str)
         painter.setFont(QFont("Segoe UI", font_temp_sz, QFont.Weight.Normal))
         painter.setPen(COLOR_TEXT_MUTED)
-        painter.drawText(QRectF(right_x, cy + wheel_dy + 6, right_col_w, 14), Qt.AlignmentFlag.AlignRight, f"{self.rr_temp:.0f}°C")
+        painter.drawText(QRectF(right_x, cy + wheel_dy + 6, right_col_w, 14), Qt.AlignmentFlag.AlignRight, rr_t_str)
 
         painter.end()
 
@@ -676,8 +716,13 @@ class AwdTorqueVectorWidget(QWidget):
         self.front_nm = 0.0
         self.rear_nm = 0.0
         self.bias_mode = "AWD BALANCED"
+        self.unit_system = "METRIC"
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(85)
+
+    def set_unit_system(self, unit_system: str) -> None:
+        self.unit_system = unit_system
+        self.update()
 
     def set_torque_split(
         self,
@@ -737,9 +782,11 @@ class AwdTorqueVectorWidget(QWidget):
         painter.setBrush(QBrush(COLOR_MINT))
         painter.drawRoundedRect(QRectF(bar_left, y1, f_fill, bar_h), 2.5, 2.5)
 
+        is_imp = (getattr(self, "unit_system", "METRIC") == "IMPERIAL")
+        f_val_str = f"{int(self.front_pct)}% {int(self.front_nm * 0.73756)}lb-ft" if is_imp else f"{int(self.front_pct)}% {int(self.front_nm)}Nm"
         painter.setPen(COLOR_TEXT_PRIMARY)
         painter.setFont(QFont("Consolas", val_font_sz, QFont.Weight.Bold))
-        painter.drawText(QRectF(w - val_w - 8, y1 - 4, val_w, 16), Qt.AlignmentFlag.AlignRight, f"{int(self.front_pct)}% {int(self.front_nm)}Nm")
+        painter.drawText(QRectF(w - val_w - 8, y1 - 4, val_w, 16), Qt.AlignmentFlag.AlignRight, f_val_str)
 
         y2 = 28.0 + (content_h * 0.70)
         painter.setPen(COLOR_TEXT_SECONDARY)
@@ -755,9 +802,10 @@ class AwdTorqueVectorWidget(QWidget):
         painter.setBrush(QBrush(r_color))
         painter.drawRoundedRect(QRectF(bar_left, y2, r_fill, bar_h), 2.5, 2.5)
 
+        r_val_str = f"{int(self.rear_pct)}% {int(self.rear_nm * 0.73756)}lb-ft" if is_imp else f"{int(self.rear_pct)}% {int(self.rear_nm)}Nm"
         painter.setPen(COLOR_TEXT_PRIMARY)
         painter.setFont(QFont("Consolas", val_font_sz, QFont.Weight.Bold))
-        painter.drawText(QRectF(w - val_w - 8, y2 - 4, val_w, 16), Qt.AlignmentFlag.AlignRight, f"{int(self.rear_pct)}% {int(self.rear_nm)}Nm")
+        painter.drawText(QRectF(w - val_w - 8, y2 - 4, val_w, 16), Qt.AlignmentFlag.AlignRight, r_val_str)
 
         painter.end()
 
@@ -824,12 +872,17 @@ class LiveSparklineWidget(QWidget):
         self.max_points = max_points
         self.speed_history: Deque[float] = deque(maxlen=max_points)
         self.power_history: Deque[float] = deque(maxlen=max_points)
+        self.unit_system = "METRIC"
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(65)
 
         for _ in range(max_points):
             self.speed_history.append(0.0)
             self.power_history.append(0.0)
+
+    def set_unit_system(self, unit_system: str) -> None:
+        self.unit_system = unit_system
+        self.update()
 
     def add_data_point(self, speed: float, power: float) -> None:
         self.speed_history.append(speed)
@@ -870,7 +923,7 @@ class LiveSparklineWidget(QWidget):
 
         step_x = (w - 8) / (self.max_points - 1)
 
-        max_speed = 180.0
+        max_speed = 120.0 if getattr(self, "unit_system", "METRIC") == "IMPERIAL" else 180.0
         speed_path = QPainterPath()
         for i, val in enumerate(self.speed_history):
             clamped = max(0.0, min(max_speed, val))
@@ -911,8 +964,13 @@ class ThermalMonitorWidget(QWidget):
         self.motor_temp = 0.0
         self.inverter_temp = 0.0
         self.batt_temp = 0.0
+        self.unit_system = "METRIC"
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(35)
+
+    def set_unit_system(self, unit_system: str) -> None:
+        self.unit_system = unit_system
+        self.update()
 
     def set_temperatures(self, motor: float, inverter: float, battery: float) -> None:
         self.motor_temp = motor
@@ -957,12 +1015,15 @@ class ThermalMonitorWidget(QWidget):
             painter.setFont(QFont("Segoe UI", lbl_font_sz, QFont.Weight.Bold))
             painter.drawText(QRectF(box_x + 8, 3, box_w - 16, h * 0.35), Qt.AlignmentFlag.AlignLeft, label)
 
+            is_imp = (getattr(self, "unit_system", "METRIC") == "IMPERIAL")
+            disp_temp = (temp * 9.0 / 5.0 + 32.0) if is_imp else temp
+            unit_sym = "°F" if is_imp else "°C"
             painter.setPen(color)
             painter.setFont(QFont("Consolas", val_font_sz, QFont.Weight.Bold))
             painter.drawText(
                 QRectF(box_x + 8, h * 0.36, box_w - 24, h * 0.55),
                 Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                f"{temp:.1f}°C",
+                f"{disp_temp:.1f}{unit_sym}",
             )
 
             pip_r = max(2.5, min(4.5, h * 0.08))
@@ -991,6 +1052,8 @@ class VoltesseDashboard(QMainWindow):
     gear_down_requested = pyqtSignal()           # Shift Down (Manual or Auto)
     gear_shift_requested = pyqtSignal()          # Cycle gear (G key)
     logging_toggle_requested = pyqtSignal()      # Toggle DB logging (L key)
+    units_toggle_requested = pyqtSignal()        # Toggle Metric / Imperial (U key)
+    units_changed = pyqtSignal(str)              # "METRIC" or "IMPERIAL"
     pause_requested = pyqtSignal()
 
     def __init__(self):
@@ -1003,6 +1066,8 @@ class VoltesseDashboard(QMainWindow):
         # Active operating mode state
         self.current_mode = "RACE"
         self.current_transmission = "AUTO"
+        self.unit_system = "METRIC"
+        self._last_record: Optional[TelemetryRecord] = None
 
         # Track currently held keys for video game simulation
         self._held_keys: Set[int] = set()
@@ -1064,6 +1129,12 @@ class VoltesseDashboard(QMainWindow):
             "color: #00F5A0; background-color: rgba(0, 245, 160, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4); font-weight: bold;"
         )
 
+        # Unit System Status Badge (METRIC / IMPERIAL)
+        self.units_badge = QLabel("METRIC")
+        self.units_badge.setStyleSheet(
+            "color: #00F5A0; background-color: rgba(0, 245, 160, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4); font-weight: bold;"
+        )
+
         # Operating Mode Ribbon Badge
         self.op_mode_badge = QLabel("RACE [CAN]")
 
@@ -1098,7 +1169,7 @@ class VoltesseDashboard(QMainWindow):
         self.ambient_label.setStyleSheet("color: #9AE6B4;")
 
         # Live Clock
-        self.clock_label = QLabel("00:00:00")
+        self.clock_label = QLabel("12:00:00 AM")
         self.clock_label.setStyleSheet("color: #FFFFFF;")
 
         # Turn Signal Right
@@ -1112,6 +1183,8 @@ class VoltesseDashboard(QMainWindow):
         self.top_layout.addWidget(self.ready_badge)
         self.top_layout.addSpacing(6)
         self.top_layout.addWidget(self.logging_badge)
+        self.top_layout.addSpacing(6)
+        self.top_layout.addWidget(self.units_badge)
         self.top_layout.addStretch(1)
         self.top_layout.addWidget(self.op_mode_badge)
         self.top_layout.addSpacing(6)
@@ -1348,7 +1421,7 @@ class VoltesseDashboard(QMainWindow):
         self._apply_dynamic_scale()
 
     def _update_clock(self) -> None:
-        self.clock_label.setText(time.strftime("%H:%M:%S"))
+        self.clock_label.setText(time.strftime("%I:%M:%S %p"))
 
     def set_operating_mode(self, mode: str) -> None:
         """Updates the active operating mode display in the UI and resets held input keys."""
@@ -1363,19 +1436,57 @@ class VoltesseDashboard(QMainWindow):
             self.op_mode_badge.setStyleSheet(
                 "background-color: rgba(0, 245, 160, 0.22); color: #00F5A0; padding: 2px 10px; border-radius: 4px; border: 1px solid #00F5A0; font-weight: bold;"
             )
-            self.controls_hint.setText("[KEYS: 1:RACE | 2:SIM | 3:TEST | T:TRANS | E/C:SHIFT | L:LOG]")
+            self.controls_hint.setText("[KEYS: 1:RACE | 2:SIM | 3:TEST | T:TRANS | E/C:SHIFT | U:UNITS | L:LOG]")
         elif mode == "SIMULATION":
             self.op_mode_badge.setText("SIMULATION [GAME]")
             self.op_mode_badge.setStyleSheet(
                 "background-color: rgba(0, 229, 255, 0.22); color: #00E5FF; padding: 2px 10px; border-radius: 4px; border: 1px solid #00E5FF; font-weight: bold;"
             )
-            self.controls_hint.setText("[T:TRANS | W/S:PEDALS | A/D:STEER | E/C:SHIFT | L:LOG | M:MODE]")
+            self.controls_hint.setText("[T:TRANS | W/S:PEDALS | A/D:STEER | E/C:SHIFT | U:UNITS | L:LOG | M:MODE]")
         elif mode == "TEST":
             self.op_mode_badge.setText("TEST [MOCK]")
             self.op_mode_badge.setStyleSheet(
                 "background-color: rgba(154, 230, 180, 0.20); color: #5CFFC7; padding: 2px 10px; border-radius: 4px; border: 1px solid #5CFFC7; font-weight: bold;"
             )
-            self.controls_hint.setText("[TEST: AUTO ONLY | 1:RACE | 2:SIM | L:LOG | SPACE:PAUSE]")
+            self.controls_hint.setText("[TEST: AUTO ONLY | 1:RACE | 2:SIM | U:UNITS | L:LOG | SPACE:PAUSE]")
+
+    def toggle_units(self) -> str:
+        """Toggles between METRIC and IMPERIAL units across all dashboard widgets."""
+        new_mode = "IMPERIAL" if self.unit_system == "METRIC" else "METRIC"
+        self.set_unit_system(new_mode)
+        return new_mode
+
+    def set_unit_system(self, system: str) -> None:
+        """Sets dashboard unit system to METRIC or IMPERIAL across all gauges and widgets."""
+        self.unit_system = "IMPERIAL" if system.upper() == "IMPERIAL" else "METRIC"
+        is_imp = (self.unit_system == "IMPERIAL")
+
+        if is_imp:
+            self.units_badge.setText("IMPERIAL")
+            self.units_badge.setStyleSheet(
+                "color: #00E5FF; background-color: rgba(0, 229, 255, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 229, 255, 0.4); font-weight: bold;"
+            )
+            self.ambient_label.setText("72°F")
+            self.speed_gauge.set_units(unit="MPH", max_val=120.0)
+        else:
+            self.units_badge.setText("METRIC")
+            self.units_badge.setStyleSheet(
+                "color: #00F5A0; background-color: rgba(0, 245, 160, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4); font-weight: bold;"
+            )
+            self.ambient_label.setText("22°C")
+            self.speed_gauge.set_units(unit="KM/H", max_val=180.0)
+
+        self.battery_widget.set_unit_system(self.unit_system)
+        self.tpms_widget.set_unit_system(self.unit_system)
+        self.thermal_widget.set_unit_system(self.unit_system)
+        self.awd_widget.set_unit_system(self.unit_system)
+        self.sparkline_widget.set_unit_system(self.unit_system)
+
+        if hasattr(self, "_last_record") and self._last_record is not None:
+            self.update_telemetry(self._last_record)
+
+        self.units_changed.emit(self.unit_system)
+        self.units_toggle_requested.emit()
 
     def set_logging_state(self, write_enabled: bool, read_only: bool = False) -> None:
         """Updates top ribbon database logging badge."""
@@ -1399,12 +1510,16 @@ class VoltesseDashboard(QMainWindow):
         """
         Non-blocking slot updating all telemetry gauges and HUD indicators.
         """
+        self._last_record = record
         gear = record.gear if hasattr(record, "gear") and record.gear else "D1"
         trans_mode = record.transmission_mode if hasattr(record, "transmission_mode") and record.transmission_mode else "AUTO"
         self.current_transmission = trans_mode
 
+        is_imp = (self.unit_system == "IMPERIAL")
+        disp_speed = (record.speed_kmh * 0.621371) if is_imp else record.speed_kmh
+
         # Central Speedometer Dial
-        self.speed_gauge.set_value(record.speed_kmh, sub_val=str(record.motor_rpm))
+        self.speed_gauge.set_value(disp_speed, sub_val=str(record.motor_rpm))
         self.speed_gauge.set_pedals_and_gear(
             throttle=record.throttle_pct,
             brake=record.brake_pct,
@@ -1483,10 +1598,12 @@ class VoltesseDashboard(QMainWindow):
         )
 
         # Trip Odometer
-        self.trip_dist_val.setText(f"{record.trip_distance_km:.2f} km")
+        disp_dist = (record.trip_distance_km * 0.621371) if is_imp else record.trip_distance_km
+        dist_unit = "mi" if is_imp else "km"
+        self.trip_dist_val.setText(f"{disp_dist:.2f} {dist_unit}")
 
         # Sparkline trace
-        self.sparkline_widget.add_data_point(record.speed_kmh, record.battery_power_kw)
+        self.sparkline_widget.add_data_point(disp_speed, record.battery_power_kw)
 
         # Dynamic AWD Dual-Motor Torque Calculation
         if record.battery_power_kw < -0.5:
@@ -1609,6 +1726,9 @@ class VoltesseDashboard(QMainWindow):
             return
         elif key == Qt.Key.Key_L:
             self.logging_toggle_requested.emit()
+            return
+        elif key == Qt.Key.Key_U:
+            self.toggle_units()
             return
         elif key == Qt.Key.Key_Space:
             self.pause_requested.emit()

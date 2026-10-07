@@ -556,6 +556,81 @@ class TestDashboardGUI(unittest.TestCase):
         gui.keyPressEvent(event_l)
         self.assertEqual(len(emitted), 1)
 
+    def test_gui_units_and_12h_clock(self):
+        gui = VoltesseDashboard()
+
+        # 1. Test 12-hour AM/PM clock display
+        gui._update_clock()
+        clock_text = gui.clock_label.text()
+        self.assertTrue(clock_text.endswith("AM") or clock_text.endswith("PM"), f"Clock text {clock_text} does not end with AM/PM")
+        self.assertEqual(clock_text.count(":"), 2)
+
+        # 2. Test initial Metric mode
+        self.assertEqual(gui.unit_system, "METRIC")
+        self.assertEqual(gui.units_badge.text(), "METRIC")
+        self.assertEqual(gui.ambient_label.text(), "22°C")
+        self.assertEqual(gui.speed_gauge.unit, "KM/H")
+        self.assertEqual(gui.speed_gauge.max_val, 180.0)
+
+        # Feed sample record
+        rec = TelemetryRecord(
+            timestamp=time.time(),
+            speed_kmh=100.0,
+            motor_rpm=6000,
+            battery_soc=80.0,
+            battery_voltage=400.0,
+            battery_current=50.0,
+            battery_power_kw=20.0,
+            battery_temp_c=30.0,
+            motor_temp_c=55.0,
+            inverter_temp_c=45.0,
+            throttle_pct=50.0,
+            brake_pct=0.0,
+            drive_mode="DRIVE",
+            steering_angle=0.0,
+            trip_distance_km=10.0,
+            warnings=[],
+            gear="D4",
+            transmission_mode="AUTO",
+        )
+        gui.update_telemetry(rec)
+        self.assertIn("km", gui.trip_dist_val.text())
+        self.assertEqual(round(gui.speed_gauge.current_val), 100)
+
+        # 3. Test Toggle to Imperial via key 'U'
+        units_signals = []
+        gui.units_changed.connect(lambda u: units_signals.append(u))
+
+        event_u = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_U, Qt.KeyboardModifier.NoModifier)
+        gui.keyPressEvent(event_u)
+
+        self.assertEqual(gui.unit_system, "IMPERIAL")
+        self.assertEqual(gui.units_badge.text(), "IMPERIAL")
+        self.assertEqual(gui.ambient_label.text(), "72°F")
+        self.assertEqual(gui.speed_gauge.unit, "MPH")
+        self.assertEqual(gui.speed_gauge.max_val, 120.0)
+        self.assertEqual(gui.battery_widget.unit_system, "IMPERIAL")
+        self.assertEqual(gui.tpms_widget.unit_system, "IMPERIAL")
+        self.assertEqual(gui.thermal_widget.unit_system, "IMPERIAL")
+        self.assertEqual(gui.awd_widget.unit_system, "IMPERIAL")
+        self.assertEqual(gui.sparkline_widget.unit_system, "IMPERIAL")
+
+        # Telemetry should be converted to imperial values
+        self.assertIn("mi", gui.trip_dist_val.text())
+        # 100 km/h * 0.621371 = ~62.1 mph
+        self.assertEqual(round(gui.speed_gauge.current_val), 62)
+        self.assertEqual(units_signals, ["IMPERIAL"])
+
+        # 4. Toggle back to Metric
+        gui.keyPressEvent(event_u)
+        self.assertEqual(gui.unit_system, "METRIC")
+        self.assertEqual(gui.units_badge.text(), "METRIC")
+        self.assertEqual(gui.ambient_label.text(), "22°C")
+        self.assertEqual(gui.speed_gauge.unit, "KM/H")
+        self.assertEqual(round(gui.speed_gauge.current_val), 100)
+        self.assertIn("km", gui.trip_dist_val.text())
+        self.assertEqual(units_signals, ["IMPERIAL", "METRIC"])
+
     def test_transmission_toggle_restriction(self):
         gui = VoltesseDashboard()
         signals_received = []
@@ -726,6 +801,35 @@ class TestVoltesseAppModes(unittest.TestCase):
         app_ro._toggle_logging()
         self.assertFalse(app_ro.db_manager.is_write_enabled())
         app_ro.shutdown()
+
+    def test_app_imperial_units_flag(self):
+        args_imp = argparse.Namespace(
+            mode="RACE",
+            can_interface=None,
+            can_channel=None,
+            can_mock=False,
+            db_path=self.db_path,
+            interval_ms=10,
+            batch_size=5,
+            flush_interval=0.2,
+            windowed=True,
+            read_only=False,
+            no_logging=False,
+            imperial=True,
+            units="imperial",
+        )
+        app_imp = VoltesseApp(args_imp)
+        self.assertEqual(app_imp.gui.unit_system, "IMPERIAL")
+        self.assertEqual(app_imp.gui.units_badge.text(), "IMPERIAL")
+        self.assertEqual(app_imp.gui.speed_gauge.unit, "MPH")
+
+        # Toggle at runtime
+        app_imp.gui.toggle_units()
+        self.assertEqual(app_imp.gui.unit_system, "METRIC")
+        self.assertEqual(app_imp.gui.units_badge.text(), "METRIC")
+        self.assertEqual(app_imp.gui.speed_gauge.unit, "KM/H")
+
+        app_imp.shutdown()
 
 
 if __name__ == "__main__":

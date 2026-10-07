@@ -57,6 +57,8 @@ class VoltesseApp:
         # 2. Initialize Distraction-Free Cockpit GUI
         logger.info("Initializing Cockpit GUI...")
         self.gui = VoltesseDashboard()
+        if getattr(args, "imperial", False) or getattr(args, "units", "metric").lower() == "imperial":
+            self.gui.set_unit_system("IMPERIAL")
 
         # Reflect database write logging state on top HUD ribbon
         self.gui.set_logging_state(
@@ -102,6 +104,7 @@ class VoltesseApp:
         self.gui.gear_up_requested.connect(self._shift_up)
         self.gui.gear_down_requested.connect(self._shift_down)
         self.gui.logging_toggle_requested.connect(self._toggle_logging)
+        self.gui.units_toggle_requested.connect(self._toggle_units)
         self.gui.pause_requested.connect(self._toggle_pause)
 
         # Connect window close / application quit
@@ -253,6 +256,10 @@ class VoltesseApp:
         elif self.current_mode == "TEST":
             new_gear = self.test_stream.shift_gear()
             logger.info("Test gear shifted to: %s", new_gear)
+
+    def _toggle_units(self) -> None:
+        """Logs runtime toggle of units."""
+        logger.info("Cockpit unit system switched to: %s", self.gui.unit_system)
 
     def _toggle_logging(self) -> None:
         """Toggles database write access on and off at runtime via hotkey L."""
@@ -407,6 +414,18 @@ def parse_args() -> argparse.Namespace:
         "--windowed",
         action="store_true",
         help="Launch in windowed mode rather than fullscreen (default: fullscreen)",
+    )
+    parser.add_argument(
+        "--imperial",
+        action="store_true",
+        help="Launch dashboard in Imperial units (mph, mi, °F, psi, lb-ft)",
+    )
+    parser.add_argument(
+        "--units",
+        type=str,
+        default="metric",
+        choices=["metric", "imperial"],
+        help="Initial unit system (metric or imperial, default: metric)",
     )
     return parser.parse_args()
 
