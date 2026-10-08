@@ -1,0 +1,22 @@
+# Local PostgreSQL for development, until the Raspberry Pi is ready for SSH.
+#   cd db && cp .env.example .env && docker compose up -d
+services:
+  db:
+    image: postgres:${PG_VERSION:-16}
+    container_name: voltesse-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-voltesse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-voltesse_dash}
+    ports:
+      # Bound to localhost only so nothing else on your network can reach it
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # These run once, the first time the volume is created
+      - ./init/00_create_test_db.sql:/docker-entrypoint-initdb.d/00_create_test_db.sql:ro
+      - ./schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+
+volumes:
+  pgdata:

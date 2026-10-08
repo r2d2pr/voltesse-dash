@@ -26,3 +26,13 @@ exports/
 
 # Project specific exclusions
 AGENTS.md
+
+# Mac Specific Files
+.DS_Store
+
+# PostgreSQL local setup (never commit passwords or backups)
+db/.env
+db/backups/
+
+# graphify knowledge graph output (machine-specific)
+graphify-out/

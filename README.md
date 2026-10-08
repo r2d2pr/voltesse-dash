@@ -6,7 +6,7 @@
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern, high-contrast automotive digital cockpit instrument cluster and local telemetry logging engine engineered for embedded displays (e.g., Raspberry Pi) and EV powertrains. Built with **Python**, **PyQt6**, **python-can**, and **SQLite**.
+A modern, high-contrast automotive digital cockpit instrument cluster and local telemetry logging engine engineered for embedded displays (e.g., Raspberry Pi) and EV powertrains. Built with **Python**, **PyQt6**, **python-can**, and **PostgreSQL**.
 
 ---
 
@@ -78,7 +78,8 @@ A modern, high-contrast automotive digital cockpit instrument cluster and local 
   - **Live Oscilloscope Trace**: Rolling sparkline graph plotting speed and power curves.
 - **Asynchronous Telemetry & Batched Logging**:
   - Dedicated `QThread` telemetry sources guarantee zero main GUI thread blocking.
-  - High-performance SQLite persistence with `WAL` mode and micro-batched writes to safeguard SD card flash memory.
+  - PostgreSQL persistence (schema from the SRS, section 3.4) with micro-batched background writes, so database load never blocks the display and SD card writes stay low.
+  - Session-based retention keeps the newest N vehicle sessions (`--keep-sessions`).
 
 ---
 
@@ -86,15 +87,17 @@ A modern, high-contrast automotive digital cockpit instrument cluster and local 
 
 ```
 voltesse-dash/
-├── data/                      # Local SQLite databases and session exports (auto-created)
-│   └── exports/               # Generated CSV & JSON trip session dumps
+├── db/                        # PostgreSQL schema, sample data, local Docker setup, backup/migration scripts
+│   └── README.md              # How to run the database locally and move it to the Raspberry Pi
+├── data/
+│   └── exports/               # Generated CSV & JSON session dumps (auto-created)
 ├── src/
 │   ├── __init__.py
 │   ├── can_bus_source.py      # CAN Bus interface, frame decoders, and synchronized mock transmitter
 │   ├── simulation_source.py   # Video-game interactive EV dynamics engine (W/A/S/D, 6-speed manual, D1-D6 auto)
 │   ├── telemetry_source.py    # Autonomous EV driving cycle telemetry stream (Test Mode, D1-D6 auto)
 │   ├── dashboard_gui.py       # PyQt6 digital cluster interface & auto-scaling widgets
-│   └── database.py            # SQLite schema, write access controls, and session export engine
+│   └── database.py            # PostgreSQL access: batched writer, sessions, retention, write controls, exports
 ├── tests/
 │   └── test_voltesse.py       # Comprehensive unit and integration test suite (16 tests)
 ├── main.py                    # Application lifecycle, transmission, and mode controller
@@ -149,7 +152,14 @@ source .venv/bin/activate        # Linux/macOS
 
 # Install requirements
 pip install -r requirements.txt
+
+# Start the local PostgreSQL database (see db/README.md for details)
+cd db && cp .env.example .env && docker compose up -d && cd ..
+export VOLTESSE_DB_URL=postgresql://voltesse:voltesse@localhost:5432/voltesse_dash
+# or (Windows PowerShell): $env:VOLTESSE_DB_URL="postgresql://voltesse:voltesse@localhost:5432/voltesse_dash"
 ```
+
+No Docker? [db/README.md](db/README.md#without-docker-fallback) shows how to install PostgreSQL directly on macOS, Windows or the Pi. Without any database the dashboard still runs, with logging switched off.
 
 ### 3. Launching the Dashboard
 
@@ -199,26 +209,28 @@ Generated files are saved directly to `data/exports/`.
 | :--- | :--- | :--- |
 | `--mode` | `RACE` | Initial telemetry mode (`RACE`, `SIMULATION`, `TEST`) |
 | `--windowed` | `False` | Run in windowed mode (default is fullscreen) |
-| `--read-only` | `False` | Open SQLite database in strict read-only mode |
+| `--read-only` | `False` | Open the database in strict read-only mode |
 | `--no-logging`| `False` | Launch with database writing paused (toggleable with `L`) |
-| `--export-csv` | `None` | Export a specific trip session ID to CSV and exit |
-| `--export-json`| `None` | Export a specific trip session ID to JSON and exit |
-| `--export-summary`| `False` | Export summary of all trip sessions to CSV and exit |
+| `--export-csv` | `None` | Export a specific vehicle session ID to CSV and exit |
+| `--export-json`| `None` | Export a specific vehicle session ID to JSON and exit |
+| `--export-summary`| `False` | Export summary of all vehicle sessions to CSV and exit |
 | `--can-interface` | `None` | CAN driver (`socketcan`, `virtual`, `pcan`, etc.) |
 | `--can-channel` | `None` | CAN channel name (e.g., `can0`, `vcan0`) |
 | `--can-mock` | `False` | Enable background mock CAN frame broadcaster for bench testing |
 | `--interval-ms` | `40` | Telemetry poll interval in milliseconds (40ms = 25 Hz) |
-| `--batch-size` | `25` | Number of records to batch before SQLite commit |
+| `--batch-size` | `25` | Number of records to batch before a PostgreSQL commit |
 | `--flush-interval`| `1.0` | Max seconds between database batch flushes |
-| `--db-path` | `data/voltesse_telemetry.db` | Path to SQLite database file |
+| `--db-url` | `$VOLTESSE_DB_URL` | PostgreSQL connection URL (default `postgresql://voltesse@localhost:5432/voltesse_dash`) |
+| `--keep-sessions` | `20` | Keep only the newest N sessions at startup (`0` keeps everything) |
 
 ---
 
 ## Running Tests
 
-Execute the automated test suite with Python's built-in `unittest`:
+Execute the automated test suite with Python's built-in `unittest`. The database tests need the local PostgreSQL from `db/` to be running (they create and delete their own temporary schemas inside the `voltesse_test` database) and are skipped if it can't be reached:
 
 ```bash
+export VOLTESSE_TEST_DB_URL=postgresql://voltesse:voltesse@localhost:5432/voltesse_test
 python -m unittest discover tests
 ```
 

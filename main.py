@@ -1,6 +1,6 @@
 """
 Voltesse Dash - Main Application Entrypoint
-Orchestrates the SQLite database logger, multi-mode telemetry streams
+Orchestrates the PostgreSQL database logger, multi-mode telemetry streams
 (CAN Bus Race Mode, Keyboard Game Simulation Mode, Autonomous Test Mode),
 and the PyQt6 driver cockpit GUI.
 Supports Automatic and Sequential Manual transmission switching,
@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import QApplication
 
 from src.can_bus_source import CANTelemetrySource
 from src.dashboard_gui import VoltesseDashboard
-from src.database import DatabaseManager
+from src.database import DatabaseManager, redact_db_url
 from src.simulation_source import SimulationTelemetryStream
 from src.telemetry_source import MockTelemetryStream
 
@@ -30,6 +30,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("voltesse.main")
 
+# Operating mode -> VEHICLE_SESSION.source_type
+MODE_TO_SOURCE_TYPE = {"RACE": "CAN_BUS", "SIMULATION": "SIMULATION", "TEST": "TEST"}
+
 
 class VoltesseApp:
     """Application Controller managing lifecycle, operating modes, and signal routing."""
@@ -39,19 +42,29 @@ class VoltesseApp:
         self.app = QApplication.instance() or QApplication(sys.argv)
         self.app.setApplicationName("Voltesse Dash")
 
-        # 1. Initialize SQLite Database Manager with write access controls
-        logger.info("Initializing Database Manager at %s...", args.db_path)
+        # 1. Initialize PostgreSQL Database Manager with write access controls
+        db_url = getattr(args, "db_url", None)
+        initial_mode = args.mode.upper() if args.mode else "RACE"
+        logger.info("Initializing Database Manager...")
         read_only = getattr(args, "read_only", False)
         no_logging = getattr(args, "no_logging", False)
         write_enabled = (not read_only) and (not no_logging)
 
         self.db_manager = DatabaseManager(
-            db_path=args.db_path,
+            db_url=db_url,
             batch_size=args.batch_size,
             flush_interval_sec=args.flush_interval,
             write_enabled=write_enabled,
             read_only=read_only,
         )
+        logger.info("Database target: %s", redact_db_url(self.db_manager.db_url))
+        self.db_manager.set_source_type(MODE_TO_SOURCE_TYPE.get(initial_mode, "CAN_BUS"))
+
+        # Session-based retention: keep the newest N sessions (0 disables pruning)
+        keep_sessions = getattr(args, "keep_sessions", 20)
+        if keep_sessions and keep_sessions > 0:
+            self.db_manager.prune_old_sessions(keep_sessions=keep_sessions)
+
         self.session_id = self.db_manager.start_session(initial_soc=88.5)
 
         # 2. Initialize Distraction-Free Cockpit GUI
@@ -95,6 +108,10 @@ class VoltesseApp:
 
         self.current_mode: Optional[str] = None
 
+        # Record each source's connection status with its readings (TELEMETRY_LOG.signal_status)
+        for stream in (self.can_stream, self.sim_stream, self.test_stream):
+            stream.status_changed.connect(self.db_manager.set_signal_status)
+
         # 4. Wire Interactive Signals from GUI
         self.gui.mode_switch_requested.connect(self.switch_mode)
         self.gui.simulation_input_changed.connect(self._handle_sim_inputs)
@@ -116,7 +133,6 @@ class VoltesseApp:
         self._final_soc = 88.5
 
         # 5. Activate Default Mode (Default: RACE)
-        initial_mode = args.mode.upper() if args.mode else "RACE"
         self.switch_mode(initial_mode)
 
     def switch_mode(self, mode: str) -> None:
@@ -130,6 +146,7 @@ class VoltesseApp:
             return
 
         logger.info("Switching operating mode to: %s", mode)
+        self.db_manager.set_source_type(MODE_TO_SOURCE_TYPE.get(mode, "CAN_BUS"))
 
         # Disconnect and pause previous active stream
         if self.current_mode == "RACE":
@@ -358,15 +375,24 @@ def parse_args() -> argparse.Namespace:
         help="Enable mock CAN transmitter for bench testing without live vehicle ECU",
     )
     parser.add_argument(
-        "--db-path",
+        "--db-url",
         type=str,
-        default="data/voltesse_telemetry.db",
-        help="Path to SQLite database file",
+        default=None,
+        help=(
+            "PostgreSQL connection URL, e.g. postgresql://user:password@host:5432/voltesse_dash "
+            "(default: $VOLTESSE_DB_URL, else postgresql://voltesse@localhost:5432/voltesse_dash)"
+        ),
+    )
+    parser.add_argument(
+        "--keep-sessions",
+        type=int,
+        default=20,
+        help="Keep only the newest N vehicle sessions at startup (default: 20, 0 = keep everything)",
     )
     parser.add_argument(
         "--read-only",
         action="store_true",
-        help="Open SQLite database in strict read-only mode (disables session and telemetry writes)",
+        help="Open the database in strict read-only mode (disables session and telemetry writes)",
     )
     parser.add_argument(
         "--no-logging",
@@ -378,19 +404,19 @@ def parse_args() -> argparse.Namespace:
         type=int,
         metavar="SESSION_ID",
         default=None,
-        help="Export a specific trip session to CSV and exit",
+        help="Export a specific vehicle session to CSV and exit",
     )
     parser.add_argument(
         "--export-json",
         type=int,
         metavar="SESSION_ID",
         default=None,
-        help="Export a specific trip session to JSON and exit",
+        help="Export a specific vehicle session to JSON and exit",
     )
     parser.add_argument(
         "--export-summary",
         action="store_true",
-        help="Export summary of all trip sessions to CSV and exit",
+        help="Export summary of all vehicle sessions to CSV and exit",
     )
     parser.add_argument(
         "--interval-ms",
@@ -402,7 +428,7 @@ def parse_args() -> argparse.Namespace:
         "--batch-size",
         type=int,
         default=25,
-        help="Number of records to batch before committing to SQLite",
+        help="Number of records to batch before committing to PostgreSQL",
     )
     parser.add_argument(
         "--flush-interval",
@@ -438,7 +464,7 @@ def main() -> None:
 
     # Handle direct database export commands if requested
     if args.export_csv is not None or args.export_json is not None or args.export_summary:
-        db = DatabaseManager(db_path=args.db_path, read_only=True)
+        db = DatabaseManager(db_url=args.db_url, read_only=True)
         try:
             if args.export_csv is not None:
                 path = db.export_session_to_csv(args.export_csv)

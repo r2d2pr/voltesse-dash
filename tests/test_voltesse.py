@@ -1,6 +1,6 @@
 """
 Unit and integration tests for Voltesse Dash components:
-- SQLite Database & Asynchronous Batch Writer with Granular Write Access & Exports
+- PostgreSQL Database (SRS schema) & Asynchronous Batch Writer with Granular Write Access, Retention & Exports
 - CAN Bus Race Mode Telemetry Source & Frame Decoding
 - Interactive Video Game Simulation Telemetry Stream
 - Autonomous Mock Telemetry Stream (Test Mode)
@@ -19,6 +19,9 @@ import struct
 import tempfile
 import time
 import unittest
+import uuid
+
+import psycopg
 
 from PyQt6.QtCore import Qt, QCoreApplication
 from PyQt6.QtGui import QKeyEvent
@@ -42,14 +45,75 @@ except ImportError:
     can = None
 
 
+# ---------------------------------------------------------------------
+# PostgreSQL test database support
+# Set VOLTESSE_TEST_DB_URL to a database the tests may create schemas in, e.g.
+#   postgresql://voltesse:password@localhost:5432/voltesse_test
+# Every test gets its own temporary schema, so tests never touch real data.
+# ---------------------------------------------------------------------
+TEST_DB_URL = os.environ.get(
+    "VOLTESSE_TEST_DB_URL", "postgresql://voltesse:voltesse@localhost:5432/voltesse_test"
+)
+
+
+def _test_db_available() -> bool:
+    try:
+        psycopg.connect(TEST_DB_URL, connect_timeout=2).close()
+        return True
+    except psycopg.Error:
+        return False
+
+
+DB_AVAILABLE = _test_db_available()
+SKIP_NO_DB = unittest.skipUnless(DB_AVAILABLE, "PostgreSQL test database not reachable (set VOLTESSE_TEST_DB_URL)")
+
+
+def create_isolated_schema():
+    """Creates a throwaway schema and returns (schema_name, connection_url_using_it)."""
+    name = "t_" + uuid.uuid4().hex[:12]
+    with psycopg.connect(TEST_DB_URL, autocommit=True) as conn:
+        conn.execute(f'CREATE SCHEMA "{name}"')
+    separator = "&" if "?" in TEST_DB_URL else "?"
+    return name, f"{TEST_DB_URL}{separator}options=-csearch_path%3D{name}"
+
+
+def drop_isolated_schema(name: str) -> None:
+    with psycopg.connect(TEST_DB_URL, autocommit=True) as conn:
+        conn.execute(f'DROP SCHEMA IF EXISTS "{name}" CASCADE')
+
+
+def make_record(**overrides) -> "TelemetryRecord":
+    values = dict(
+        timestamp=time.time(),
+        speed_kmh=50.0,
+        motor_rpm=4000,
+        battery_soc=90.0,
+        battery_voltage=398.0,
+        battery_current=25.0,
+        battery_power_kw=10.0,
+        battery_temp_c=31.0,
+        motor_temp_c=45.0,
+        inverter_temp_c=40.0,
+        throttle_pct=30.0,
+        brake_pct=0.0,
+        drive_mode="DRIVE",
+        trip_distance_km=0.5,
+        warnings=[],
+    )
+    values.update(overrides)
+    return TelemetryRecord(**values)
+
+
+@SKIP_NO_DB
 class TestDatabaseManager(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.db_path = os.path.join(self.test_dir, "test_telemetry.db")
-        self.db = DatabaseManager(db_path=self.db_path, batch_size=5, flush_interval_sec=0.2)
+        self.schema, self.db_url = create_isolated_schema()
+        self.db = DatabaseManager(db_url=self.db_url, batch_size=5, flush_interval_sec=0.2)
 
     def tearDown(self):
         self.db.close()
+        drop_isolated_schema(self.schema)
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def test_schema_and_batched_logging(self):
@@ -135,7 +199,7 @@ class TestDatabaseManager(unittest.TestCase):
         self.assertTrue(self.db.log_telemetry(rec))
 
     def test_read_only_mode_enforcement(self):
-        ro_db = DatabaseManager(db_path=self.db_path, read_only=True)
+        ro_db = DatabaseManager(db_url=self.db_url, read_only=True)
         self.assertTrue(ro_db.read_only)
         self.assertFalse(ro_db.is_write_enabled())
 
@@ -200,8 +264,8 @@ class TestDatabaseManager(unittest.TestCase):
         with open(out_csv, "r", encoding="utf-8") as f:
             reader = csv.reader(f)
             header = next(reader)
-            self.assertIn("speed_kmh", header)
-            self.assertIn("battery_soc", header)
+            self.assertIn("speed_mph", header)
+            self.assertIn("battery_percent", header)
             self.assertIn("gear", header)
             row = next(reader)
             self.assertGreater(len(row), 5)
@@ -221,6 +285,89 @@ class TestDatabaseManager(unittest.TestCase):
         summary_csv = os.path.join(self.test_dir, "all_summary.csv")
         out_sum = self.db.export_all_sessions_summary_csv(output_path=summary_csv)
         self.assertTrue(os.path.exists(out_sum))
+
+    def test_srs_columns_and_units(self):
+        """Readings are stored with SRS names/units: mph, watts, battery percent, warning list."""
+        self.db.set_signal_status("CAN ACTIVE")
+        session_id = self.db.start_session(initial_soc=90.0)
+        self.assertTrue(
+            self.db.log_telemetry(
+                make_record(speed_kmh=100.0, battery_power_kw=10.0, battery_soc=150.0, warnings=["HIGH TEMP"])
+            )
+        )
+        time.sleep(0.6)
+
+        row = self.db.get_recent_telemetry(limit=1)[0]
+        self.assertEqual(row["session_id"], session_id)
+        self.assertAlmostEqual(row["speed_mph"], 62.1371, places=2)
+        self.assertAlmostEqual(row["power_draw_watts"], 10000.0, places=1)
+        self.assertEqual(row["battery_percent"], 100.0)  # out-of-range sensor value is clamped
+        self.assertEqual(row["warning_state"], ["HIGH TEMP"])
+        self.assertEqual(row["signal_status"], "CAN ACTIVE")
+        self.assertEqual(row["motor_temperature"], 45.0)
+
+    def test_every_reading_belongs_to_a_session(self):
+        """With no session active, logging starts one (TELEMETRY_LOG.session_id is NOT NULL)."""
+        self.assertTrue(self.db.log_telemetry(make_record()))
+        time.sleep(0.6)
+        sessions = self.db.get_all_sessions()
+        self.assertEqual(len(sessions), 1)
+        self.assertEqual(self.db.get_recent_telemetry(limit=5)[0]["session_id"], sessions[0]["session_id"])
+
+    def test_session_lifecycle_and_interrupted_sessions(self):
+        first = self.db.start_session(initial_soc=95.0)
+        # Simulate a crash: the first session is never ended, then a new run starts.
+        self.db._current_session_id = None
+        second = self.db.start_session(initial_soc=80.0)
+        self.assertNotEqual(first, second)
+        self.db.end_session(75.0, 100.0, 50.0, 3.0, 0.5)
+
+        by_id = {s["session_id"]: s for s in self.db.get_all_sessions()}
+        self.assertEqual(by_id[first]["status"], "INTERRUPTED")
+        self.assertIsNotNone(by_id[first]["end_timestamp"])
+        self.assertEqual(by_id[second]["status"], "COMPLETED")
+        self.assertAlmostEqual(by_id[second]["max_speed_mph"], 62.1371, places=2)
+        self.assertEqual(by_id[second]["end_soc_percent"], 75.0)
+
+    def test_source_change_marks_session_mixed(self):
+        self.db.set_source_type("CAN_BUS")
+        session_id = self.db.start_session()
+        self.db.set_source_type("SIMULATION")
+        session = [s for s in self.db.get_all_sessions() if s["session_id"] == session_id][0]
+        self.assertEqual(session["source_type"], "MIXED")
+
+    def test_session_based_retention(self):
+        for i in range(5):
+            self.db.start_session(initial_soc=90.0)
+            self.db.log_telemetry(make_record(speed_kmh=10.0 + i))
+            time.sleep(0.5)  # let the writer flush this session's reading
+            self.db.end_session(89.0, 20.0, 10.0, 1.0, 0.1)
+
+        self.assertEqual(len(self.db.get_all_sessions()), 5)
+        self.assertEqual(self.db.prune_old_sessions(keep_sessions=2), 3)
+
+        remaining = self.db.get_all_sessions()
+        self.assertEqual(len(remaining), 2)
+        # Telemetry of pruned sessions is removed with them (no orphans).
+        readings = self.db.get_recent_telemetry(limit=100)
+        self.assertEqual(len(readings), 2)
+        self.assertEqual({r["session_id"] for r in readings}, {s["session_id"] for s in remaining})
+
+    def test_retention_never_deletes_active_session(self):
+        self.db.start_session()
+        self.assertEqual(self.db.prune_old_sessions(keep_sessions=1), 0)
+        self.assertEqual(len(self.db.get_all_sessions()), 1)
+
+    def test_recent_window_returns_last_15_seconds(self):
+        session_id = self.db.start_session()
+        base = time.time() - 60
+        for offset in (0, 10, 20, 30):
+            self.db.log_telemetry(make_record(timestamp=base + offset))
+        time.sleep(0.8)
+
+        window = self.db.get_recent_window(session_id, seconds=15)
+        self.assertEqual(len(window), 2)  # readings at +20 s and +30 s
+        self.assertLessEqual(window[0]["timestamp"], window[1]["timestamp"])
 
 
 class TestCANTelemetrySource(unittest.TestCase):
@@ -679,6 +826,7 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertEqual(modes_switched, ["RACE", "SIMULATION"])
 
 
+@SKIP_NO_DB
 class TestVoltesseAppModes(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -686,9 +834,10 @@ class TestVoltesseAppModes(unittest.TestCase):
 
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.db_path = os.path.join(self.test_dir, "test_app.db")
+        self.schema, self.db_url = create_isolated_schema()
 
     def tearDown(self):
+        drop_isolated_schema(self.schema)
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def test_app_mode_transitions_and_transmission(self):
@@ -697,7 +846,7 @@ class TestVoltesseAppModes(unittest.TestCase):
             can_interface=None,
             can_channel=None,
             can_mock=False,
-            db_path=self.db_path,
+            db_url=self.db_url,
             interval_ms=10,
             batch_size=5,
             flush_interval=0.2,
@@ -766,7 +915,7 @@ class TestVoltesseAppModes(unittest.TestCase):
             can_interface=None,
             can_channel=None,
             can_mock=False,
-            db_path=self.db_path,
+            db_url=self.db_url,
             interval_ms=10,
             batch_size=5,
             flush_interval=0.2,
@@ -785,7 +934,7 @@ class TestVoltesseAppModes(unittest.TestCase):
             can_interface=None,
             can_channel=None,
             can_mock=False,
-            db_path=self.db_path,
+            db_url=self.db_url,
             interval_ms=10,
             batch_size=5,
             flush_interval=0.2,
@@ -808,7 +957,7 @@ class TestVoltesseAppModes(unittest.TestCase):
             can_interface=None,
             can_channel=None,
             can_mock=False,
-            db_path=self.db_path,
+            db_url=self.db_url,
             interval_ms=10,
             batch_size=5,
             flush_interval=0.2,
