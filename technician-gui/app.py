@@ -1,7 +1,8 @@
 """Voltesse Dash — Technician/Admin Streamlit presentation prototype.
 
-Run from the project root: python -m streamlit run app.py
-Uses simulated telemetry only; login is NOT real authentication.
+Run from this folder (technician-gui/): python -m streamlit run app.py
+Shows simulated telemetry, or the Voltesse PostgreSQL database when VOLTESSE_DB_URL is set
+(see data/source.py). Login is NOT real authentication.
 """
 
 import streamlit as st

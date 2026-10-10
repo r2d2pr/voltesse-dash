@@ -3,18 +3,36 @@
 import plotly.graph_objects as go
 import streamlit as st
 
-from data.simulator import live_metrics, live_temperature_history
+from data import source
 
 
 def show_live():
     st.title("Live Telemetry")
-    st.caption("Voltesse Dash | Simulated Vehicle Data")
+    if source.USING_DB:
+        st.caption("Voltesse Dash | Latest reading from the database (refreshes every second)")
+        live_from_db()
+        return
 
+    st.caption("Voltesse Dash | Simulated Vehicle Data")
     simulation_time = st.slider(
         "Simulation Time (seconds)", min_value=0, max_value=120, value=30, step=5,
     )
-    values = live_metrics(simulation_time)
+    times, temperatures = source.live_temperature_history(simulation_time)
+    show_vehicle_status(source.live_metrics(simulation_time), times, temperatures,
+                        "Simulation Time (seconds)")
 
+
+@st.fragment(run_every=1)
+def live_from_db():
+    values = source.latest_metrics()
+    if values is None:
+        st.info("No telemetry recorded yet. Start the dashboard (main.py) to log a session.")
+        return
+    times, temperatures = source.temperature_history()
+    show_vehicle_status(values, times, temperatures, "Time Into Session (seconds)")
+
+
+def show_vehicle_status(values, times, temperatures, x_title):
     st.subheader("Vehicle Status")
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Speed", f"{values['speed']} MPH", border=True)
@@ -35,7 +53,6 @@ def show_live():
         st.success("Vehicle Status: Normal")
 
     st.subheader("Motor Temperature (Last 60 Seconds)")
-    times, temperatures = live_temperature_history(simulation_time)
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=times, y=temperatures, mode="lines", name="Motor Temperature",
@@ -46,7 +63,7 @@ def show_live():
         annotation_text="Warning Limit", annotation_position="top right",
     )
     fig.update_layout(
-        xaxis_title="Simulation Time (seconds)",
+        xaxis_title=x_title,
         yaxis_title="Temperature (°C)", height=400,
         margin=dict(l=30, r=30, t=40, b=30),
     )

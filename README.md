@@ -98,8 +98,9 @@ voltesse-dash/
 │   ├── telemetry_source.py    # Autonomous EV driving cycle telemetry stream (Test Mode, D1-D6 auto)
 │   ├── dashboard_gui.py       # PyQt6 digital cluster interface & auto-scaling widgets
 │   └── database.py            # PostgreSQL access: batched writer, sessions, retention, write controls, exports
+├── technician-gui/            # Streamlit Technician/Admin dashboard (simulated data, or the database via VOLTESSE_DB_URL)
 ├── tests/
-│   └── test_voltesse.py       # Comprehensive unit and integration test suite (16 tests)
+│   └── test_voltesse.py       # Comprehensive unit and integration test suite (25 tests)
 ├── main.py                    # Application lifecycle, transmission, and mode controller
 ├── requirements.txt           # Python dependencies (PyQt6, python-can)
 ├── AGENTS.md                  # Embedded developer rules, architecture contracts & specifications
@@ -159,6 +160,8 @@ export VOLTESSE_DB_URL=postgresql://voltesse:voltesse@localhost:5432/voltesse_da
 # or (Windows PowerShell): $env:VOLTESSE_DB_URL="postgresql://voltesse:voltesse@localhost:5432/voltesse_dash"
 ```
 
+Keep the virtual environment out of iCloud- or OneDrive-synced folders (such as `~/Documents` with iCloud Desktop & Documents on): Qt can't find its platform plugin there and Python quits on launch. A venv elsewhere, e.g. `python -m venv ~/.venvs/voltesse-dash`, works.
+
 No Docker? [db/README.md](db/README.md#without-docker-fallback) shows how to install PostgreSQL directly on macOS, Windows or the Pi. Without any database the dashboard still runs, with logging switched off.
 
 ### 3. Launching the Dashboard
@@ -197,11 +200,24 @@ python main.py --export-csv 1
 # Export specific trip session to structured JSON
 python main.py --export-json 1
 
-# Export from a custom database location
-python main.py --db-path data/voltesse_telemetry.db --export-csv 1
+# Export from a specific database
+python main.py --db-url postgresql://voltesse:voltesse@localhost:5432/voltesse_dash --export-csv 1
 ```
 
 Generated files are saved directly to `data/exports/`.
+
+### 5. Technician GUI (Streamlit)
+
+A separate Technician/Admin dashboard in `technician-gui/` with Live, Diagnostics, Sessions and Settings pages. It shows **simulated data** unless `VOLTESSE_DB_URL` is set, in which case it reads the PostgreSQL database: the newest reading (refreshing every second), recorded sessions, and Diagnostics charts built from the views in `db/schema.sql`.
+
+```bash
+pip install -r technician-gui/requirements.txt
+cd technician-gui
+export VOLTESSE_DB_URL=postgresql://voltesse:voltesse@localhost:5432/voltesse_dash   # leave out for simulated data
+streamlit run app.py            # opens http://localhost:8501
+```
+
+Run `python main.py` in another terminal (with the same `VOLTESSE_DB_URL`) to watch the Live page update while you drive. The login is a presentation demo, not real authentication, so do not expose the GUI with a database URL set.
 
 #### Command-Line Options
 
@@ -232,6 +248,12 @@ Execute the automated test suite with Python's built-in `unittest`. The database
 ```bash
 export VOLTESSE_TEST_DB_URL=postgresql://voltesse:voltesse@localhost:5432/voltesse_test
 python -m unittest discover tests
+```
+
+The technician GUI has its own tests (run from `technician-gui/`; the database test is skipped unless `VOLTESSE_DB_URL` is set):
+
+```bash
+cd technician-gui && python -m unittest discover tests
 ```
 
 ---

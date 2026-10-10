@@ -3,7 +3,7 @@
 import plotly.graph_objects as go
 import streamlit as st
 
-from data.simulator import diagnostics_data
+from data import source
 
 
 def compact_chart(figure):
@@ -19,7 +19,7 @@ def compact_chart(figure):
 
 def show_diagnostics():
     st.header("Vehicle Diagnostics")
-    st.caption("Voltesse Dash | Simulated Performance Analysis")
+    st.caption("Voltesse Dash | " + ("Performance Analysis (database)" if source.USING_DB else "Simulated Performance Analysis"))
 
     selected = st.session_state.get("selected_session")
     if selected:
@@ -28,9 +28,10 @@ def show_diagnostics():
             f"Duration: {selected['duration']} | Max Temperature: {selected['max_temp']} °C"
         )
     else:
-        st.info("No session selected. Visit the Sessions page and click View.")
+        st.info("No session selected. Showing the newest session." if source.USING_DB
+                else "No session selected. Visit the Sessions page and click View.")
 
-    data = diagnostics_data(selected)
+    data = source.diagnostics_data(selected)
     top_cols = st.columns(3, gap="small")
     bottom_cols = st.columns(2, gap="small")
 
@@ -45,7 +46,7 @@ def show_diagnostics():
     fig.update_layout(
         xaxis_title="Vehicle Speed (MPH)",
         yaxis_title="Energy Consumption (Wh/mi)",
-        yaxis_range=[110, 300], template="plotly_white",
+        yaxis_range=None if source.USING_DB else [110, 300], template="plotly_white",
     )
     top_cols[0].plotly_chart(compact_chart(fig), width="stretch")
 

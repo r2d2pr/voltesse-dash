@@ -21,7 +21,7 @@ The schema follows the SRS (Activity 4.3, v1.1, section 3.4 Logical Database Req
 
 `vehicle_session` and `telemetry_log` also have a few **extra nullable columns** for values the app already records (battery voltage/current, inverter temperature, throttle, brake, gear, trip distance and so on, plus session summary fields). They are not in the SRS table and should be listed in the SDD, or removed if the team prefers the SRS columns only.
 
-Technician troubleshooting metrics are views: `v_efficiency_by_speed`, `v_power_by_temperature`, `v_battery_over_distance`, `v_power_by_rpm`, `v_temperature_over_time`.
+Technician troubleshooting metrics are views: `v_efficiency_by_speed`, `v_power_by_temperature`, `v_battery_over_distance`, `v_power_by_rpm`, `v_temperature_over_time`. The technician GUI (`technician-gui/`) draws its Diagnostics charts from them when `VOLTESSE_DB_URL` is set.
 
 Retention: `SELECT prune_old_sessions(20, 0);` deletes sessions outside the newest 20 (and older than 0 days). Active sessions are never deleted. The app calls it at startup (`--keep-sessions`). PR-4 allows "15 days or 15-20 sessions", so the team still has to approve the final numbers.
 

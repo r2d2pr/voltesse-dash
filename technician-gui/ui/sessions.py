@@ -2,18 +2,18 @@
 
 import streamlit as st
 
-from data.simulator import SESSIONS
+from data import source
 
 
 def show_sessions():
     st.title("Recent Sessions")
-    st.caption("Voltesse Dash | Simulated Session History")
+    st.caption("Voltesse Dash | " + ("Session History (database)" if source.USING_DB else "Simulated Session History"))
 
     headers = st.columns([1, 2, 1, 1, 1])
     for col, label in zip(headers, ["Session", "Date", "Duration", "Max Temp", "Action"]):
         col.markdown(f"**{label}**")
 
-    for session in SESSIONS:
+    for session in source.get_sessions():
         cols = st.columns([1, 2, 1, 1, 1])
         cols[0].write(session["id"])
         cols[1].write(session["date"])
@@ -29,4 +29,4 @@ def show_sessions():
             f"Date: {selected['date']} | Duration: {selected['duration']} | "
             f"Max Temperature: {selected['max_temp']} °C"
         )
-        st.caption("Open Diagnostics to review the selected session's simulated charts.")
+        st.caption("Open Diagnostics to review the selected session's charts.")
