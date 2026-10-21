@@ -179,6 +179,9 @@ source .venv/bin/activate        # Linux/macOS
 # Install driver cockpit dependencies
 pip install -r requirements.txt
 
+# Or install ALL dependencies (Cockpit + Technician Web Portal)
+pip install -r requirements-all.txt
+
 # Start the local PostgreSQL database (see db/README.md for details)
 cd db && cp .env.example .env && docker compose up -d && cd ..
 export VOLTESSE_DB_URL=postgresql://voltesse:voltesse@localhost:5432/voltesse_dash
