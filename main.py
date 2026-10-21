@@ -67,6 +67,8 @@ class VoltesseApp:
             self.gui.set_hero_view(args.view)
         if getattr(args, "swap_wings", False):
             self.gui.set_wing_swap(args.swap_wings)
+        if getattr(args, "no_animation", False):
+            self.gui.set_animation_enabled(False)
 
         # Screen enumeration & hardware detection
         screens = self.app.screens()
@@ -572,6 +574,11 @@ def parse_args() -> argparse.Namespace:
         "--swap-wings",
         action="store_true",
         help="Swap left and right cockpit wings (default: false)",
+    )
+    parser.add_argument(
+        "--no-animation",
+        action="store_true",
+        help="Disable slide animations when switching cockpit views",
     )
     return parser.parse_args()
 

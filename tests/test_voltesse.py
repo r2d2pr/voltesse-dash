@@ -1006,8 +1006,46 @@ class TestDashboardGUI(unittest.TestCase):
             sys.argv = ["main.py", "--view", "powertrain"]
             args = parse_args()
             self.assertEqual(args.view, "powertrain")
+
+            # Test --no-animation flag
+            sys.argv = ["main.py", "--no-animation"]
+            args = parse_args()
+            self.assertTrue(args.no_animation)
         finally:
             sys.argv = old_argv
+
+    def test_gui_animated_view_transitions(self):
+        gui = VoltesseDashboard()
+        gui.resize(800, 480)
+
+        # 1. Animation enabled by default with AnimatedStackedWidget
+        self.assertTrue(hasattr(gui, "page_stack"))
+        self.assertTrue(hasattr(gui.page_stack, "slide_to_index"))
+        self.assertTrue(gui.page_stack.is_animation_enabled())
+
+        # 2. Toggle animation enabled state
+        gui.set_animation_enabled(False)
+        self.assertFalse(gui.page_stack.is_animation_enabled())
+        gui.set_animation_enabled(True)
+        self.assertTrue(gui.page_stack.is_animation_enabled())
+
+        # 3. Test slide direction determination and wraparound
+        gui.set_page(0, animated=False)
+        self.assertEqual(gui.page_stack.currentIndex(), 0)
+
+        gui.next_page()
+        self.assertEqual(gui.page_stack.currentIndex(), 1)
+
+        gui.next_page()
+        self.assertEqual(gui.page_stack.currentIndex(), 2)
+
+        gui.prev_page()
+        self.assertEqual(gui.page_stack.currentIndex(), 1)
+
+        # 4. Immediate settlement with finish_animation
+        gui.page_stack.slide_to_index(3, direction="RIGHT", animated=True)
+        gui.page_stack.finish_animation()
+        self.assertEqual(gui.page_stack.currentIndex(), 3)
 
 
 

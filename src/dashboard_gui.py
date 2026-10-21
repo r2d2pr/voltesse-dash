@@ -15,7 +15,17 @@ import math
 import time
 from typing import Deque, List, Optional, Set, Tuple
 
-from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import (
+    QEasingCurve,
+    QParallelAnimationGroup,
+    QPoint,
+    QPointF,
+    QPropertyAnimation,
+    QRectF,
+    Qt,
+    QTimer,
+    pyqtSignal,
+)
 from PyQt6.QtGui import (
     QBrush,
     QColor,
@@ -30,6 +40,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import (
     QApplication,
     QFrame,
+    QGraphicsOpacityEffect,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -1759,6 +1770,189 @@ class PowertrainHeroWidget(QWidget):
         painter.end()
 
 
+class AnimatedStackedWidget(QStackedWidget):
+    """
+    High-end automotive sliding carousel stacked widget with smooth cubic easing
+    and depth crossfade transitions between cockpit views.
+    Supports directional horizontal transitions (Left / Right), rapid interruption
+    handling, and instantaneous fallback for headless tests or unmapped windows.
+    """
+    animation_finished = pyqtSignal(int)  # Emits current index when transition completes
+
+    def __init__(self, parent: Optional[QWidget] = None, duration_ms: int = 260):
+        super().__init__(parent)
+        self.duration_ms = duration_ms
+        self._animation_enabled: bool = True
+        self._target_index: int = 0
+        self._is_animating: bool = False
+        self._anim_group: Optional[QParallelAnimationGroup] = None
+        self._active_widgets: List[QWidget] = []
+
+    def set_animation_enabled(self, enabled: bool) -> None:
+        """Enables or disables view transition animations."""
+        self._animation_enabled = bool(enabled)
+        if not self._animation_enabled and self._is_animating:
+            self.finish_animation()
+
+    def is_animation_enabled(self) -> bool:
+        return self._animation_enabled
+
+    def currentIndex(self) -> int:
+        if self._is_animating:
+            return self._target_index
+        return super().currentIndex()
+
+    def currentWidget(self) -> Optional[QWidget]:
+        if self._is_animating:
+            return self.widget(self._target_index)
+        return super().currentWidget()
+
+    def setCurrentIndex(self, index: int) -> None:
+        """Immediate set index without animation."""
+        self.finish_animation()
+        self._target_index = index
+        super().setCurrentIndex(index)
+
+    def finish_animation(self) -> None:
+        """Immediately settles any in-flight slide animation."""
+        if self._anim_group is not None:
+            try:
+                self._anim_group.stop()
+            except Exception:
+                pass
+            self._anim_group = None
+        for w in self._active_widgets:
+            try:
+                w.setGraphicsEffect(None)
+                w.move(0, 0)
+            except Exception:
+                pass
+        self._active_widgets.clear()
+        if self._is_animating:
+            self._is_animating = False
+            super().setCurrentIndex(self._target_index)
+            self.animation_finished.emit(self._target_index)
+
+    def slide_to_index(
+        self,
+        next_index: int,
+        direction: Optional[str] = None,
+        animated: bool = True,
+    ) -> None:
+        """
+        Transitions to next_index with a smooth horizontal slide and crossfade.
+        direction: "RIGHT" (slides left, enters from right) or "LEFT" (slides right, enters from left).
+        """
+        count = self.count()
+        if count <= 0:
+            return
+        next_index = max(0, min(next_index, count - 1))
+        curr_index = self.currentIndex()
+
+        if next_index == curr_index and not self._is_animating:
+            return
+
+        # Settle any running animation first
+        if self._is_animating:
+            self.finish_animation()
+            curr_index = super().currentIndex()
+            if next_index == curr_index:
+                return
+
+        # Settle instantly if animations disabled, widget hidden, or zero size
+        if (
+            not self._animation_enabled
+            or not self.isVisible()
+            or self.width() <= 10
+            or not animated
+            or self.duration_ms <= 0
+        ):
+            self._target_index = next_index
+            super().setCurrentIndex(next_index)
+            return
+
+        curr_widget = self.widget(curr_index)
+        next_widget = self.widget(next_index)
+        if not curr_widget or not next_widget or curr_widget == next_widget:
+            self._target_index = next_index
+            super().setCurrentIndex(next_index)
+            return
+
+        # Determine slide direction
+        if direction is None:
+            direction = "RIGHT" if next_index > curr_index else "LEFT"
+        else:
+            direction = str(direction).upper().strip()
+
+        w = self.width()
+        h = self.height()
+        offset_x = w if direction == "RIGHT" else -w
+
+        self._target_index = next_index
+        self._is_animating = True
+        self._active_widgets = [curr_widget, next_widget]
+
+        # Position incoming widget off-screen
+        next_widget.setGeometry(offset_x, 0, w, h)
+        next_widget.setVisible(True)
+        next_widget.raise_()
+
+        # Apply depth crossfade graphics effects
+        eff_curr = QGraphicsOpacityEffect(curr_widget)
+        curr_widget.setGraphicsEffect(eff_curr)
+        eff_curr.setOpacity(1.0)
+
+        eff_next = QGraphicsOpacityEffect(next_widget)
+        next_widget.setGraphicsEffect(eff_next)
+        eff_next.setOpacity(0.2)
+
+        group = QParallelAnimationGroup(self)
+
+        # Outgoing widget position animation: 0 -> -offset_x
+        anim_pos_curr = QPropertyAnimation(curr_widget, b"pos")
+        anim_pos_curr.setDuration(self.duration_ms)
+        anim_pos_curr.setStartValue(QPoint(0, 0))
+        anim_pos_curr.setEndValue(QPoint(-offset_x, 0))
+        anim_pos_curr.setEasingCurve(QEasingCurve.Type.OutCubic)
+        group.addAnimation(anim_pos_curr)
+
+        # Outgoing widget opacity animation: 1.0 -> 0.15
+        anim_op_curr = QPropertyAnimation(eff_curr, b"opacity")
+        anim_op_curr.setDuration(self.duration_ms)
+        anim_op_curr.setStartValue(1.0)
+        anim_op_curr.setEndValue(0.15)
+        anim_op_curr.setEasingCurve(QEasingCurve.Type.OutCubic)
+        group.addAnimation(anim_op_curr)
+
+        # Incoming widget position animation: offset_x -> 0
+        anim_pos_next = QPropertyAnimation(next_widget, b"pos")
+        anim_pos_next.setDuration(self.duration_ms)
+        anim_pos_next.setStartValue(QPoint(offset_x, 0))
+        anim_pos_next.setEndValue(QPoint(0, 0))
+        anim_pos_next.setEasingCurve(QEasingCurve.Type.OutCubic)
+        group.addAnimation(anim_pos_next)
+
+        # Incoming widget opacity animation: 0.2 -> 1.0
+        anim_op_next = QPropertyAnimation(eff_next, b"opacity")
+        anim_op_next.setDuration(self.duration_ms)
+        anim_op_next.setStartValue(0.2)
+        anim_op_next.setEndValue(1.0)
+        anim_op_next.setEasingCurve(QEasingCurve.Type.OutCubic)
+        group.addAnimation(anim_op_next)
+
+        def _on_done():
+            self.finish_animation()
+
+        group.finished.connect(_on_done)
+        self._anim_group = group
+        group.start()
+
+    def resizeEvent(self, event) -> None:
+        if self._is_animating:
+            self.finish_animation()
+        super().resizeEvent(event)
+
+
 class VoltesseDashboard(QMainWindow):
     """
     Main Automotive Digital Cockpit Cluster Window.
@@ -1958,7 +2152,7 @@ class VoltesseDashboard(QMainWindow):
         # -------------------------------------------------------------
         # 2. MAIN COCKPIT CENTRAL STAGE (Full-Width Single Widget Stack)
         # -------------------------------------------------------------
-        self.page_stack = QStackedWidget()
+        self.page_stack = AnimatedStackedWidget(duration_ms=260)
         self.page_stack.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         # Page 0: Full-Width Speedometer Dial (MPH)
@@ -2300,14 +2494,49 @@ class VoltesseDashboard(QMainWindow):
             )
             self.controls_hint.setText("[TEST: AUTO ONLY | V:VIEW | X:SWAP | 1:RACE | 2:SIM | U:UNITS | L:LOG | SPACE:PAUSE]")
 
+    def _flash_nav_btn(self, btn: QPushButton) -> None:
+        """Briefly flashes chevron button for tactile visual feedback."""
+        if not self.isVisible():
+            return
+        try:
+            btn.setStyleSheet(
+                "QPushButton { color: #FFFFFF; background: rgba(0, 245, 160, 0.35); border-radius: 3px; font-weight: bold; font-size: 10pt; }"
+            )
+            QTimer.singleShot(
+                150,
+                btn,
+                lambda: btn.setStyleSheet(
+                    "QPushButton { color: #00F5A0; background: transparent; border: none; font-weight: bold; font-size: 10pt; } "
+                    "QPushButton:hover { color: #FFFFFF; }"
+                ),
+            )
+        except Exception:
+            pass
+
+    def set_animation_enabled(self, enabled: bool) -> None:
+        """Enables or disables view transition slide animations."""
+        if hasattr(self, "page_stack") and hasattr(self.page_stack, "set_animation_enabled"):
+            self.page_stack.set_animation_enabled(enabled)
+
     PAGE_NAMES = ["SPEED", "BATTERY", "POWERTRAIN", "TPMS"]
 
-    def set_page(self, index: int) -> None:
-        """Sets the active full-width page in the main cluster stack."""
+    def set_page(self, index: int, direction: Optional[str] = None, animated: bool = True) -> None:
+        """Sets the active full-width page in the main cluster stack with smooth slide animation."""
+        prev_idx = self.current_page_idx
         self.current_page_idx = index % len(self.PAGE_NAMES)
-        self.page_stack.setCurrentIndex(self.current_page_idx)
         p_name = self.PAGE_NAMES[self.current_page_idx]
         self.active_hero_view = p_name
+
+        if direction is None:
+            if self.current_page_idx > prev_idx:
+                direction = "RIGHT"
+            elif self.current_page_idx < prev_idx:
+                direction = "LEFT"
+
+        if hasattr(self.page_stack, "slide_to_index"):
+            self.page_stack.slide_to_index(self.current_page_idx, direction=direction, animated=animated)
+        else:
+            self.page_stack.setCurrentIndex(self.current_page_idx)
 
         swap_suffix = " [⇄]" if self.swap_wings else ""
         self.page_title_label.setText(f"◄ {p_name} [{self.current_page_idx+1}/4]{swap_suffix} ►")
@@ -2356,18 +2585,24 @@ class VoltesseDashboard(QMainWindow):
         self.hero_view_changed.emit(self.active_hero_view)
 
     def next_page(self) -> None:
-        """Navigates to the next widget page (Right)."""
-        self.set_page(self.current_page_idx + 1)
+        """Navigates to the next widget page (Right) with slide animation."""
+        if hasattr(self, "nav_next_btn"):
+            self._flash_nav_btn(self.nav_next_btn)
+        self.set_page(self.current_page_idx + 1, direction="RIGHT")
 
     def prev_page(self) -> None:
-        """Navigates to the previous widget page (Left)."""
-        self.set_page(self.current_page_idx - 1)
+        """Navigates to the previous widget page (Left) with slide animation."""
+        if hasattr(self, "nav_prev_btn"):
+            self._flash_nav_btn(self.nav_prev_btn)
+        self.set_page(self.current_page_idx - 1, direction="LEFT")
 
     def set_hero_view(self, view_name: str) -> None:
         """Sets the active widget page in the central stack by name."""
         v = view_name.upper().strip()
         mapping = {"SPEED": 0, "BATTERY": 1, "BATT": 1, "POWERTRAIN": 2, "PWR": 2, "TPMS": 3}
-        self.set_page(mapping.get(v, 0))
+        target = mapping.get(v, 0)
+        direction = "RIGHT" if target >= self.current_page_idx else "LEFT"
+        self.set_page(target, direction=direction)
 
     def cycle_hero_view(self) -> str:
         """Cycles to the next widget page."""

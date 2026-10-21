@@ -1,6 +1,6 @@
-# Voltesse Dash ⚡ v4.2.0
+# Voltesse Dash ⚡ v4.3.0
 
-[![Version](https://img.shields.io/badge/version-4.2.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
+[![Version](https://img.shields.io/badge/version-4.3.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/PyQt-6-green.svg)](https://riverbankcomputing.com/software/pyqt/)
 [![Web](https://img.shields.io/badge/Streamlit-1.65-red.svg)](https://streamlit.io/)
@@ -8,7 +8,31 @@
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 4.2.0 delivers an **Always-Visible Speed View across all cockpit pages** (real-time velocity, active gear, motor RPM, dynamic speed progress bar, throttle/brake and steering telemetry on Battery, Powertrain, and TPMS views), and a **Modern High-End Cyber Flair Overhaul for the Bottom Telemetry Deck** (sculpted obsidian cards, glowing state-aware borders, status tags, and micro-thermometer level bars for Motor, Inverter, and Battery thermals, paired with a glowing Trip Odometer pod), building on an **Exclusively Imperial Telemetry System** (`MPH`, `mi`, `°F`, `psi`, `lb-ft`), **Continuous Always-Active Logging**, and **Streamlined Non-Invasive Top HUD Ribbon**. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
+A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 4.3.0 delivers **Modern Automotive Slide & Depth-Crossfade Animated View Transitions between Cockpit Pages**, building on Version 4.2's **Always-Visible Speed View across all cockpit pages** (real-time velocity, active gear, motor RPM, dynamic speed progress bar, throttle/brake and steering telemetry on Battery, Powertrain, and TPMS views), a **Modern High-End Cyber Flair Overhaul for the Bottom Telemetry Deck** (sculpted obsidian cards, glowing state-aware borders, status tags, and micro-thermometer level bars for Motor, Inverter, and Battery thermals, paired with a glowing Trip Odometer pod), an **Exclusively Imperial Telemetry System** (`MPH`, `mi`, `°F`, `psi`, `lb-ft`), **Continuous Always-Active Logging**, and **Streamlined Non-Invasive Top HUD Ribbon**. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
+
+---
+
+## What's New in Version 4.3.0 🚀
+
+- 🎬 **Modern Automotive Animated View Transitions**:
+  - Upgraded the central cockpit stage with `AnimatedStackedWidget`, bringing fluid, high-end hypercar cluster carousel animations between views.
+  - **Directional Horizontal Slide**:
+    - **Navigating Right (`►`, `Right Arrow`, `V` key)**: Active view smoothly glides off to the left while the incoming view slides in effortlessly from the right.
+    - **Navigating Left (`◄`, `Left Arrow`)**: Active view glides off to the right while the incoming view slides in from the left.
+    - **Circular Wraparound**: Flawless loop transitions between Page 4 (`TPMS`) and Page 1 (`SPEED`).
+  - **Depth Crossfade**:
+    - Outgoing card smoothly fades out (1.0 ➔ 0.15) to simulate depth and spatial separation.
+    - Incoming card glides in glowing with an opacity ramp (0.2 ➔ 1.0).
+  - **Snappy 260ms Cubic Easing (`QEasingCurve.Type.OutCubic`)**:
+    - Engineered for authentic automotive feel—instant response to driver input with smooth, gentle deceleration upon arrival.
+  - **Tactile Chevron Haptic Pulse**:
+    - Interactive touch chevrons (`◄` / `►`) in the Top HUD ribbon illuminate with a momentary white pulse upon click or key press for instant tactile feedback.
+  - **Zero-Overhead Settle & Immediate Interruption Handling**:
+    - Graphics effects are automatically purged upon animation completion, maintaining 100% native rendering speed with zero GPU/CPU drag.
+    - Rapid consecutive page switches immediately fast-forward and cleanly glide to the newly requested view without stutter or ghosting.
+  - **CLI & Runtime Controls**:
+    - `--no-animation`: Option to disable transitions for instant cuts on lower-powered hardware or headless bench testing.
+    - Programmatic toggle via `gui.set_animation_enabled(bool)`.
 
 ---
 
@@ -152,7 +176,7 @@ voltesse-dash/
 ├── data/
 │   └── exports/               # Generated CSV & JSON session dumps (auto-created)
 ├── src/
-│   ├── __init__.py            # Package version (v4.2.0)
+│   ├── __init__.py            # Package version (v4.3.0)
 │   ├── can_bus_source.py      # CAN Bus interface, frame decoders, and synchronized mock transmitter
 │   ├── simulation_source.py   # Video-game interactive EV dynamics engine (W/A/S/D, 6-speed manual, D1-D6 auto)
 │   ├── telemetry_source.py    # Autonomous EV driving cycle telemetry stream (Test Mode, D1-D6 auto)
@@ -167,7 +191,7 @@ voltesse-dash/
 │   ├── tests/                 # Unit tests for database integration and simulator
 │   └── requirements.txt       # Streamlit dependencies (streamlit, pandas, plotly, psycopg)
 ├── tests/
-│   └── test_voltesse.py       # Comprehensive unit and integration test suite (28 tests)
+│   └── test_voltesse.py       # Comprehensive unit and integration test suite (29 tests)
 ├── main.py                    # Application lifecycle, transmission, and mode controller
 ├── requirements.txt           # Driver cockpit dependencies (PyQt6, python-can, psycopg)
 ├── AGENTS.md                  # Embedded developer rules, architecture contracts & specifications
