@@ -8,7 +8,7 @@ Type=simple
 User=admin
 WorkingDirectory=/home/admin/voltesse-dash/technician-gui
 Environment="VOLTESSE_DB_URL=postgresql://voltesse:voltesse@localhost:5432/voltesse_dash"
-ExecStart=/home/admin/voltesse-dash/venv/bin/streamlit run app.py --server.port 8501 --server.headless true
+ExecStart=/home/admin/voltesse-dash/venv/bin/streamlit run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false
 Restart=always
 RestartSec=5
 
