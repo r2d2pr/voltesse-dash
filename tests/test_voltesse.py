@@ -870,59 +870,71 @@ class TestDashboardGUI(unittest.TestCase):
         gui = VoltesseDashboard()
         gui.resize(800, 480)
 
-        # 1. Default initial state is SPEED hero view with unswapped wings
+        # 1. Default initial state is SPEED page (1/4)
         self.assertEqual(gui.active_hero_view, "SPEED")
         self.assertFalse(gui.swap_wings)
-        self.assertEqual(gui.center_stack.currentIndex(), 0)      # Speed Dial
-        self.assertEqual(gui.wing_1_top_stack.currentIndex(), 0)  # Battery Widget
-        self.assertEqual(gui.wing_2_stack.currentIndex(), 0)      # Dynamics Group
-        self.assertEqual(gui.view_badge.text(), "VIEW: SPEED")
+        self.assertEqual(gui.page_stack.currentIndex(), 0)        # Speed Dial
+        self.assertEqual(gui.center_stack.currentIndex(), 0)      # Backward-compatible alias
+        self.assertIn("SPEED", gui.page_title_label.text())
+        self.assertIn("1/4", gui.page_title_label.text())
+        # On Speedometer page, speed HUD badge is hidden (dial is visible)
+        self.assertTrue(gui.speed_hud_badge.isHidden())
+        self.assertFalse(gui.ready_badge.isHidden())
 
-        # 2. Cycle view via hotkey 'V' -> BATTERY Hero
+        # 2. Switch Right via Key_Right -> BATTERY page (2/4)
+        event_right = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Right, Qt.KeyboardModifier.NoModifier)
+        gui.keyPressEvent(event_right)
+        self.assertEqual(gui.active_hero_view, "BATTERY")
+        self.assertEqual(gui.page_stack.currentIndex(), 1)        # Battery Hero
+        self.assertIn("BATTERY", gui.page_title_label.text())
+        self.assertIn("2/4", gui.page_title_label.text())
+        # Away from Speed page: Speed HUD badge is now visible
+        self.assertFalse(gui.speed_hud_badge.isHidden())
+        self.assertTrue(gui.ready_badge.isHidden())
+
+        # 3. Switch Right via Key_Right -> POWERTRAIN page (3/4)
+        gui.keyPressEvent(event_right)
+        self.assertEqual(gui.active_hero_view, "POWERTRAIN")
+        self.assertEqual(gui.page_stack.currentIndex(), 2)        # Powertrain Hero
+        self.assertIn("POWERTRAIN", gui.page_title_label.text())
+        self.assertIn("3/4", gui.page_title_label.text())
+        self.assertFalse(gui.speed_hud_badge.isHidden())
+
+        # 4. Switch Right via Key_Right -> TPMS page (4/4)
+        gui.keyPressEvent(event_right)
+        self.assertEqual(gui.active_hero_view, "TPMS")
+        self.assertEqual(gui.page_stack.currentIndex(), 3)        # TPMS Widget
+        self.assertIn("TPMS", gui.page_title_label.text())
+        self.assertIn("4/4", gui.page_title_label.text())
+        self.assertFalse(gui.speed_hud_badge.isHidden())
+
+        # 5. Switch Left via Key_Left -> wraps back to POWERTRAIN (3/4)
+        event_left = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Left, Qt.KeyboardModifier.NoModifier)
+        gui.keyPressEvent(event_left)
+        self.assertEqual(gui.active_hero_view, "POWERTRAIN")
+        self.assertEqual(gui.page_stack.currentIndex(), 2)
+
+        # 6. Cycle view via hotkey 'V' -> wraps to TPMS (4/4) then SPEED (1/4)
         event_v = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_V, Qt.KeyboardModifier.NoModifier)
         gui.keyPressEvent(event_v)
-        self.assertEqual(gui.active_hero_view, "BATTERY")
-        self.assertEqual(gui.center_stack.currentIndex(), 1)      # Battery Hero
-        self.assertEqual(gui.wing_1_top_stack.currentIndex(), 1)  # Compact Speed Pod
-        self.assertEqual(gui.wing_2_stack.currentIndex(), 0)      # Dynamics Group
-        self.assertEqual(gui.view_badge.text(), "VIEW: BATT")
-
-        # 3. Cycle view via hotkey 'V' -> POWERTRAIN Hero
-        gui.keyPressEvent(event_v)
-        self.assertEqual(gui.active_hero_view, "POWERTRAIN")
-        self.assertEqual(gui.center_stack.currentIndex(), 2)      # Powertrain Hero
-        self.assertEqual(gui.wing_1_top_stack.currentIndex(), 1)  # Compact Speed Pod
-        self.assertEqual(gui.wing_2_stack.currentIndex(), 1)      # Battery & Sparkline Alt Group
-        self.assertEqual(gui.view_badge.text(), "VIEW: PWR")
-
-        # 4. Cycle view via hotkey 'V' -> back to SPEED Hero
+        self.assertEqual(gui.active_hero_view, "TPMS")
         gui.keyPressEvent(event_v)
         self.assertEqual(gui.active_hero_view, "SPEED")
-        self.assertEqual(gui.center_stack.currentIndex(), 0)
-        self.assertEqual(gui.wing_1_top_stack.currentIndex(), 0)
-        self.assertEqual(gui.wing_2_stack.currentIndex(), 0)
-        self.assertEqual(gui.view_badge.text(), "VIEW: SPEED")
+        self.assertEqual(gui.page_stack.currentIndex(), 0)
+        self.assertTrue(gui.speed_hud_badge.isHidden())
 
-        # 5. Toggle Wing Swap via hotkey 'X'
+        # 7. Toggle Wing Swap via hotkey 'X' (backward compatibility)
         event_x = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_X, Qt.KeyboardModifier.NoModifier)
         gui.keyPressEvent(event_x)
         self.assertTrue(gui.swap_wings)
-        self.assertEqual(gui.view_badge.text(), "VIEW: SPEED [⇄]")
-
-        # Check stage layout child order: wing_2 is now first, wing_1 is third
-        self.assertEqual(gui.stage_layout.itemAt(0).widget(), gui.wing_2)
-        self.assertEqual(gui.stage_layout.itemAt(1).widget(), gui.center_stage)
-        self.assertEqual(gui.stage_layout.itemAt(2).widget(), gui.wing_1)
+        self.assertIn("[⇄]", gui.page_title_label.text())
 
         # Toggle back via hotkey 'X'
         gui.keyPressEvent(event_x)
         self.assertFalse(gui.swap_wings)
-        self.assertEqual(gui.view_badge.text(), "VIEW: SPEED")
-        self.assertEqual(gui.stage_layout.itemAt(0).widget(), gui.wing_1)
-        self.assertEqual(gui.stage_layout.itemAt(1).widget(), gui.center_stage)
-        self.assertEqual(gui.stage_layout.itemAt(2).widget(), gui.wing_2)
+        self.assertNotIn("[⇄]", gui.page_title_label.text())
 
-        # 6. Feed Telemetry & verify active hero pods update
+        # 8. Feed Telemetry & verify active hero pods update
         rec = TelemetryRecord(
             timestamp=time.time(),
             speed_kmh=112.0,
@@ -945,12 +957,9 @@ class TestDashboardGUI(unittest.TestCase):
         )
         gui.update_telemetry(rec)
 
-        # Verify CompactSpeedPod received speed, gear, rpm, pedals, steering
-        self.assertEqual(gui.compact_speed_widget.speed, 112.0)
-        self.assertEqual(gui.compact_speed_widget.gear, "5")
-        self.assertEqual(gui.compact_speed_widget.motor_rpm, 7200)
-        self.assertEqual(gui.compact_speed_widget.throttle_pct, 70.0)
-        self.assertEqual(gui.compact_speed_widget.steer_angle, 8.5)
+        # Verify Speed HUD badge in Top Ribbon received speed and gear
+        self.assertIn("112 KM/H", gui.speed_hud_badge.text())
+        self.assertIn("M5", gui.speed_hud_badge.text())
 
         # Verify BatteryHeroWidget received SoC, voltage, current, power
         self.assertEqual(gui.battery_hero.soc, 82.5)
@@ -961,9 +970,9 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertEqual(gui.powertrain_hero.power_kw, 25.3)
         self.assertEqual(gui.powertrain_hero.bias_mode, "RWD BIAS")
 
-        # 7. Constant Pinned Deck: Verify bottom deck remains visible and intact across all views
-        for view in ["SPEED", "BATTERY", "POWERTRAIN"]:
-            gui.set_hero_view(view)
+        # 9. Constant Pinned Deck: Verify bottom deck remains visible and intact across all 4 pages
+        for page_name in ["SPEED", "BATTERY", "POWERTRAIN", "TPMS"]:
+            gui.set_hero_view(page_name)
             self.assertFalse(gui.bottom_bar.isHidden())
             self.assertFalse(gui.trip_pod.isHidden())
             self.assertFalse(gui.thermal_widget.isHidden())

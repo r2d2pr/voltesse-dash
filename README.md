@@ -8,28 +8,30 @@
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 4.0 delivers **Zoomed-In Interchangeable Hero Views** (Speedometer, Battery & Energy Diagnostics, Powertrain Dynamics), **Left ⇄ Right Wing Swapping**, distraction-free compact speed pods, and a **pinned constant bottom telemetry deck** (trip odometer and powertrain thermals). Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
+A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 4.0 delivers **Full-Width Dedicated Widget Pages** (Speedometer, Battery & Energy Diagnostics, Powertrain Dynamics, and TPMS), **Intuitive Left ⇄ Right Page Navigation** (`◄` / `►` arrow keys, `V` hotkey, and interactive touch chevrons), **Top HUD Speed Fallback** when away from the speedometer, and a **pinned constant bottom telemetry deck** (trip odometer and powertrain thermals). Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
 
 ---
 
 ## What's New in Version 4.0 🚀
 
-- 🔍 **Zoomed-In Interchangeable Hero Views (Center Stage)**:
-  - **Speedometer Hero (Default)**: Central radial dial with digital numerals, RPM, gear pill, pedals, and steering angle.
-  - **Battery & Energy Diagnostics Hero**: Magnified SoC arc, prominent range HUD (`km`/`mi`), 96S architecture pack status, and a 4-quadrant diagnostic grid (Pack Voltage, Current Draw, Net Power, Energy Consumption).
-  - **Powertrain Dynamics Hero**: Dual-motor AWD front/rear torque split bars with Nm/lb-ft readouts, bidirectional Power/Regen bar with center zero mark, and wide rolling telemetry oscilloscope.
-  - **Driver Safety Compact Speed Pod (`CompactSpeedPod`)**: Automatically activates in the wing when Battery or Powertrain hero views are active, ensuring velocity, gear, RPM, throttle, brake, and steering indicators are NEVER lost.
-  - **Hotkey `V`**: Distraction-free driver cycling across Hero Views (`SPEED` ➔ `BATT` ➔ `PWR`).
-- ⇄ **Interchangeable Left ⇄ Right Wing Swapping**:
-  - **Hotkey `X`**: Dynamically mirrors and swaps Left and Right cockpit wings with zero flicker.
-  - Top HUD ribbon actively reflects swapped state with badge indicator (`VIEW: SPEED [⇄]`, `VIEW: BATT [⇄]`, `VIEW: PWR [⇄]`).
+- 📄 **Full-Width Dedicated Widget Pages (Individual Cockpit Views)**:
+  - Designed specifically for compact embedded screens (e.g., 800×480 Raspberry Pi touchscreens) where crowded multi-column layouts cause visual clutter. Each primary widget now commands the full central stage with clean breathing room, zero clipping, and authentic automotive typography:
+    - **Page 1 (SPEED)**: Full-stage radial speedometer dial with digital speed numerals, PRNDB capsule, active dynamic EV gear, motor RPM, steering angle, and throttle/brake meters.
+    - **Page 2 (BATTERY)**: High-voltage battery & energy diagnostics featuring a large glowing circular SoC gauge, range estimation HUD (`km`/`mi`), 4 pack diagnostic chips (Cell Avg, Health SOH, Charge Limit, Peak Temp), and a 4-quadrant electrical grid (Pack Voltage, Current Draw, Net Power, Energy Consumption).
+    - **Page 3 (POWERTRAIN)**: Dual-motor AWD torque vectoring dynamics, front/rear distribution bars with real-time torque in Nm (or lb-ft), center-zero bidirectional Power/Regen bar, and live telemetry wave chart.
+    - **Page 4 (TPMS)**: Full-width tire pressure monitoring system with EV chassis blueprint, 4 corner diagnostic cards with dashed guide lines, individual tire pressures, and temperatures.
+- ↔️ **Intuitive Left ⇄ Right Page Switching**:
+  - **Arrow Keys `◄` / `►`**: Instant page flipping left or right.
+  - **Hotkey `V`**: Quick single-key page cycle (`SPEED` ➔ `BATTERY` ➔ `POWERTRAIN` ➔ `TPMS`).
+  - **Interactive Top HUD Navigator**: Touch-screen friendly `◄` and `►` buttons with live page indicator pill (`◄ SPEED [1/4] ►`, `◄ BATTERY [2/4] ►`, `◄ POWERTRAIN [3/4] ►`, `◄ TPMS [4/4] ►`).
+- 🛡️ **Top HUD Driver Safety Speed Fallback**:
+  - When viewing Pages 2, 3, or 4 (navigated away from the speedometer), the Top HUD displays a high-visibility compact digital speed pill (e.g. `104 KM/H [D4]` or `65 MPH [M5]`), ensuring the driver is never without essential speed and active gear context.
 - ⚓ **Pinned Constant Telemetry Deck**:
-  - The bottom deck (Trip Odometer + Powertrain Temperatures: Motor, Inverter, Battery Pack) remains fixed, visible, and constant across all Hero views and layouts.
-- ⚙️ **CLI Flags for Custom Views & Layouts**:
-  - Added `--view {speed,battery,powertrain}` to configure the initial center stage hero view on startup.
-  - Added `--swap-wings` to launch with left and right cockpit wings swapped.
-- 🎯 **Preserved Version 3.0.1 Optimizations**:
-  - Collision-free central dial sequencing, zero-clipping proportional card typography, cursor suppression under Wayland/Cage kiosks, and technician web portal.
+  - The bottom deck (Trip Odometer + Powertrain Temperatures: Motor, Inverter, Battery Pack) remains fixed, visible, and constant across all 4 pages.
+- ⚡ **Instant Frame-1 Display Initialization**:
+  - Eliminated startup black screen delay under Cage/Wayland kiosks by displaying the cockpit window immediately on frame 1 before executing database or network handshakes.
+- ⚙️ **CLI Flags for Custom Startup Views**:
+  - `--view {speed,battery,powertrain,tpms}`: Configure the initial startup page.
 
 ---
 
@@ -142,8 +144,10 @@ voltesse-dash/
 | `C` | **Downshift** (`6` ➔ `1` ➔ `N` ➔ `R` in Manual, or selector in Auto) | Global |
 | `G` | Cycle Gear (`P-R-N-D-B` in Auto, Upshift in Manual) | Global |
 | `U` | **Toggle Units (Metric ⮂ Imperial)** | Global (Race, Sim, Test) |
-| `V` | **Cycle Hero Views** (`Speed` ➔ `Battery` ➔ `Powertrain`) | Global (Race, Sim, Test) |
-| `X` | **Swap Left ⮂ Right Cockpit Wings** | Global (Race, Sim, Test) |
+| `Left Arrow` | **Previous Cockpit Page (Left ◄)** | Global (Race, Sim, Test) |
+| `Right Arrow` | **Next Cockpit Page (Right ►)** | Global (Race, Sim, Test) |
+| `V` | **Cycle Cockpit Pages** (`Speed` ➔ `Battery` ➔ `Powertrain` ➔ `TPMS`) | Global (Race, Sim, Test) |
+| `X` | **Swap Wing Views (Alternate Layout)** | Global (Race, Sim, Test) |
 | `L` | **Toggle Database Logging / Write Access** (`REC` ⮂ `LOG OFF`) | Global |
 | `-` / `_` | **Zoom Out UI** (reduce cockpit scale by 5%) | Global |
 | `+` / `=` | **Zoom In UI** (increase cockpit scale by 5%) | Global |
@@ -267,7 +271,7 @@ Generated files are saved directly to `data/exports/`.
 | `--scale` / `--ui-scale` | `auto` | Custom cockpit UI scale factor (e.g. `0.85` for compact screens) |
 | `--show-cursor` | `False` | Keep mouse cursor visible (default: hidden for distraction-free cockpit) |
 | `--imperial` | `False` | Launch in Imperial units (`MPH`, `mi`, `°F`, `psi`, `lb-ft`) |
-| `--view` | `speed` | Initial central hero view (`speed`, `battery`, `powertrain`) |
+| `--view` | `speed` | Initial cockpit page (`speed`, `battery`, `powertrain`, `tpms`) |
 | `--swap-wings` | `False` | Swap left and right cockpit wings |
 | `--read-only` | `False` | Open the database in strict read-only mode |
 | `--no-logging`| `False` | Launch with database writing paused (toggleable with `L`) |

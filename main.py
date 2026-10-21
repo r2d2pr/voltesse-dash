@@ -53,32 +53,7 @@ class VoltesseApp:
         self.app = QApplication.instance() or QApplication(sys.argv)
         self.app.setApplicationName("Voltesse Dash")
 
-        # 1. Initialize PostgreSQL Database Manager with write access controls
-        db_url = getattr(args, "db_url", None)
-        initial_mode = args.mode.upper() if args.mode else "RACE"
-        logger.info("Initializing Database Manager...")
-        read_only = getattr(args, "read_only", False)
-        no_logging = getattr(args, "no_logging", False)
-        write_enabled = (not read_only) and (not no_logging)
-
-        self.db_manager = DatabaseManager(
-            db_url=db_url,
-            batch_size=args.batch_size,
-            flush_interval_sec=args.flush_interval,
-            write_enabled=write_enabled,
-            read_only=read_only,
-        )
-        logger.info("Database target: %s", redact_db_url(self.db_manager.db_url))
-        self.db_manager.set_source_type(MODE_TO_SOURCE_TYPE.get(initial_mode, "CAN_BUS"))
-
-        # Session-based retention: keep the newest N sessions (0 disables pruning)
-        keep_sessions = getattr(args, "keep_sessions", 20)
-        if keep_sessions and keep_sessions > 0:
-            self.db_manager.prune_old_sessions(keep_sessions=keep_sessions)
-
-        self.session_id = self.db_manager.start_session(initial_soc=88.5)
-
-        # 2. Initialize Distraction-Free Cockpit GUI
+        # 1. Initialize Distraction-Free Cockpit GUI Immediately (Prevents startup black screen under Cage/Wayland)
         logger.info("Initializing Cockpit GUI...")
         self.gui = VoltesseDashboard()
         if not getattr(args, "show_cursor", False):
@@ -92,12 +67,6 @@ class VoltesseApp:
             self.gui.set_hero_view(args.view)
         if getattr(args, "swap_wings", False):
             self.gui.set_wing_swap(args.swap_wings)
-
-        # Reflect database write logging state on top HUD ribbon
-        self.gui.set_logging_state(
-            write_enabled=self.db_manager.is_write_enabled(),
-            read_only=self.db_manager.read_only,
-        )
 
         # Screen enumeration & hardware detection
         screens = self.app.screens()
@@ -159,7 +128,7 @@ class VoltesseApp:
 
         self.gui.resize(screen_w, screen_h)
 
-        # Fullscreen by default as specified in design requirements
+        # Display GUI window immediately to map to Wayland/X11 surface without delay
         if args.windowed:
             logger.info("Launching in windowed development mode (%dx%d)...", screen_w, screen_h)
             self.gui.show()
@@ -171,6 +140,39 @@ class VoltesseApp:
             )
             self.gui.setGeometry(geom_x, geom_y, screen_w, screen_h)
             self.gui.showFullScreen()
+
+        self.app.processEvents()
+
+        # 2. Initialize PostgreSQL Database Manager with write access controls
+        db_url = getattr(args, "db_url", None)
+        initial_mode = args.mode.upper() if args.mode else "RACE"
+        logger.info("Initializing Database Manager...")
+        read_only = getattr(args, "read_only", False)
+        no_logging = getattr(args, "no_logging", False)
+        write_enabled = (not read_only) and (not no_logging)
+
+        self.db_manager = DatabaseManager(
+            db_url=db_url,
+            batch_size=args.batch_size,
+            flush_interval_sec=args.flush_interval,
+            write_enabled=write_enabled,
+            read_only=read_only,
+        )
+        logger.info("Database target: %s", redact_db_url(self.db_manager.db_url))
+        self.db_manager.set_source_type(MODE_TO_SOURCE_TYPE.get(initial_mode, "CAN_BUS"))
+
+        # Session-based retention: keep the newest N sessions (0 disables pruning)
+        keep_sessions = getattr(args, "keep_sessions", 20)
+        if keep_sessions and keep_sessions > 0:
+            self.db_manager.prune_old_sessions(keep_sessions=keep_sessions)
+
+        self.session_id = self.db_manager.start_session(initial_soc=88.5)
+
+        # Reflect database write logging state on top HUD ribbon
+        self.gui.set_logging_state(
+            write_enabled=self.db_manager.is_write_enabled(),
+            read_only=self.db_manager.read_only,
+        )
 
         # 3. Initialize Three Telemetry Sources
         logger.info("Initializing Telemetry Sources (Race CAN, Game Sim, Test Autonomous)...")
@@ -567,8 +569,8 @@ def parse_args() -> argparse.Namespace:
         "--view",
         type=str,
         default="speed",
-        choices=["speed", "battery", "powertrain"],
-        help="Initial hero view for central cluster (speed, battery, powertrain; default: speed)",
+        choices=["speed", "battery", "powertrain", "tpms"],
+        help="Initial page view for central cluster (speed, battery, powertrain, tpms; default: speed)",
     )
     parser.add_argument(
         "--swap-wings",

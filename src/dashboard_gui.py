@@ -32,6 +32,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QPushButton,
     QSizePolicy,
     QStackedWidget,
     QVBoxLayout,
@@ -630,98 +631,183 @@ class TPMSWidget(QWidget):
         painter.setPen(QPen(COLOR_PANEL_BORDER, 1))
         painter.drawRoundedRect(QRectF(0, 0, w - 1, h - 1), 8, 8)
 
-        hdr_font_sz = max(7, min(11, int(w * 0.026)))
+        # Header
+        hdr_font_sz = max(7, min(11, int(w * 0.024)))
         painter.setPen(COLOR_TEXT_SECONDARY)
         painter.setFont(QFont("Segoe UI", hdr_font_sz, QFont.Weight.Bold))
-        painter.drawText(QRectF(14, 8, w - 28, 18), Qt.AlignmentFlag.AlignLeft, "TIRE PRESSURE & TPMS")
+        painter.drawText(QRectF(14, 8, w * 0.5, 18), Qt.AlignmentFlag.AlignLeft, "TIRE PRESSURE & TPMS")
 
         painter.setPen(COLOR_MINT)
-        painter.drawText(QRectF(14, 8, w - 28, 18), Qt.AlignmentFlag.AlignRight, "● ALL NOMINAL")
-
-        cx = w / 2.0
-        cy = 28.0 + (h - 28.0) / 2.0
+        painter.drawText(QRectF(w * 0.5, 8, w * 0.5 - 14, 18), Qt.AlignmentFlag.AlignRight, "● ALL NOMINAL")
 
         content_h = h - 30.0
-        ch = max(28.0, min(75.0, content_h * 0.46))
-        cw = max(16.0, min(44.0, ch * 0.56))
-
-        chassis_rect = QRectF(cx - cw / 2.0, cy - ch / 2.0, cw, ch)
-        painter.setBrush(QBrush(QColor(12, 30, 22, 220)))
-        painter.setPen(QPen(COLOR_PANEL_BORDER, 1.2))
-        painter.drawRoundedRect(chassis_rect, 5, 5)
-
-        painter.setPen(QPen(QColor(0, 245, 160, 70), 1))
-        painter.drawLine(int(cx - cw * 0.35), int(cy - ch * 0.16), int(cx + cw * 0.35), int(cy - ch * 0.16))
-
-        tw = max(3.5, min(7.0, cw * 0.20))
-        th = max(5.0, min(14.0, ch * 0.22))
-        wheel_dx = cw * 0.58
-        wheel_dy = ch * 0.26
-        wheel_coords = [
-            (cx - wheel_dx - tw, cy - wheel_dy - th / 2, self.fl_bar),
-            (cx + wheel_dx, cy - wheel_dy - th / 2, self.fr_bar),
-            (cx - wheel_dx - tw, cy + wheel_dy - th / 2, self.rl_bar),
-            (cx + wheel_dx, cy + wheel_dy - th / 2, self.rr_bar),
-        ]
-        for wx, wy, p_val in wheel_coords:
-            painter.setBrush(QBrush(self._color_for_bar(p_val)))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRoundedRect(QRectF(wx, wy, tw, th), 2, 2)
-
-        font_bar_sz = max(5, min(9, int(content_h * 0.075)))
-        font_temp_sz = max(5, min(8, int(content_h * 0.060)))
-        left_col_w = max(35.0, cx - wheel_dx - tw - 12.0)
+        cx = w / 2.0
+        cy = 30.0 + (content_h / 2.0)
 
         is_imp = (getattr(self, "unit_system", "METRIC") == "IMPERIAL")
-        if is_imp:
-            fl_p_str = f"FL {self.fl_bar * 14.5038:.1f}psi"
-            rl_p_str = f"RL {self.rl_bar * 14.5038:.1f}psi"
-            fr_p_str = f"{self.fr_bar * 14.5038:.1f}psi FR"
-            rr_p_str = f"{self.rr_bar * 14.5038:.1f}psi RR"
-            fl_t_str = f"{self.fl_temp * 9.0 / 5.0 + 32.0:.0f}°F"
-            rl_t_str = f"{self.rl_temp * 9.0 / 5.0 + 32.0:.0f}°F"
-            fr_t_str = f"{self.fr_temp * 9.0 / 5.0 + 32.0:.0f}°F"
-            rr_t_str = f"{self.rr_temp * 9.0 / 5.0 + 32.0:.0f}°F"
+
+        if w > 400:
+            # Full-Width Panoramic Page Layout
+            ch = max(40.0, min(180.0, content_h * 0.62))
+            cw = max(24.0, min(95.0, ch * 0.52))
+
+            chassis_rect = QRectF(cx - cw / 2.0, cy - ch / 2.0, cw, ch)
+            painter.setBrush(QBrush(QColor(10, 24, 18, 230)))
+            painter.setPen(QPen(COLOR_PANEL_BORDER, 1.4))
+            painter.drawRoundedRect(chassis_rect, 10, 10)
+
+            # Windshield & cockpit details
+            painter.setPen(QPen(QColor(0, 245, 160, 90), 1.2))
+            painter.drawLine(int(cx - cw * 0.36), int(cy - ch * 0.18), int(cx + cw * 0.36), int(cy - ch * 0.18))
+            painter.drawLine(int(cx - cw * 0.32), int(cy + ch * 0.22), int(cx + cw * 0.32), int(cy + ch * 0.22))
+
+            # Battery Pack Glow in Floor
+            batt_floor = QRectF(cx - cw * 0.32, cy - ch * 0.12, cw * 0.64, ch * 0.32)
+            painter.setBrush(QBrush(QColor(0, 245, 160, 25)))
+            painter.setPen(QPen(QColor(0, 245, 160, 60), 0.8))
+            painter.drawRoundedRect(batt_floor, 3, 3)
+
+            # Wheels
+            tw = max(4.0, min(14.0, cw * 0.18))
+            th = max(8.0, min(28.0, ch * 0.22))
+            wheel_dx = cw * 0.60
+            wheel_dy = ch * 0.28
+            wheel_coords = [
+                (cx - wheel_dx - tw, cy - wheel_dy - th / 2, self.fl_bar),
+                (cx + wheel_dx, cy - wheel_dy - th / 2, self.fr_bar),
+                (cx - wheel_dx - tw, cy + wheel_dy - th / 2, self.rl_bar),
+                (cx + wheel_dx, cy + wheel_dy - th / 2, self.rr_bar),
+            ]
+            for wx, wy, p_val in wheel_coords:
+                painter.setBrush(QBrush(self._color_for_bar(p_val)))
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.drawRoundedRect(QRectF(wx, wy, tw, th), 3, 3)
+
+            if is_imp:
+                tires_data = [
+                    ("FRONT LEFT", f"{self.fl_bar * 14.5038:.1f} psi", f"{self.fl_temp * 9.0 / 5.0 + 32.0:.0f}°F", self.fl_bar, True, True),
+                    ("FRONT RIGHT", f"{self.fr_bar * 14.5038:.1f} psi", f"{self.fr_temp * 9.0 / 5.0 + 32.0:.0f}°F", self.fr_bar, False, True),
+                    ("REAR LEFT", f"{self.rl_bar * 14.5038:.1f} psi", f"{self.rl_temp * 9.0 / 5.0 + 32.0:.0f}°F", self.rl_bar, True, False),
+                    ("REAR RIGHT", f"{self.rr_bar * 14.5038:.1f} psi", f"{self.rr_temp * 9.0 / 5.0 + 32.0:.0f}°F", self.rr_bar, False, False),
+                ]
+            else:
+                tires_data = [
+                    ("FRONT LEFT", f"{self.fl_bar:.2f} bar", f"{self.fl_temp:.0f}°C", self.fl_bar, True, True),
+                    ("FRONT RIGHT", f"{self.fr_bar:.2f} bar", f"{self.fr_temp:.0f}°C", self.fr_bar, False, True),
+                    ("REAR LEFT", f"{self.rl_bar:.2f} bar", f"{self.rl_temp:.0f}°C", self.rl_bar, True, False),
+                    ("REAR RIGHT", f"{self.rr_bar:.2f} bar", f"{self.rr_temp:.0f}°C", self.rr_bar, False, False),
+                ]
+
+            card_w = max(110.0, min(170.0, w * 0.22))
+            card_h = max(45.0, min(76.0, content_h * 0.32))
+
+            for pos_lbl, press_str, temp_str, p_val, is_left, is_front in tires_data:
+                c_x = 24.0 if is_left else (w - 24.0 - card_w)
+                c_y = (cy - wheel_dy - card_h / 2.0) if is_front else (cy + wheel_dy - card_h / 2.0)
+
+                c_rect = QRectF(c_x, c_y, card_w, card_h)
+                painter.setBrush(QBrush(QColor(8, 18, 14, 210)))
+                painter.setPen(QPen(COLOR_PANEL_BORDER, 0.8))
+                painter.drawRoundedRect(c_rect, 6, 6)
+
+                painter.setFont(QFont("Segoe UI", max(6, min(8, int(card_h * 0.16))), QFont.Weight.Bold))
+                painter.setPen(COLOR_TEXT_MUTED)
+                painter.drawText(QRectF(c_x + 8, c_y + 4, card_w - 16, card_h * 0.25), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, pos_lbl)
+
+                painter.setFont(QFont("Consolas", max(9, min(15, int(card_h * 0.34))), QFont.Weight.Bold))
+                painter.setPen(self._color_for_bar(p_val))
+                painter.drawText(QRectF(c_x + 8, c_y + card_h * 0.28, card_w - 16, card_h * 0.38), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, press_str)
+
+                painter.setFont(QFont("Segoe UI", max(6, min(9, int(card_h * 0.20))), QFont.Weight.DemiBold))
+                painter.setPen(COLOR_TEXT_SECONDARY)
+                painter.drawText(QRectF(c_x + 8, c_y + card_h * 0.66, card_w - 16, card_h * 0.30), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"{temp_str} • NOMINAL")
+
+                painter.setPen(QPen(QColor(18, 50, 38, 140), 1, Qt.PenStyle.DashLine))
+                start_lx = (c_x + card_w) if is_left else c_x
+                target_lx = (cx - wheel_dx - tw) if is_left else (cx + wheel_dx + tw)
+                painter.drawLine(int(start_lx), int(c_y + card_h / 2.0), int(target_lx), int(c_y + card_h / 2.0))
+
         else:
-            fl_p_str = f"FL {self.fl_bar:.2f}b"
-            rl_p_str = f"RL {self.rl_bar:.2f}b"
-            fr_p_str = f"{self.fr_bar:.2f}b FR"
-            rr_p_str = f"{self.rr_bar:.2f}b RR"
-            fl_t_str = f"{self.fl_temp:.0f}°C"
-            rl_t_str = f"{self.rl_temp:.0f}°C"
-            fr_t_str = f"{self.fr_temp:.0f}°C"
-            rr_t_str = f"{self.rr_temp:.0f}°C"
+            # Compact Side Card Layout
+            ch = max(28.0, min(75.0, content_h * 0.46))
+            cw = max(16.0, min(44.0, ch * 0.56))
 
-        painter.setFont(QFont("Consolas", font_bar_sz, QFont.Weight.Bold))
-        painter.setPen(self._color_for_bar(self.fl_bar))
-        painter.drawText(QRectF(10, cy - wheel_dy - 12, left_col_w, 16), Qt.AlignmentFlag.AlignLeft, fl_p_str)
-        painter.setFont(QFont("Segoe UI", font_temp_sz, QFont.Weight.Normal))
-        painter.setPen(COLOR_TEXT_MUTED)
-        painter.drawText(QRectF(10, cy - wheel_dy + 4, left_col_w, 14), Qt.AlignmentFlag.AlignLeft, fl_t_str)
+            chassis_rect = QRectF(cx - cw / 2.0, cy - ch / 2.0, cw, ch)
+            painter.setBrush(QBrush(QColor(12, 30, 22, 220)))
+            painter.setPen(QPen(COLOR_PANEL_BORDER, 1.2))
+            painter.drawRoundedRect(chassis_rect, 5, 5)
 
-        painter.setFont(QFont("Consolas", font_bar_sz, QFont.Weight.Bold))
-        painter.setPen(self._color_for_bar(self.rl_bar))
-        painter.drawText(QRectF(10, cy + wheel_dy - 10, left_col_w, 16), Qt.AlignmentFlag.AlignLeft, rl_p_str)
-        painter.setFont(QFont("Segoe UI", font_temp_sz, QFont.Weight.Normal))
-        painter.setPen(COLOR_TEXT_MUTED)
-        painter.drawText(QRectF(10, cy + wheel_dy + 6, left_col_w, 14), Qt.AlignmentFlag.AlignLeft, rl_t_str)
+            painter.setPen(QPen(QColor(0, 245, 160, 70), 1))
+            painter.drawLine(int(cx - cw * 0.35), int(cy - ch * 0.16), int(cx + cw * 0.35), int(cy - ch * 0.16))
 
-        right_x = cx + wheel_dx + tw + 10.0
-        right_col_w = max(40.0, w - right_x - 10.0)
+            tw = max(3.5, min(7.0, cw * 0.20))
+            th = max(5.0, min(14.0, ch * 0.22))
+            wheel_dx = cw * 0.58
+            wheel_dy = ch * 0.26
+            wheel_coords = [
+                (cx - wheel_dx - tw, cy - wheel_dy - th / 2, self.fl_bar),
+                (cx + wheel_dx, cy - wheel_dy - th / 2, self.fr_bar),
+                (cx - wheel_dx - tw, cy + wheel_dy - th / 2, self.rl_bar),
+                (cx + wheel_dx, cy + wheel_dy - th / 2, self.rr_bar),
+            ]
+            for wx, wy, p_val in wheel_coords:
+                painter.setBrush(QBrush(self._color_for_bar(p_val)))
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.drawRoundedRect(QRectF(wx, wy, tw, th), 2, 2)
 
-        painter.setFont(QFont("Consolas", font_bar_sz, QFont.Weight.Bold))
-        painter.setPen(self._color_for_bar(self.fr_bar))
-        painter.drawText(QRectF(right_x, cy - wheel_dy - 12, right_col_w, 16), Qt.AlignmentFlag.AlignRight, fr_p_str)
-        painter.setFont(QFont("Segoe UI", font_temp_sz, QFont.Weight.Normal))
-        painter.setPen(COLOR_TEXT_MUTED)
-        painter.drawText(QRectF(right_x, cy - wheel_dy + 4, right_col_w, 14), Qt.AlignmentFlag.AlignRight, fr_t_str)
+            font_bar_sz = max(5, min(9, int(content_h * 0.075)))
+            font_temp_sz = max(5, min(8, int(content_h * 0.060)))
+            left_col_w = max(35.0, cx - wheel_dx - tw - 12.0)
 
-        painter.setFont(QFont("Consolas", font_bar_sz, QFont.Weight.Bold))
-        painter.setPen(self._color_for_bar(self.rr_bar))
-        painter.drawText(QRectF(right_x, cy + wheel_dy - 10, right_col_w, 16), Qt.AlignmentFlag.AlignRight, rr_p_str)
-        painter.setFont(QFont("Segoe UI", font_temp_sz, QFont.Weight.Normal))
-        painter.setPen(COLOR_TEXT_MUTED)
-        painter.drawText(QRectF(right_x, cy + wheel_dy + 6, right_col_w, 14), Qt.AlignmentFlag.AlignRight, rr_t_str)
+            if is_imp:
+                fl_p_str = f"FL {self.fl_bar * 14.5038:.1f}psi"
+                rl_p_str = f"RL {self.rl_bar * 14.5038:.1f}psi"
+                fr_p_str = f"{self.fr_bar * 14.5038:.1f}psi FR"
+                rr_p_str = f"{self.rr_bar * 14.5038:.1f}psi RR"
+                fl_t_str = f"{self.fl_temp * 9.0 / 5.0 + 32.0:.0f}°F"
+                rl_t_str = f"{self.rl_temp * 9.0 / 5.0 + 32.0:.0f}°F"
+                fr_t_str = f"{self.fr_temp * 9.0 / 5.0 + 32.0:.0f}°F"
+                rr_t_str = f"{self.rr_temp * 9.0 / 5.0 + 32.0:.0f}°F"
+            else:
+                fl_p_str = f"FL {self.fl_bar:.2f}b"
+                rl_p_str = f"RL {self.rl_bar:.2f}b"
+                fr_p_str = f"{self.fr_bar:.2f}b FR"
+                rr_p_str = f"{self.rr_bar:.2f}b RR"
+                fl_t_str = f"{self.fl_temp:.0f}°C"
+                rl_t_str = f"{self.rl_temp:.0f}°C"
+                fr_t_str = f"{self.fr_temp:.0f}°C"
+                rr_t_str = f"{self.rr_temp:.0f}°C"
+
+            painter.setFont(QFont("Consolas", font_bar_sz, QFont.Weight.Bold))
+            painter.setPen(self._color_for_bar(self.fl_bar))
+            painter.drawText(QRectF(10, cy - wheel_dy - 12, left_col_w, 16), Qt.AlignmentFlag.AlignLeft, fl_p_str)
+            painter.setFont(QFont("Segoe UI", font_temp_sz, QFont.Weight.Normal))
+            painter.setPen(COLOR_TEXT_MUTED)
+            painter.drawText(QRectF(10, cy - wheel_dy + 4, left_col_w, 14), Qt.AlignmentFlag.AlignLeft, fl_t_str)
+
+            painter.setFont(QFont("Consolas", font_bar_sz, QFont.Weight.Bold))
+            painter.setPen(self._color_for_bar(self.rl_bar))
+            painter.drawText(QRectF(10, cy + wheel_dy - 10, left_col_w, 16), Qt.AlignmentFlag.AlignLeft, rl_p_str)
+            painter.setFont(QFont("Segoe UI", font_temp_sz, QFont.Weight.Normal))
+            painter.setPen(COLOR_TEXT_MUTED)
+            painter.drawText(QRectF(10, cy + wheel_dy + 6, left_col_w, 14), Qt.AlignmentFlag.AlignLeft, rl_t_str)
+
+            right_x = cx + wheel_dx + tw + 10.0
+            right_col_w = max(40.0, w - right_x - 10.0)
+
+            painter.setFont(QFont("Consolas", font_bar_sz, QFont.Weight.Bold))
+            painter.setPen(self._color_for_bar(self.fr_bar))
+            painter.drawText(QRectF(right_x, cy - wheel_dy - 12, right_col_w, 16), Qt.AlignmentFlag.AlignRight, fr_p_str)
+            painter.setFont(QFont("Segoe UI", font_temp_sz, QFont.Weight.Normal))
+            painter.setPen(COLOR_TEXT_MUTED)
+            painter.drawText(QRectF(right_x, cy - wheel_dy + 4, right_col_w, 14), Qt.AlignmentFlag.AlignRight, fr_t_str)
+
+            painter.setFont(QFont("Consolas", font_bar_sz, QFont.Weight.Bold))
+            painter.setPen(self._color_for_bar(self.rr_bar))
+            painter.drawText(QRectF(right_x, cy + wheel_dy - 10, right_col_w, 16), Qt.AlignmentFlag.AlignRight, rr_p_str)
+            painter.setFont(QFont("Segoe UI", font_temp_sz, QFont.Weight.Normal))
+            painter.setPen(COLOR_TEXT_MUTED)
+            painter.drawText(QRectF(right_x, cy + wheel_dy + 6, right_col_w, 14), Qt.AlignmentFlag.AlignRight, rr_t_str)
 
         painter.end()
 
@@ -1292,10 +1378,14 @@ class BatteryHeroWidget(QWidget):
 
         content_h = h - 30.0
 
-        # Upper Area: Left SoC Arc + Right Range HUD
-        arc_cx = max(55.0, w * 0.24)
-        arc_r = min(w * 0.16, content_h * 0.24)
-        arc_cy = 30.0 + (content_h * 0.26)
+        # Upper Area: Left SoC Arc + Range HUD, Right Pack Diagnostics Chips
+        upper_h = content_h * 0.52
+        upper_y = 30.0
+
+        # Left Section: SoC Arc
+        arc_cx = max(65.0, w * 0.16)
+        arc_r = min(w * 0.11, upper_h * 0.44)
+        arc_cy = upper_y + (upper_h * 0.48)
         arc_rect = QRectF(arc_cx - arc_r, arc_cy - arc_r, arc_r * 2, arc_r * 2)
 
         start_ang = 210.0
@@ -1314,17 +1404,17 @@ class BatteryHeroWidget(QWidget):
             painter.drawArc(arc_rect, int(start_ang * 16), int(active_span * 16))
 
         # SoC Number
-        font_soc_sz = max(12, min(22, int(arc_r * 0.40)))
+        font_soc_sz = max(13, min(24, int(arc_r * 0.42)))
         painter.setFont(QFont("Segoe UI", font_soc_sz, QFont.Weight.Bold))
         painter.setPen(COLOR_TEXT_PRIMARY)
         painter.drawText(QRectF(arc_cx - arc_r, arc_cy - (arc_r * 0.55), arc_r * 2, arc_r), Qt.AlignmentFlag.AlignCenter, f"{int(round(self.soc))}%")
 
-        # Range HUD on the Right
+        # Range HUD
         rng_x = arc_cx + arc_r + 14.0
-        rng_w = w - rng_x - 14.0
-        rng_y = arc_cy - (arc_r * 0.70)
+        rng_w = max(100.0, (w * 0.46) - rng_x)
+        rng_y = arc_cy - (arc_r * 0.65)
 
-        painter.setFont(QFont("Segoe UI", max(6, min(9, int(content_h * 0.04))), QFont.Weight.DemiBold))
+        painter.setFont(QFont("Segoe UI", max(6, min(9, int(upper_h * 0.10))), QFont.Weight.DemiBold))
         painter.setPen(COLOR_TEXT_MUTED)
         painter.drawText(QRectF(rng_x, rng_y, rng_w, 14), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "ESTIMATED RANGE")
 
@@ -1332,20 +1422,47 @@ class BatteryHeroWidget(QWidget):
         range_val = int(round(self.est_range_km * 0.621371)) if is_imp else int(round(self.est_range_km))
         unit_str = "mi" if is_imp else "km"
 
-        font_range_sz = max(16, min(26, int(content_h * 0.11)))
-        painter.setFont(QFont("Segoe UI", font_range_sz, QFont.Weight.Bold))
+        painter.setFont(QFont("Segoe UI", max(14, min(24, int(upper_h * 0.22))), QFont.Weight.Bold))
         painter.setPen(COLOR_MINT)
-        painter.drawText(QRectF(rng_x, rng_y + 14, rng_w, 32), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"{range_val} {unit_str}")
+        painter.drawText(QRectF(rng_x, rng_y + 16, rng_w, 28), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"{range_val} {unit_str}")
 
-        # SOH Pill below Arc
-        soh_y = arc_cy + arc_r + 8.0
-        painter.setFont(QFont("Segoe UI", max(6, min(8, int(content_h * 0.035))), QFont.Weight.Bold))
-        painter.setPen(COLOR_TEXT_MUTED)
-        painter.drawText(QRectF(14, soh_y, w - 28, 14), Qt.AlignmentFlag.AlignCenter, "96S ARCHITECTURE • 100% SOH")
+        # Right Section: Pack Diagnostics Summary Grid (4 chips)
+        right_start_x = max(w * 0.50, rng_x + rng_w + 10.0)
+        right_w = w - right_start_x - 14.0
+        chip_w = (right_w - 8.0) / 2.0
+        chip_h = (upper_h - 14.0) / 2.0
+
+        chips = [
+            ("CELL AVG", "4.15 V", COLOR_MINT),
+            ("HEALTH (SOH)", "100%", COLOR_MINT_BRIGHT),
+            ("CHARGE LIMIT", "90%", COLOR_CYAN),
+            ("PEAK TEMP", "32.0°C" if not is_imp else "89.6°F", COLOR_TEXT_PRIMARY),
+        ]
+        f_ch_lbl = QFont("Segoe UI", max(6, min(8, int(chip_h * 0.26))), QFont.Weight.Bold)
+        f_ch_val = QFont("Consolas", max(7, min(11, int(chip_h * 0.38))), QFont.Weight.Bold)
+
+        for idx, (title, val, color) in enumerate(chips):
+            c_col = idx % 2
+            c_row = idx // 2
+            cx_pos = right_start_x + c_col * (chip_w + 8.0)
+            cy_pos = upper_y + 6.0 + c_row * (chip_h + 6.0)
+
+            c_rect = QRectF(cx_pos, cy_pos, chip_w, chip_h)
+            painter.setBrush(QBrush(QColor(6, 14, 10, 190)))
+            painter.setPen(QPen(COLOR_PANEL_BORDER, 0.8))
+            painter.drawRoundedRect(c_rect, 4, 4)
+
+            painter.setFont(f_ch_lbl)
+            painter.setPen(COLOR_TEXT_MUTED)
+            painter.drawText(QRectF(cx_pos + 6, cy_pos + 2, chip_w - 12, chip_h * 0.42), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, title)
+
+            painter.setFont(f_ch_val)
+            painter.setPen(color)
+            painter.drawText(QRectF(cx_pos + 6, cy_pos + chip_h * 0.38, chip_w - 12, chip_h * 0.58), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, val)
 
         # Bottom 4-Quadrant Diagnostic Grid
-        grid_y = soh_y + 18.0
-        grid_h = h - grid_y - 10.0
+        grid_y = upper_y + upper_h + 4.0
+        grid_h = h - grid_y - 8.0
         grid_w = w - 24.0
 
         quad_w = (grid_w - 8.0) / 2.0
@@ -1358,8 +1475,8 @@ class BatteryHeroWidget(QWidget):
             ("CONSUMPTION", "15.2 kWh/100km" if not is_imp else "24.5 kWh/100mi", COLOR_TEXT_PRIMARY, 1, 1),
         ]
 
-        f_q_lbl = QFont("Segoe UI", max(6, min(8, int(quad_h * 0.28))), QFont.Weight.Bold)
-        f_q_val = QFont("Consolas", max(7, min(10, int(quad_h * 0.38))), QFont.Weight.Bold)
+        f_q_lbl = QFont("Segoe UI", max(6, min(9, int(quad_h * 0.28))), QFont.Weight.Bold)
+        f_q_val = QFont("Consolas", max(8, min(14, int(quad_h * 0.40))), QFont.Weight.Bold)
 
         for title, val, color, col, row in quads:
             qx = 12.0 + col * (quad_w + 8.0)
@@ -1372,11 +1489,11 @@ class BatteryHeroWidget(QWidget):
 
             painter.setFont(f_q_lbl)
             painter.setPen(COLOR_TEXT_MUTED)
-            painter.drawText(QRectF(qx + 6, qy + 2, quad_w - 12, quad_h * 0.45), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, title)
+            painter.drawText(QRectF(qx + 10, qy + 2, quad_w - 20, quad_h * 0.42), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, title)
 
             painter.setFont(f_q_val)
             painter.setPen(color)
-            painter.drawText(QRectF(qx + 6, qy + (quad_h * 0.40), quad_w - 12, quad_h * 0.55), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, val)
+            painter.drawText(QRectF(qx + 10, qy + (quad_h * 0.38), quad_w - 20, quad_h * 0.58), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, val)
 
         painter.end()
 
@@ -1651,6 +1768,7 @@ class VoltesseDashboard(QMainWindow):
         self.current_transmission = "AUTO"
         self.unit_system = "METRIC"
         self.user_scale_multiplier = 1.0
+        self.current_page_idx = 0
         self.active_hero_view = "SPEED"
         self.swap_wings = False
         self._last_record: Optional[TelemetryRecord] = None
@@ -1703,6 +1821,14 @@ class VoltesseDashboard(QMainWindow):
         self.brand_label = QLabel("⚡ VOLTESSE")
         self.brand_label.setStyleSheet("color: #00F5A0; letter-spacing: 2px;")
 
+        # Compact Digital Speed Pill (Always visible when away from Speedometer page)
+        self.speed_hud_badge = QLabel("0 KM/H [D1]")
+        self.speed_hud_badge.setStyleSheet(
+            "color: #00F5A0; background-color: rgba(0, 245, 160, 0.18); border: 1px solid #00F5A0; "
+            "padding: 2px 8px; border-radius: 4px; font-weight: bold; font-family: Consolas; font-size: 8.5pt;"
+        )
+        self.speed_hud_badge.setVisible(False)
+
         # Ready Indicator
         self.ready_badge = QLabel("READY")
         self.ready_badge.setStyleSheet(
@@ -1721,11 +1847,31 @@ class VoltesseDashboard(QMainWindow):
             "color: #00F5A0; background-color: rgba(0, 245, 160, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4); font-weight: bold;"
         )
 
-        # Hero View Status Badge (SPEED / BATT / PWR)
-        self.view_badge = QLabel("VIEW: SPEED")
-        self.view_badge.setStyleSheet(
-            "color: #00F5A0; background-color: rgba(0, 245, 160, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4); font-weight: bold;"
-        )
+        # Interactive Page Navigator Pill with clickable Left/Right buttons
+        self.nav_frame = QFrame()
+        self.nav_frame.setStyleSheet("background-color: rgba(12, 26, 20, 0.9); border: 1px solid rgba(0, 245, 160, 0.35); border-radius: 4px;")
+        nav_layout = QHBoxLayout(self.nav_frame)
+        nav_layout.setContentsMargins(4, 1, 4, 1)
+        nav_layout.setSpacing(6)
+
+        self.nav_prev_btn = QPushButton("◄")
+        self.nav_prev_btn.setFixedSize(20, 20)
+        self.nav_prev_btn.setStyleSheet("QPushButton { color: #00F5A0; background: transparent; border: none; font-weight: bold; font-size: 10pt; } QPushButton:hover { color: #FFFFFF; }")
+        self.nav_prev_btn.clicked.connect(self.prev_page)
+        nav_layout.addWidget(self.nav_prev_btn)
+
+        self.page_title_label = QLabel("PAGE 1/4: SPEED")
+        self.page_title_label.setStyleSheet("color: #00F5A0; font-weight: bold; font-size: 8pt; font-family: 'Segoe UI';")
+        nav_layout.addWidget(self.page_title_label)
+
+        self.nav_next_btn = QPushButton("►")
+        self.nav_next_btn.setFixedSize(20, 20)
+        self.nav_next_btn.setStyleSheet("QPushButton { color: #00F5A0; background: transparent; border: none; font-weight: bold; font-size: 10pt; } QPushButton:hover { color: #FFFFFF; }")
+        self.nav_next_btn.clicked.connect(self.next_page)
+        nav_layout.addWidget(self.nav_next_btn)
+
+        # Hero View Status Badge alias
+        self.view_badge = self.page_title_label
 
         # Operating Mode Ribbon Badge
         self.op_mode_badge = QLabel("RACE [CAN]")
@@ -1743,7 +1889,7 @@ class VoltesseDashboard(QMainWindow):
         )
 
         # Controls Hint Pill
-        self.controls_hint = QLabel("[KEYS: 1:RACE | 2:SIM | 3:TEST | V:VIEW | X:SWAP | T:TRANS | E/C:SHIFT]")
+        self.controls_hint = QLabel("[KEYS: ◄/►:PAGE | 1:RACE | 2:SIM | 3:TEST | T:TRANS | E/C:SHIFT | U:UNITS]")
         self.controls_hint.setStyleSheet(
             "color: #4E7566; background-color: rgba(12, 26, 20, 0.6); padding: 2px 8px; border-radius: 4px;"
         )
@@ -1774,11 +1920,12 @@ class VoltesseDashboard(QMainWindow):
 
         self.top_layout.addWidget(self.left_blinker)
         self.top_layout.addWidget(self.brand_label)
+        self.top_layout.addWidget(self.speed_hud_badge)
         self.top_layout.addWidget(self.ready_badge)
         self.top_layout.addWidget(self.logging_badge)
         self.top_layout.addWidget(self.units_badge)
-        self.top_layout.addWidget(self.view_badge)
         self.top_layout.addStretch(1)
+        self.top_layout.addWidget(self.nav_frame)
         self.top_layout.addWidget(self.op_mode_badge)
         self.top_layout.addWidget(self.trans_mode_badge)
         self.top_layout.addWidget(self.mode_badge)
@@ -1792,36 +1939,70 @@ class VoltesseDashboard(QMainWindow):
         self.main_layout.addWidget(self.top_bar)
 
         # -------------------------------------------------------------
-        # 2. MAIN COCKPIT PANORAMIC STAGE (Balanced Symmetrical Wings)
+        # 2. MAIN COCKPIT CENTRAL STAGE (Full-Width Single Widget Stack)
         # -------------------------------------------------------------
-        self.stage_layout = QHBoxLayout()
-        self.stage_layout.setContentsMargins(0, 0, 0, 0)
-        self.stage_layout.setSpacing(14)
+        self.page_stack = QStackedWidget()
+        self.page_stack.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        # =============================================================
-        # --- WING 1 (Left Wing by Default): Energy / Speed Station ---
-        # =============================================================
-        self.wing_1 = QFrame()
-        self.wing_1.setStyleSheet("background: transparent;")
-        self.wing_1_layout = QVBoxLayout(self.wing_1)
-        self.wing_1_layout.setContentsMargins(0, 0, 0, 0)
-        self.wing_1_layout.setSpacing(10)
+        # Page 0: Full-Width Speedometer Dial
+        self.speed_page = SpeedometerDialWidget(min_val=0.0, max_val=180.0, title="SPEED", unit="KM/H")
+        self.page_stack.addWidget(self.speed_page)      # Index 0
 
-        # Card 1: Stacked between BatteryStatusWidget and CompactSpeedPod
-        self.wing_1_top_stack = QStackedWidget()
-        self.battery_widget = BatteryStatusWidget()
+        # Page 1: Full-Width Battery & Energy Diagnostics
+        self.battery_page = BatteryHeroWidget()
+        self.page_stack.addWidget(self.battery_page)    # Index 1
+
+        # Page 2: Full-Width Powertrain Dynamics & AWD
+        self.powertrain_page = PowertrainHeroWidget()
+        self.page_stack.addWidget(self.powertrain_page) # Index 2
+
+        # Page 3: Full-Width 4-Wheel TPMS Monitoring
+        self.tpms_page = TPMSWidget()
+        self.page_stack.addWidget(self.tpms_page)       # Index 3
+
+        self.main_layout.addWidget(self.page_stack, stretch=1)
+
+        # Aliases for core widgets
+        self.center_stack = self.page_stack
+        self.speed_gauge = self.speed_page
+        self.battery_hero = self.battery_page
+        self.powertrain_hero = self.powertrain_page
+        self.tpms_widget = self.tpms_page
+
+        # Preserved widgets and dummy hierarchies for legacy telemetry / test assertions
         self.compact_speed_widget = CompactSpeedPod()
-        self.wing_1_top_stack.addWidget(self.battery_widget)        # Index 0
-        self.wing_1_top_stack.addWidget(self.compact_speed_widget)  # Index 1
-        self.wing_1_layout.addWidget(self.wing_1_top_stack, stretch=5)
+        self.battery_widget = BatteryStatusWidget()
+        self.battery_widget_alt = BatteryStatusWidget()
+        self.awd_widget = AwdTorqueVectorWidget()
+        self.power_bar = PowerBarWidget()
+        self.sparkline_widget = LiveSparklineWidget(max_points=50)
+        self.sparkline_widget_alt = LiveSparklineWidget(max_points=50)
 
-        # Card 2: 4-Wheel TPMS Monitoring Card
-        self.tpms_widget = TPMSWidget()
-        self.wing_1_layout.addWidget(self.tpms_widget, stretch=5)
+        self.wing_1 = QFrame()
+        self.wing_1_layout = QVBoxLayout(self.wing_1)
+        self.wing_1_top_stack = QStackedWidget()
+        self.wing_1_top_stack.addWidget(self.battery_widget)
+        self.wing_1_top_stack.addWidget(self.compact_speed_widget)
 
-        # Backwards compatible alias and mock references for tests
+        self.wing_2 = QFrame()
+        self.wing_2_layout = QVBoxLayout(self.wing_2)
+        self.wing_2_stack = QStackedWidget()
+        dummy_dyn = QWidget()
+        self.wing_2_stack.addWidget(dummy_dyn)
+        dummy_pwr = QWidget()
+        self.wing_2_stack.addWidget(dummy_pwr)
+
         self.left_wing = self.wing_1
         self.left_wing_layout = self.wing_1_layout
+        self.right_wing = self.wing_2
+        self.right_wing_layout = self.wing_2_layout
+
+        self.stage_layout = QHBoxLayout()
+        self.center_stage = QFrame()
+        self.stage_layout.addWidget(self.wing_1, stretch=3)
+        self.stage_layout.addWidget(self.center_stage, stretch=4)
+        self.stage_layout.addWidget(self.wing_2, stretch=3)
+
         self.left_hdr = QLabel("⚡ ENERGY & BATTERY")
         self.left_hdr.setVisible(False)
         self.volt_curr_pod = QFrame()
@@ -1837,121 +2018,13 @@ class VoltesseDashboard(QMainWindow):
         self.hlth_hdr = QLabel()
         self.health_val = QLabel("100% NOMINAL")
 
-        # =============================================================
-        # --- CENTER STAGE: Hero Stacked Widget ---
-        # =============================================================
-        self.center_stage = QFrame()
-        self.center_stage.setStyleSheet("background: transparent;")
-        self.center_layout = QVBoxLayout(self.center_stage)
-        self.center_layout.setContentsMargins(0, 0, 0, 0)
-
-        self.center_stack = QStackedWidget()
-        self.speed_gauge = SpeedometerDialWidget(min_val=0.0, max_val=180.0, title="SPEED", unit="KM/H")
-        self.battery_hero = BatteryHeroWidget()
-        self.powertrain_hero = PowertrainHeroWidget()
-
-        self.center_stack.addWidget(self.speed_gauge)      # Index 0: Speed Dial
-        self.center_stack.addWidget(self.battery_hero)     # Index 1: Battery Hero
-        self.center_stack.addWidget(self.powertrain_hero)  # Index 2: Powertrain Hero
-        self.center_layout.addWidget(self.center_stack)
-
-        # =============================================================
-        # --- WING 2 (Right Wing by Default): Dynamics / Energy Station ---
-        # =============================================================
-        self.wing_2 = QFrame()
-        self.wing_2.setStyleSheet("background: transparent;")
-        self.wing_2_layout = QVBoxLayout(self.wing_2)
-        self.wing_2_layout.setContentsMargins(0, 0, 0, 0)
-        self.wing_2_layout.setSpacing(0)
-
-        self.wing_2_stack = QStackedWidget()
-
-        # Page 0: Dynamics Pod Group (for Speed and Battery views)
-        page_dyn = QWidget()
-        page_dyn_layout = QVBoxLayout(page_dyn)
-        page_dyn_layout.setContentsMargins(0, 0, 0, 0)
-        page_dyn_layout.setSpacing(10)
-
-        # Card 1: Net Power & Pedal Dynamics Pod
         self.power_pod = QFrame()
-        self.power_pod.setStyleSheet(
-            "background-color: rgba(8, 18, 14, 0.9); border: 1px solid rgba(18, 50, 38, 0.8); border-radius: 8px;"
-        )
-        pp_layout = QVBoxLayout(self.power_pod)
-        pp_layout.setContentsMargins(14, 8, 14, 8)
-        pp_layout.setSpacing(6)
-
-        p_hdr_row = QHBoxLayout()
         self.right_hdr = QLabel("⚡ POWERTRAIN DYNAMICS")
-        self.right_hdr.setStyleSheet("color: #9AE6B4; letter-spacing: 1px; font-weight: bold;")
         self.power_title = QLabel("NET POWER")
-        self.power_title.setStyleSheet("color: #4E7566; font-weight: bold;")
-        p_hdr_row.addWidget(self.right_hdr)
-        p_hdr_row.addStretch(1)
-        p_hdr_row.addWidget(self.power_title)
-        pp_layout.addLayout(p_hdr_row)
-
-        p_val_row = QHBoxLayout()
         self.power_val = QLabel("0.0 kW")
-        self.power_val.setStyleSheet("color: #00F5A0; font-weight: bold;")
-        p_val_row.addStretch(1)
-        p_val_row.addWidget(self.power_val)
-        pp_layout.addLayout(p_val_row)
-
-        self.power_bar = PowerBarWidget()
-        pp_layout.addWidget(self.power_bar)
-
         self.pedal_frame = QFrame()
-        pedal_layout = QHBoxLayout(self.pedal_frame)
-        pedal_layout.setContentsMargins(0, 2, 0, 0)
-
         self.throttle_label = QLabel("THR: 0%")
-        self.throttle_label.setStyleSheet("color: #00F5A0; font-weight: bold;")
         self.brake_label = QLabel("BRK: 0%")
-        self.brake_label.setStyleSheet("color: #FF4D6D; font-weight: bold;")
-
-        pedal_layout.addWidget(self.throttle_label)
-        pedal_layout.addStretch(1)
-        pedal_layout.addWidget(self.brake_label)
-        pp_layout.addWidget(self.pedal_frame)
-
-        page_dyn_layout.addWidget(self.power_pod, stretch=4)
-
-        # Card 2: AWD Torque Vectoring Card
-        self.awd_widget = AwdTorqueVectorWidget()
-        page_dyn_layout.addWidget(self.awd_widget, stretch=3)
-
-        # Card 3: Live Oscilloscope Waveform Card
-        self.sparkline_widget = LiveSparklineWidget(max_points=50)
-        page_dyn_layout.addWidget(self.sparkline_widget, stretch=3)
-
-        self.wing_2_stack.addWidget(page_dyn)  # Index 0
-
-        # Page 1: Energy & Power Pod Group (for Powertrain Hero view)
-        page_energy = QWidget()
-        page_energy_layout = QVBoxLayout(page_energy)
-        page_energy_layout.setContentsMargins(0, 0, 0, 0)
-        page_energy_layout.setSpacing(10)
-
-        self.battery_widget_alt = BatteryStatusWidget()
-        page_energy_layout.addWidget(self.battery_widget_alt, stretch=5)
-
-        self.sparkline_widget_alt = LiveSparklineWidget(max_points=50)
-        page_energy_layout.addWidget(self.sparkline_widget_alt, stretch=4)
-
-        self.wing_2_stack.addWidget(page_energy)  # Index 1
-
-        self.wing_2_layout.addWidget(self.wing_2_stack)
-
-        self.right_wing = self.wing_2
-        self.right_wing_layout = self.wing_2_layout
-
-        # Initial layout order: Wing 1, Center, Wing 2
-        self.stage_layout.addWidget(self.wing_1, stretch=3)
-        self.stage_layout.addWidget(self.center_stage, stretch=4)
-        self.stage_layout.addWidget(self.wing_2, stretch=3)
-
-        self.main_layout.addLayout(self.stage_layout, stretch=4)
 
         # -------------------------------------------------------------
         # 3. BOTTOM TELEMETRY & TRIP DECK
@@ -2058,7 +2131,11 @@ class VoltesseDashboard(QMainWindow):
 
         # The full controls legend competes with live status badges for space
         # on narrow displays (e.g. 800x480 Raspberry Pi); controls remain active when hidden.
-        self.controls_hint.setVisible(w >= 950)
+        self.controls_hint.setVisible(w >= 1050)
+
+        # On compact screens (< 950px), hide nominal SYSTEM READY badge to give page navigator breathing room
+        has_warnings = bool(hasattr(self, "_last_record") and self._last_record and self._last_record.warnings)
+        self.status_badge.setVisible(has_warnings or w >= 950)
 
         # Dynamic text compactness on smaller displays
         if w < 950:
@@ -2169,50 +2246,69 @@ class VoltesseDashboard(QMainWindow):
             )
             self.controls_hint.setText("[TEST: AUTO ONLY | V:VIEW | X:SWAP | 1:RACE | 2:SIM | U:UNITS | L:LOG | SPACE:PAUSE]")
 
-    def set_hero_view(self, view_name: str) -> None:
-        """Sets the active hero widget in Center Stage and reorganizes wings accordingly."""
-        v = view_name.upper().strip()
-        if v not in ("SPEED", "BATTERY", "POWERTRAIN"):
-            v = "SPEED"
-        self.active_hero_view = v
-        swap_suffix = " [⇄]" if self.swap_wings else ""
+    PAGE_NAMES = ["SPEED", "BATTERY", "POWERTRAIN", "TPMS"]
 
-        if self.active_hero_view == "SPEED":
-            self.center_stack.setCurrentIndex(0)
-            self.wing_1_top_stack.setCurrentIndex(0)  # Battery Widget in Wing 1
-            self.wing_2_stack.setCurrentIndex(0)      # Dynamics in Wing 2
-            self.view_badge.setText(f"VIEW: SPEED{swap_suffix}")
-            self.view_badge.setStyleSheet(
-                "color: #00F5A0; background-color: rgba(0, 245, 160, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4); font-weight: bold;"
-            )
-        elif self.active_hero_view == "BATTERY":
-            self.center_stack.setCurrentIndex(1)
-            self.wing_1_top_stack.setCurrentIndex(1)  # Compact Speed in Wing 1
-            self.wing_2_stack.setCurrentIndex(0)      # Dynamics in Wing 2
-            self.view_badge.setText(f"VIEW: BATT{swap_suffix}")
-            self.view_badge.setStyleSheet(
-                "color: #00E5FF; background-color: rgba(0, 229, 255, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 229, 255, 0.4); font-weight: bold;"
-            )
-        elif self.active_hero_view == "POWERTRAIN":
-            self.center_stack.setCurrentIndex(2)
-            self.wing_1_top_stack.setCurrentIndex(1)  # Compact Speed in Wing 1
-            self.wing_2_stack.setCurrentIndex(1)      # Battery & Sparkline in Wing 2
-            self.view_badge.setText(f"VIEW: PWR{swap_suffix}")
-            self.view_badge.setStyleSheet(
-                "color: #FFB800; background-color: rgba(255, 184, 0, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(255, 184, 0, 0.4); font-weight: bold;"
-            )
+    def set_page(self, index: int) -> None:
+        """Sets the active full-width page in the main cluster stack."""
+        self.current_page_idx = index % len(self.PAGE_NAMES)
+        self.page_stack.setCurrentIndex(self.current_page_idx)
+        p_name = self.PAGE_NAMES[self.current_page_idx]
+        self.active_hero_view = p_name
+
+        swap_suffix = " [⇄]" if self.swap_wings else ""
+        self.page_title_label.setText(f"◄ {p_name} [{self.current_page_idx+1}/4]{swap_suffix} ►")
+
+        if p_name == "SPEED":
+            self.nav_frame.setStyleSheet("background-color: rgba(12, 26, 20, 0.9); border: 1px solid rgba(0, 245, 160, 0.4); border-radius: 4px;")
+            self.page_title_label.setStyleSheet("color: #00F5A0; font-weight: bold; font-size: 8pt;")
+            self.speed_hud_badge.setVisible(False)
+            self.ready_badge.setVisible(True)
+            self.wing_1_top_stack.setCurrentIndex(0)
+            self.wing_2_stack.setCurrentIndex(0)
+        elif p_name == "BATTERY":
+            self.nav_frame.setStyleSheet("background-color: rgba(6, 20, 26, 0.9); border: 1px solid rgba(0, 229, 255, 0.5); border-radius: 4px;")
+            self.page_title_label.setStyleSheet("color: #00E5FF; font-weight: bold; font-size: 8pt;")
+            self.speed_hud_badge.setVisible(True)
+            self.ready_badge.setVisible(False)
+            self.wing_1_top_stack.setCurrentIndex(1)
+            self.wing_2_stack.setCurrentIndex(0)
+        elif p_name == "POWERTRAIN":
+            self.nav_frame.setStyleSheet("background-color: rgba(26, 20, 6, 0.9); border: 1px solid rgba(255, 184, 0, 0.5); border-radius: 4px;")
+            self.page_title_label.setStyleSheet("color: #FFB800; font-weight: bold; font-size: 8pt;")
+            self.speed_hud_badge.setVisible(True)
+            self.ready_badge.setVisible(False)
+            self.wing_1_top_stack.setCurrentIndex(1)
+            self.wing_2_stack.setCurrentIndex(1)
+        elif p_name == "TPMS":
+            self.nav_frame.setStyleSheet("background-color: rgba(12, 26, 20, 0.9); border: 1px solid rgba(92, 255, 199, 0.4); border-radius: 4px;")
+            self.page_title_label.setStyleSheet("color: #5CFFC7; font-weight: bold; font-size: 8pt;")
+            self.speed_hud_badge.setVisible(True)
+            self.ready_badge.setVisible(False)
+            self.wing_1_top_stack.setCurrentIndex(1)
+            self.wing_2_stack.setCurrentIndex(0)
 
         if hasattr(self, "_last_record") and self._last_record is not None:
             self.update_telemetry(self._last_record)
 
         self.hero_view_changed.emit(self.active_hero_view)
 
+    def next_page(self) -> None:
+        """Navigates to the next widget page (Right)."""
+        self.set_page(self.current_page_idx + 1)
+
+    def prev_page(self) -> None:
+        """Navigates to the previous widget page (Left)."""
+        self.set_page(self.current_page_idx - 1)
+
+    def set_hero_view(self, view_name: str) -> None:
+        """Sets the active widget page in the central stack by name."""
+        v = view_name.upper().strip()
+        mapping = {"SPEED": 0, "BATTERY": 1, "BATT": 1, "POWERTRAIN": 2, "PWR": 2, "TPMS": 3}
+        self.set_page(mapping.get(v, 0))
+
     def cycle_hero_view(self) -> str:
-        """Cycles the hero view: SPEED -> BATTERY -> POWERTRAIN -> SPEED."""
-        order = ["SPEED", "BATTERY", "POWERTRAIN"]
-        curr_idx = order.index(self.active_hero_view) if self.active_hero_view in order else 0
-        next_view = order[(curr_idx + 1) % len(order)]
-        self.set_hero_view(next_view)
+        """Cycles to the next widget page."""
+        self.next_page()
         return self.active_hero_view
 
     def toggle_wing_swap(self) -> bool:
@@ -2236,7 +2332,7 @@ class VoltesseDashboard(QMainWindow):
             self.stage_layout.addWidget(self.center_stage, stretch=4)
             self.stage_layout.addWidget(self.wing_1, stretch=3)
 
-        self.set_hero_view(self.active_hero_view)
+        self.set_page(self.current_page_idx)
         self.wing_swap_changed.emit(self.swap_wings)
 
     def toggle_units(self) -> str:
@@ -2348,6 +2444,10 @@ class VoltesseDashboard(QMainWindow):
                 "background-color: rgba(0, 245, 160, 0.15); color: #5CFFC7; padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4); font-weight: bold;"
             )
 
+        # Compact Speed HUD Badge in Top Ribbon (Visible when away from Speedometer page)
+        spd_u = "MPH" if is_imp else "KM/H"
+        self.speed_hud_badge.setText(f"{int(round(disp_speed))} {spd_u} [{display_gear}]")
+
         # Battery & Voltage
         self.battery_widget.set_battery_data(
             record.battery_soc, record.battery_voltage, record.battery_current
@@ -2402,11 +2502,13 @@ class VoltesseDashboard(QMainWindow):
             self.status_badge.setStyleSheet(
                 "background-color: rgba(255, 77, 109, 0.25); color: #FFA3B4; padding: 2px 10px; border-radius: 4px; border: 1px solid #FF4D6D; font-weight: bold;"
             )
+            self.status_badge.setVisible(True)
         else:
             self.status_badge.setText("SYSTEM READY")
             self.status_badge.setStyleSheet(
                 "background-color: rgba(0, 245, 160, 0.12); color: #5CFFC7; padding: 2px 10px; border-radius: 4px;"
             )
+            self.status_badge.setVisible(self.width() >= 950)
 
         # Thermals
         self.thermal_widget.set_temperatures(
@@ -2476,8 +2578,8 @@ class VoltesseDashboard(QMainWindow):
         """Dispatches active driving controls to simulation stream."""
         thr = (Qt.Key.Key_W in self._held_keys or Qt.Key.Key_Up in self._held_keys)
         brk = (Qt.Key.Key_S in self._held_keys or Qt.Key.Key_Down in self._held_keys)
-        steer_l = (Qt.Key.Key_A in self._held_keys or Qt.Key.Key_Left in self._held_keys)
-        steer_r = (Qt.Key.Key_D in self._held_keys or Qt.Key.Key_Right in self._held_keys)
+        steer_l = (Qt.Key.Key_A in self._held_keys)
+        steer_r = (Qt.Key.Key_D in self._held_keys)
         self.simulation_input_changed.emit(thr, brk, steer_l, steer_r)
 
     def keyPressEvent(self, event) -> None:
@@ -2489,8 +2591,7 @@ class VoltesseDashboard(QMainWindow):
             if key not in (
                 Qt.Key.Key_W, Qt.Key.Key_Up,
                 Qt.Key.Key_S, Qt.Key.Key_Down,
-                Qt.Key.Key_A, Qt.Key.Key_Left,
-                Qt.Key.Key_D, Qt.Key.Key_Right,
+                Qt.Key.Key_A, Qt.Key.Key_D,
             ):
                 return
 
@@ -2557,7 +2658,13 @@ class VoltesseDashboard(QMainWindow):
             self.toggle_units()
             return
         elif key == Qt.Key.Key_V:
-            self.cycle_hero_view()
+            self.next_page()
+            return
+        elif key == Qt.Key.Key_Left:
+            self.prev_page()
+            return
+        elif key == Qt.Key.Key_Right:
+            self.next_page()
             return
         elif key == Qt.Key.Key_X:
             self.toggle_wing_swap()
@@ -2583,12 +2690,11 @@ class VoltesseDashboard(QMainWindow):
             self.status_badge.setText("ZOOM: 100%")
             return
 
-        # Video Game Driving Inputs (W/A/S/D and Arrow Keys)
+        # Video Game Driving Inputs (W/A/S/D and Arrow Keys Up/Down)
         if key in (
             Qt.Key.Key_W, Qt.Key.Key_Up,
             Qt.Key.Key_S, Qt.Key.Key_Down,
-            Qt.Key.Key_A, Qt.Key.Key_Left,
-            Qt.Key.Key_D, Qt.Key.Key_Right,
+            Qt.Key.Key_A, Qt.Key.Key_D,
         ):
             self._held_keys.add(key)
             self._update_simulation_keys()
