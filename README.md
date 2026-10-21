@@ -258,6 +258,7 @@ Generated files are saved directly to `data/exports/`.
 | :--- | :--- | :--- |
 | `--mode` | `RACE` | Initial telemetry mode (`RACE`, `SIMULATION`, `TEST`) |
 | `--windowed` | `False` | Run in windowed mode (default is fullscreen) |
+| `--geometry` | `auto` | Force explicit window resolution `WxH` (e.g. `800x480` on Raspberry Pi) |
 | `--scale` / `--ui-scale` | `auto` | Custom cockpit UI scale factor (e.g. `0.85` for compact screens) |
 | `--imperial` | `False` | Launch in Imperial units (`MPH`, `mi`, `°F`, `psi`, `lb-ft`) |
 | `--read-only` | `False` | Open the database in strict read-only mode |

@@ -92,13 +92,41 @@ class VoltesseApp:
             read_only=self.db_manager.read_only,
         )
 
+        # Screen geometry detection & logging
+        screen = self.app.primaryScreen()
+        screen_w, screen_h = 800, 480
+        dpi = 96.0
+        dpr = 1.0
+        if screen:
+            geom = screen.geometry()
+            screen_w, screen_h = geom.width(), geom.height()
+            dpi = screen.logicalDotsPerInch()
+            dpr = screen.devicePixelRatio()
+
+        logger.info(
+            "Screen hardware detected: %dx%d (DPI: %.1f, DPR: %.2f)",
+            screen_w, screen_h, dpi, dpr,
+        )
+
+        # Allow user to force specific resolution via --geometry WxH (e.g. 800x480)
+        forced_geom = getattr(args, "geometry", None)
+        if forced_geom and "x" in forced_geom:
+            try:
+                gw, gh = map(int, forced_geom.lower().split("x"))
+                screen_w, screen_h = gw, gh
+                logger.info("Overriding geometry via --geometry: %dx%d", gw, gh)
+            except ValueError:
+                logger.warning("Invalid --geometry '%s', expected WxH (e.g. 800x480)", forced_geom)
+
+        self.gui.resize(screen_w, screen_h)
+
         # Fullscreen by default as specified in design requirements
         if args.windowed:
-            logger.info("Launching in windowed development mode...")
+            logger.info("Launching in windowed development mode (%dx%d)...", screen_w, screen_h)
             self.gui.show()
         else:
-            logger.info("Launching in fullscreen cockpit mode...")
-            self.gui.setWindowFlags(self.gui.windowFlags() | Qt.WindowType.FramelessWindowHint)
+            logger.info("Launching in fullscreen cockpit mode (%dx%d)...", screen_w, screen_h)
+            self.gui.setGeometry(0, 0, screen_w, screen_h)
             self.gui.showFullScreen()
 
         # 3. Initialize Three Telemetry Sources
@@ -454,6 +482,12 @@ def parse_args() -> argparse.Namespace:
         "--windowed",
         action="store_true",
         help="Launch in windowed mode rather than fullscreen (default: fullscreen)",
+    )
+    parser.add_argument(
+        "--geometry",
+        type=str,
+        default=None,
+        help="Explicit window resolution WxH (e.g. 800x480 for Raspberry Pi displays)",
     )
     parser.add_argument(
         "--scale",

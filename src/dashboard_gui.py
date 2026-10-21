@@ -24,6 +24,7 @@ from PyQt6.QtGui import (
     QRadialGradient,
 )
 from PyQt6.QtWidgets import (
+    QApplication,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -1073,7 +1074,18 @@ class VoltesseDashboard(QMainWindow):
         # Leave room for the cockpit on smaller embedded displays. The layout
         # itself scales to the available size, including 800x480 panels.
         self.setMinimumSize(400, 240)
-        self.resize(1280, 720)
+        # Adapt default window size to detected display (800x480 on compact screens)
+        screen = QApplication.primaryScreen()
+        if screen:
+            geom = screen.geometry()
+            init_w = geom.width() if geom.width() > 0 else 800
+            init_h = geom.height() if geom.height() > 0 else 480
+            if init_w <= 1024 or init_h <= 600:
+                self.resize(init_w, init_h)
+            else:
+                self.resize(1280, 720)
+        else:
+            self.resize(800, 480)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         # Active operating mode state
@@ -1169,6 +1181,8 @@ class VoltesseDashboard(QMainWindow):
         self.controls_hint.setStyleSheet(
             "color: #4E7566; background-color: rgba(12, 26, 20, 0.6); padding: 2px 8px; border-radius: 4px;"
         )
+        self.controls_hint.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.controls_hint.setMinimumWidth(0)
 
         self._update_op_mode_badge_style("RACE")
 
@@ -1177,6 +1191,8 @@ class VoltesseDashboard(QMainWindow):
         self.status_badge.setStyleSheet(
             "background-color: rgba(0, 245, 160, 0.12); color: #5CFFC7; padding: 2px 8px; border-radius: 4px;"
         )
+        self.status_badge.setMinimumWidth(0)
+        self.top_bar.setMinimumWidth(0)
 
         # Ambient Temp
         self.ambient_label = QLabel("22°C")
