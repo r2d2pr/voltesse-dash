@@ -1,0 +1,25 @@
+[Unit]
+Description=Voltesse Dashboard
+Wants=seatd.service
+After=network-online.target seatd.service
+
+[Service]
+Type=simple
+User=admin
+WorkingDirectory=/home/admin/voltesse-dash
+RuntimeDirectory=cage
+Environment="XDG_RUNTIME_DIR=/run/cage"
+Environment="WLR_LIBINPUT_NO_DEVICES=1"
+Environment="QT_QPA_PLATFORM=wayland"
+Environment="QT_AUTO_SCREEN_SCALE_FACTOR=0"
+Environment="QT_ENABLE_HIGHDPI_SCALING=0"
+Environment="QT_SCALE_FACTOR=1.0"
+Environment="VOLTESSE_DB_URL=postgresql://voltesse:voltesse@localhost:5432/voltesse_dash"
+# Fullscreen kiosk launch via Cage Wayland compositor with explicit 800x480 resolution
+ExecStart=/usr/bin/cage -s -- /home/admin/voltesse-dash/venv/bin/python main.py --mode TEST --geometry 800x480
+#ExecStart=/usr/bin/cage -s -- /home/admin/voltesse-dash/venv/bin/python main.py --geometry 800x480
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

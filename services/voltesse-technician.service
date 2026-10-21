@@ -1,0 +1,16 @@
+[Unit]
+Description=Voltesse Technician Interface (Streamlit)
+After=network-online.target postgresql.service voltesse-dash.service
+Wants=postgresql.service voltesse-dash.service
+
+[Service]
+Type=simple
+User=admin
+WorkingDirectory=/home/admin/voltesse-dash/technician-gui
+Environment="VOLTESSE_DB_URL=postgresql://voltesse:voltesse@localhost:5432/voltesse_dash"
+ExecStart=/home/admin/voltesse-dash/venv/bin/streamlit run app.py --server.port 8501 --server.headless true
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
