@@ -195,7 +195,7 @@ class SpeedometerDialWidget(QWidget):
 
             # Major Tick Numbers
             if is_major and side > 160:
-                r_num = r_inner - (side * 0.055)
+                r_num = r_inner - (side * 0.038)
                 nx = cx + math.cos(rad) * r_num
                 ny = cy + math.sin(rad) * r_num
 
@@ -246,33 +246,34 @@ class SpeedometerDialWidget(QWidget):
 
         # 7. Central Large Digital Speedometer Readout
         speed_int = int(round(self.current_val))
-        font_speed_size = max(18, min(62, int(side * 0.13)))
+        font_speed_size = max(18, min(60, int(side * 0.125)))
         font_speed = QFont("Segoe UI", font_speed_size, QFont.Weight.Bold)
         painter.setFont(font_speed)
         painter.setPen(COLOR_TEXT_PRIMARY)
 
         speed_box_w = side * 0.70
-        speed_box_h = side * 0.26
-        speed_rect = QRectF(cx - (speed_box_w / 2.0), cy - side * 0.22, speed_box_w, speed_box_h)
+        speed_box_h = side * 0.22
+        speed_rect = QRectF(cx - (speed_box_w / 2.0), cy - side * 0.27, speed_box_w, speed_box_h)
         painter.drawText(speed_rect, Qt.AlignmentFlag.AlignCenter, f"{speed_int}")
 
         # 8. Speed Unit Label
         painter.setPen(COLOR_MINT)
-        font_unit = QFont("Segoe UI", max(7, min(15, int(side * 0.028))), QFont.Weight.Bold)
+        font_unit = QFont("Segoe UI", max(7, min(14, int(side * 0.026))), QFont.Weight.Bold)
         font_unit.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, max(1, int(side * 0.005)))
         painter.setFont(font_unit)
-        unit_rect = QRectF(cx - side * 0.20, cy + side * 0.025, side * 0.40, side * 0.055)
+        unit_h = max(11.0, side * 0.045)
+        unit_rect = QRectF(cx - side * 0.20, cy - side * 0.045, side * 0.40, unit_h)
         painter.drawText(unit_rect, Qt.AlignmentFlag.AlignCenter, self.unit)
 
         # 9. Modern Automotive Transmission Hub (Auto PRNDB with active gear or Manual R/N/1-6)
-        gear_y = cy + side * 0.075
+        gear_y = cy + side * 0.012
         if self.transmission_mode == "MANUAL":
             gears = ["R", "N", "1", "2", "3", "4", "5", "6"]
         else:
             gears = ["P", "R", "N", "D", "B"]
 
-        slot_w = max(14.0, min(32.0, (side * 0.44) / len(gears)))
-        box_h = max(14.0, min(24.0, side * 0.046))
+        slot_w = max(13.0, min(28.0, (side * 0.40) / len(gears)))
+        box_h = max(13.0, min(20.0, side * 0.042))
         total_gear_w = len(gears) * slot_w
         start_gx = cx - (total_gear_w / 2.0)
 
@@ -281,7 +282,7 @@ class SpeedometerDialWidget(QWidget):
         painter.setPen(QPen(QColor(18, 50, 38, 160), 1))
         painter.drawRoundedRect(capsule_rect, 5, 5)
 
-        font_gear = QFont("Segoe UI", max(6, min(11, int(side * 0.022))), QFont.Weight.Bold)
+        font_gear = QFont("Segoe UI", max(6, min(10, int(side * 0.020))), QFont.Weight.Bold)
         painter.setFont(font_gear)
 
         for idx, g in enumerate(gears):
@@ -313,8 +314,8 @@ class SpeedometerDialWidget(QWidget):
             painter.drawText(slot_rect, Qt.AlignmentFlag.AlignCenter, label_text)
 
         # Prominent Gear & Transmission Status Hub Pill directly beneath capsule
-        trans_status_y = gear_y + box_h + max(2.0, side * 0.010)
-        status_h = max(13.0, min(18.0, side * 0.040))
+        trans_status_y = gear_y + box_h + max(2.0, side * 0.008)
+        status_h = max(11.0, min(15.0, side * 0.034))
         if self.transmission_mode == "MANUAL":
             if self.active_gear.isdigit():
                 display_gear = f"M{self.active_gear}"
@@ -341,32 +342,37 @@ class SpeedometerDialWidget(QWidget):
                 status_text = f"AUTO  •  {self.active_gear}"
 
         painter.setPen(COLOR_CYAN if self.transmission_mode == "MANUAL" else COLOR_MINT_BRIGHT)
-        font_status = QFont("Segoe UI", max(6, min(11, int(side * 0.020))), QFont.Weight.Bold)
+        font_status = QFont("Segoe UI", max(6, min(10, int(side * 0.019))), QFont.Weight.Bold)
         font_status.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
         painter.setFont(font_status)
         status_rect = QRectF(cx - side * 0.44, trans_status_y, side * 0.88, status_h)
         painter.drawText(status_rect, Qt.AlignmentFlag.AlignCenter, status_text)
 
         # RPM Subtitle
-        rpm_y = trans_status_y + status_h + max(1.0, side * 0.008)
-        rpm_h = max(10.0, min(15.0, side * 0.030))
+        rpm_y = trans_status_y + status_h + max(1.0, side * 0.006)
+        rpm_h = max(9.0, min(12.0, side * 0.024))
         painter.setPen(COLOR_TEXT_SECONDARY)
-        font_rpm = QFont("Consolas", max(6, min(11, int(side * 0.020))), QFont.Weight.Normal)
+        font_rpm = QFont("Consolas", max(6, min(10, int(side * 0.018))), QFont.Weight.Normal)
         painter.setFont(font_rpm)
         rpm_rect = QRectF(cx - side * 0.35, rpm_y, side * 0.70, rpm_h)
         painter.drawText(rpm_rect, Qt.AlignmentFlag.AlignCenter, f"{self.sub_val_label} {self.sub_val}")
 
-        # 10. Dual Horizontal Micro-Meters for Throttle & Brake
-        pedal_y = rpm_y + rpm_h + max(2.0, side * 0.010)
-        bar_w = max(30.0, min(80.0, side * 0.14))
-        bar_h = max(3.5, min(7.0, side * 0.015))
+        # 10. Dual Horizontal Micro-Meters for Throttle & Brake (Centered collision-free)
+        pedal_y = rpm_y + rpm_h + max(2.0, side * 0.008)
+        bar_w = max(20.0, min(34.0, side * 0.085))
+        bar_h = max(3.0, min(5.0, side * 0.012))
+        lbl_w = max(18.0, min(24.0, side * 0.060))
+        gap = max(3.0, side * 0.010)
 
-        # Brake Micro-Meter (Left side)
-        brk_bx = cx - bar_w - max(8.0, side * 0.035)
+        # Center labels between the two bars
+        font_pedal_lbl = QFont("Segoe UI", max(5, min(8, int(side * 0.018))), QFont.Weight.Bold)
+        painter.setFont(font_pedal_lbl)
         painter.setPen(COLOR_TEXT_MUTED)
-        painter.setFont(QFont("Segoe UI", max(6, min(10, int(side * 0.020))), QFont.Weight.Bold))
-        painter.drawText(QRectF(brk_bx - 32, pedal_y - 4, 28, 14), Qt.AlignmentFlag.AlignRight, "BRK")
+        painter.drawText(QRectF(cx - gap - lbl_w, pedal_y - 3, lbl_w, bar_h + 6), Qt.AlignmentFlag.AlignCenter, "BRK")
+        painter.drawText(QRectF(cx + gap, pedal_y - 3, lbl_w, bar_h + 6), Qt.AlignmentFlag.AlignCenter, "THR")
 
+        # Brake Micro-Meter (Left of BRK label)
+        brk_bx = cx - gap - lbl_w - bar_w
         painter.setBrush(QBrush(COLOR_GAUGE_TRACK))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(QRectF(brk_bx, pedal_y, bar_w, bar_h), 2, 2)
@@ -375,8 +381,8 @@ class SpeedometerDialWidget(QWidget):
             painter.setBrush(QBrush(COLOR_RED))
             painter.drawRoundedRect(QRectF(brk_bx + bar_w - brk_fill, pedal_y, brk_fill, bar_h), 2, 2)
 
-        # Throttle Micro-Meter (Right side)
-        thr_bx = cx + max(8.0, side * 0.035)
+        # Throttle Micro-Meter (Right of THR label)
+        thr_bx = cx + gap + lbl_w
         painter.setBrush(QBrush(COLOR_GAUGE_TRACK))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(QRectF(thr_bx, pedal_y, bar_w, bar_h), 2, 2)
@@ -385,19 +391,15 @@ class SpeedometerDialWidget(QWidget):
             painter.setBrush(QBrush(COLOR_MINT))
             painter.drawRoundedRect(QRectF(thr_bx, pedal_y, thr_fill, bar_h), 2, 2)
 
-        painter.setPen(COLOR_TEXT_MUTED)
-        painter.setFont(QFont("Segoe UI", max(6, min(10, int(side * 0.020))), QFont.Weight.Bold))
-        painter.drawText(QRectF(thr_bx + bar_w + 4, pedal_y - 4, 28, 14), Qt.AlignmentFlag.AlignLeft, "THR")
-
         # 11. Center Steering Wheel Angle Indicator
-        steer_y = pedal_y + bar_h + max(3.0, side * 0.012)
+        steer_y = pedal_y + bar_h + max(2.0, side * 0.008)
         angle = self.steering_angle
         steer_txt = f"STR ◄ {abs(int(angle))}°" if angle < -0.5 else (f"STR {int(angle)}° ►" if angle > 0.5 else "STR 0°")
         s_color = COLOR_CYAN if abs(angle) > 1.0 else COLOR_TEXT_MUTED
 
         painter.setPen(s_color)
-        painter.setFont(QFont("Segoe UI", max(6, min(12, int(side * 0.022))), QFont.Weight.Bold))
-        painter.drawText(QRectF(cx - 50, steer_y, 100, 14), Qt.AlignmentFlag.AlignCenter, steer_txt)
+        painter.setFont(QFont("Segoe UI", max(5, min(9, int(side * 0.018))), QFont.Weight.Bold))
+        painter.drawText(QRectF(cx - 40, steer_y, 80, 12), Qt.AlignmentFlag.AlignCenter, steer_txt)
 
         painter.end()
 
