@@ -1,25 +1,36 @@
-# Voltesse Dash ⚡ v2.0.2
+# Voltesse Dash ⚡ v3.0.0
 
-[![Version](https://img.shields.io/badge/version-2.0.2-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
+[![Version](https://img.shields.io/badge/version-3.0.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/PyQt-6-green.svg)](https://riverbankcomputing.com/software/pyqt/)
+[![Web](https://img.shields.io/badge/Streamlit-1.65-red.svg)](https://streamlit.io/)
+[![Database](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern, high-contrast automotive digital cockpit instrument cluster and local telemetry logging engine engineered for embedded displays (e.g., Raspberry Pi) and EV powertrains. Built with **Python**, **PyQt6**, **python-can**, and **PostgreSQL**.
+A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 3.0.0 features the PyQt6 driver cockpit with responsive **800x480 Raspberry Pi auto-scaling** and a dedicated **Streamlit technician/admin web view** connected to the PostgreSQL database. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
 
 ---
 
-## What's New in Version 2.0.2 🚀
+## What's New in Version 3.0.0 🚀
 
-- 🌐 **Dual Metric & Imperial Unit System**: Seamless runtime switching between **Metric** (`km/h`, `km`, `°C`, `bar`, `Nm`) and **Imperial** (`mph`, `mi`, `°F`, `psi`, `lb-ft`) across all modes via hotkey `U` or CLI flag `--imperial`.
+- 🌐 **Technician/Admin Streamlit Web Portal**: Dedicated local web server communicating directly with the **PostgreSQL** database backend via `psycopg 3`:
+  - **Live Vehicle Telemetry**: Real-time readouts of speed, RPM, battery SoC, pack voltage, current draw, gear, drive mode, and motor temperature trend.
+  - **Session History & Inspection**: Queries real sessions from `vehicle_session` with start/end timestamps, duration, source type (`CAN_BUS`, `SIMULATION`, `TEST`), driver ID, peak thermals, and max velocity.
+  - **Deep Vehicle Diagnostics**: Five interactive Plotly performance charts plotting energy efficiency vs. speed, power draw vs. motor temperature, battery consumption vs. distance, power vs. RPM, and motor temperature rise over time.
+  - **Technician Authentication**: Authenticates against the `technician_user` table in PostgreSQL with demo credentials fallback.
+  - **Alert Threshold Configuration**: Interactive warning limits (`warning_temp`, `warning_battery`) driving live warnings and graph threshold markers.
+  - **Fault-Tolerant Fallback Mode**: Gracefully switches to interactive simulation if PostgreSQL is offline, ensuring reliable bench testing.
+- 📱 **800x480 Raspberry Pi Display Auto-Scaling Engine**: Complete overhaul of the cockpit scaling system for the standard Raspberry Pi 7" touchscreen (800x480) and compact displays:
+  - **Balanced Symmetrical Wings**: Proportional 3-column layout (230px Left Wing : 308px Center Stage : 230px Right Wing) eliminating layout skewing and text clipping.
+  - **Collision-Free Speedometer Dial**: Dynamically sequenced transmission capsule, gear status hub pill (`AUTO • D1 (GEAR 1)`), RPM subtitle, dual throttle/brake micro-meters, and steering angle indicator with zero overlap.
+  - **Responsive HUD Ribbon**: Compact badge padding, proportional typography, and auto-hidden controls hint on compact screens (`w < 950px`).
+- 🌐 **Dual Metric & Imperial Unit System**: Runtime switching between **Metric** (`km/h`, `km`, `°C`, `bar`, `Nm`) and **Imperial** (`mph`, `mi`, `°F`, `psi`, `lb-ft`) across all modes via hotkey `U` or CLI flag `--imperial`.
 - 🕒 **12-Hour AM/PM Automotive Clock**: High-visibility digital clock in the top HUD ribbon formatted in 12-hour AM/PM (`hh:mm:ss AM/PM`) with live 1-second precision across all modes.
-
 - 🏎️ **Tri-Mode Operating Architecture**: Instant switching between **Race Mode** (CAN bus), **Simulation Mode** (interactive keyboard video-game controls), and **Test Mode** (autonomous mock telemetry).
 - ⚙️ **Dynamic Automatic Gear Display (`D1`–`D6`)**: In Auto mode, vehicle speed dynamically drives active gear calculation across 6 EV gear ratios (`D1` to `D6`) displayed on the central capsule, gear status hub, and HUD ribbon.
 - 🕹️ **6-Speed Sequential Manual Transmission**: Driver-controlled shifting (`E` for upshift, `C` for downshift) covering gears `1`–`6`, `N`, and `R` in both Race and Simulation modes.
 - 💾 **Granular Database Write Access Controls**: Pre-flight write permission verification, runtime logging toggle (`L` key), strict read-only execution mode (`--read-only`), and direct session export to CSV and JSON.
-- 🖥️ **Variable Fullscreen Auto-Scaling Engine**: Native launch in borderless fullscreen with dynamic proportional scaling that adapts flawlessly across any aspect ratio and resolution (1024x600 RPi, 720p, 1080p, 1440p, 4K).
 
 ---
 
@@ -54,31 +65,31 @@ A modern, high-contrast automotive digital cockpit instrument cluster and local 
     - **Speed**: `KM/H` (0–180 scale) ⇄ `MPH` (0–120 scale)
     - **Estimated Range & Trip Odometer**: `km` ⇄ `mi`
     - **Thermal Temperatures (Motor, Inverter, Battery Pack)**: `°C` ⇄ `°F`
-    - **4-Wheel Tire Pressure (TPMS)**: `bar` ⇄ `psi`
+    - **4-Wheel Tire Pressure (TPMS)**:  `bar` ⇄ `psi`
     - **Dual-Motor Torque Vectoring**: `Nm` ⇄ `lb-ft`
   - Top HUD ribbon features a dedicated `[METRIC]` / `[IMPERIAL]` badge for instantaneous driver awareness.
 - **12-Hour AM/PM Precision Cockpit Clock**:
-  - Top HUD ribbon clock upgraded to 12-hour AM/PM format with live second tracking, synchronized across all operating modes.
+  - Top HUD ribbon clock formatted in 12-hour AM/PM format with live second tracking, synchronized across all operating modes.
 - **Granular Database Write Access & Storage Controls**:
-  - **Pre-flight Write Verification**: Verifies directory existence and write permissions before logging.
+  - **Pre-flight Write Verification**: Verifies connection and write permissions before logging.
   - **Runtime Write Toggle (`L` key)**: Drivers can pause and resume database logging on the fly without stopping vehicle telemetry or restarting the dashboard.
   - **Top Ribbon Status Indicator**: Live status badge shows `REC` (active writing), `LOG OFF` (writing paused), or `R/O` (strict read-only).
   - **Strict Read-Only Enforcement (`--read-only`)**: Safe post-race diagnostics without modifying existing trip sessions or records.
   - **Session Data Export**: Export trip sessions directly to CSV or structured JSON via CLI flags (`--export-csv`, `--export-json`, `--export-summary`).
-- **Fullscreen & Dynamic Auto-Scaling**:
+- **Fullscreen & Dynamic Auto-Scaling (800x480 to 4K)**:
   - Runs in **fullscreen mode by default** on launch.
-  - All dial gauges, cards, fonts, battery arcs, TPMS silhouettes, and HUD ribbons dynamically auto-scale to fit any display resolution (1024x600, 720p, 1080p, 1440p, 4K) without vertical stretching.
+  - Dynamically adapts to 800x480 Raspberry Pi touchscreens, 1024x600 displays, 720p, 1080p, 1440p, and 4K monitors without layout distortion.
 - **Distraction-Free Cyber-Mint Cockpit UI**:
   - **Dynamic Radial Speedometer**: Central gauge with digital speed numerals, motor RPM, gear capsule, dual throttle/brake micro-meters, and steering angle readout.
-  - **Battery & Range Hero**: High-visibility SoC arc, pack voltage (V), current (A), and estimated range (km).
+  - **Battery & Range Hero**: High-visibility SoC arc, pack voltage (V), current (A), and estimated range (km/mi).
   - **Bidirectional Power / Regen Bar**: Live kW delivery and regenerative braking recapture indicators.
   - **4-Wheel TPMS Monitoring Pod**: Top-down chassis schematic tracking corner tire pressures and temperatures.
-  - **AWD Dynamic Torque Vectoring Pod**: Real-time front and rear motor torque allocation (Nm) with mode bias.
-  - **Thermal Diagnostics**: Continuous monitoring for motor, inverter, and battery pack temperatures.
+  - **AWD Dynamic Torque Vectoring Pod**: Real-time front and rear motor torque allocation with mode bias.
+  - **Thermal Diagnostics Pod**: Continuous monitoring for motor, inverter, and battery pack temperatures.
   - **Live Oscilloscope Trace**: Rolling sparkline graph plotting speed and power curves.
 - **Asynchronous Telemetry & Batched Logging**:
   - Dedicated `QThread` telemetry sources guarantee zero main GUI thread blocking.
-  - PostgreSQL persistence (schema from the SRS, section 3.4) with micro-batched background writes, so database load never blocks the display and SD card writes stay low.
+  - PostgreSQL persistence (schema from the SRS, section 3.4) with micro-batched background writes, preventing I/O bottlenecks and protecting SD card flash storage.
   - Session-based retention keeps the newest N vehicle sessions (`--keep-sessions`).
 
 ---
@@ -87,21 +98,32 @@ A modern, high-contrast automotive digital cockpit instrument cluster and local 
 
 ```
 voltesse-dash/
-├── db/                        # PostgreSQL schema, sample data, local Docker setup, backup/migration scripts
-│   └── README.md              # How to run the database locally and move it to the Raspberry Pi
+├── db/                        # PostgreSQL schema, sample seed data, Docker Compose, backup/migration scripts
+│   ├── schema.sql             # Relational SRS schema (technician_user, vehicle_session, telemetry_log, backup_log)
+│   ├── seed.sql               # Seed sample telemetry and sessions
+│   ├── docker-compose.yml     # Local PostgreSQL 16 container definition
+│   └── README.md              # Database setup and Raspberry Pi migration guide
 ├── data/
 │   └── exports/               # Generated CSV & JSON session dumps (auto-created)
 ├── src/
-│   ├── __init__.py
+│   ├── __init__.py            # Package version (v3.0.0)
 │   ├── can_bus_source.py      # CAN Bus interface, frame decoders, and synchronized mock transmitter
 │   ├── simulation_source.py   # Video-game interactive EV dynamics engine (W/A/S/D, 6-speed manual, D1-D6 auto)
 │   ├── telemetry_source.py    # Autonomous EV driving cycle telemetry stream (Test Mode, D1-D6 auto)
-│   ├── dashboard_gui.py       # PyQt6 digital cluster interface & auto-scaling widgets
-│   └── database.py            # PostgreSQL access: batched writer, sessions, retention, write controls, exports
+│   ├── dashboard_gui.py       # PyQt6 digital cluster interface & 800x480 auto-scaling engine
+│   └── database.py            # PostgreSQL persistence: batched writer, sessions, retention, write controls, exports
+├── technician-gui/            # Streamlit technician & admin web interface
+│   ├── app.py                 # Streamlit entrypoint and navigation controller
+│   ├── data/
+│   │   ├── db.py              # PostgreSQL database queries, authentication & telemetry feed
+│   │   └── simulator.py       # Deterministic fallback simulator for bench testing
+│   ├── ui/                    # Modular UI pages (Live, Diagnostics, Sessions, Settings, Login)
+│   ├── tests/                 # Unit tests for database integration and simulator
+│   └── requirements.txt       # Streamlit dependencies (streamlit, pandas, plotly, psycopg)
 ├── tests/
-│   └── test_voltesse.py       # Comprehensive unit and integration test suite (16 tests)
+│   └── test_voltesse.py       # Comprehensive unit and integration test suite (25 tests)
 ├── main.py                    # Application lifecycle, transmission, and mode controller
-├── requirements.txt           # Python dependencies (PyQt6, python-can)
+├── requirements.txt           # Driver cockpit dependencies (PyQt6, python-can, psycopg)
 ├── AGENTS.md                  # Embedded developer rules, architecture contracts & specifications
 └── README.md                  # Project documentation
 ```
@@ -120,6 +142,7 @@ voltesse-dash/
 | `E` | **Upshift** (`1` ➔ `6` in Manual, or selector in Auto) | Global |
 | `C` | **Downshift** (`6` ➔ `1` ➔ `N` ➔ `R` in Manual, or selector in Auto) | Global |
 | `G` | Cycle Gear (`P-R-N-D-B` in Auto, Upshift in Manual) | Global |
+| `U` | **Toggle Units (Metric ⮂ Imperial)** | Global (Race, Sim, Test) |
 | `L` | **Toggle Database Logging / Write Access** (`REC` ⮂ `LOG OFF`) | Global |
 | `W` / `Up Arrow` | Accelerate (Throttle ramp-up) | Simulation Mode |
 | `S` / `Down Arrow` | Brake (Regen & Friction brake) | Simulation Mode |
@@ -137,7 +160,7 @@ voltesse-dash/
 ### 1. Prerequisites
 
 - Python 3.10+
-- Virtual environment (recommended)
+- PostgreSQL 16 (local installation or Docker)
 
 ### 2. Installation
 
@@ -150,7 +173,7 @@ python -m venv .venv
 source .venv/bin/activate        # Linux/macOS
 # or: .venv\Scripts\activate     # Windows
 
-# Install requirements
+# Install driver cockpit dependencies
 pip install -r requirements.txt
 
 # Start the local PostgreSQL database (see db/README.md for details)
@@ -159,16 +182,17 @@ export VOLTESSE_DB_URL=postgresql://voltesse:voltesse@localhost:5432/voltesse_da
 # or (Windows PowerShell): $env:VOLTESSE_DB_URL="postgresql://voltesse:voltesse@localhost:5432/voltesse_dash"
 ```
 
-No Docker? [db/README.md](db/README.md#without-docker-fallback) shows how to install PostgreSQL directly on macOS, Windows or the Pi. Without any database the dashboard still runs, with logging switched off.
-
-### 3. Launching the Dashboard
+### 3. Launching the Driver Cockpit
 
 ```bash
-# Launch in default Fullscreen Race Mode (CAN Bus)
+# Launch in default Fullscreen Race Mode (CAN Bus) - auto-scales to Raspberry Pi 800x480
 python main.py
 
 # Launch in windowed development mode with interactive simulation
 python main.py --windowed --mode SIMULATION
+
+# Launch with Imperial units enabled by default (MPH, °F, psi, lb-ft)
+python main.py --imperial
 
 # Launch with database logging initially paused (toggle on with key L)
 python main.py --no-logging
@@ -183,9 +207,31 @@ python main.py --can-mock
 python main.py --can-interface socketcan --can-channel can0
 ```
 
-### 4. Database Export & Inspection Tools
+### 4. Launching the Technician / Admin Web App
 
-You can export session logs directly from the command-line without launching the GUI:
+The Streamlit web portal communicates directly with the PostgreSQL database:
+
+```bash
+cd technician-gui
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+Or run from the project root:
+
+```bash
+streamlit run technician-gui/app.py
+```
+
+Access the web interface at `http://localhost:8501` (or `http://<pi-ip>:8501` on your local network).
+- Default demo credentials: `tech_demo` or `demo@voltesse.test` with password `Demo123!`.
+- If PostgreSQL is offline, the interface automatically runs in fault-tolerant simulated mode.
+
+---
+
+## Database Export & Inspection Tools
+
+Export session logs directly from the command line without launching the GUI:
 
 ```bash
 # Export summary of all trip sessions to CSV
@@ -198,17 +244,18 @@ python main.py --export-csv 1
 python main.py --export-json 1
 
 # Export from a custom database location
-python main.py --db-path data/voltesse_telemetry.db --export-csv 1
+python main.py --db-url postgresql://voltesse:voltesse@localhost:5432/voltesse_dash --export-csv 1
 ```
 
 Generated files are saved directly to `data/exports/`.
 
-#### Command-Line Options
+### Command-Line Options
 
 | Flag | Default | Description |
 | :--- | :--- | :--- |
 | `--mode` | `RACE` | Initial telemetry mode (`RACE`, `SIMULATION`, `TEST`) |
 | `--windowed` | `False` | Run in windowed mode (default is fullscreen) |
+| `--imperial` | `False` | Launch in Imperial units (`MPH`, `mi`, `°F`, `psi`, `lb-ft`) |
 | `--read-only` | `False` | Open the database in strict read-only mode |
 | `--no-logging`| `False` | Launch with database writing paused (toggleable with `L`) |
 | `--export-csv` | `None` | Export a specific vehicle session ID to CSV and exit |
@@ -220,18 +267,21 @@ Generated files are saved directly to `data/exports/`.
 | `--interval-ms` | `40` | Telemetry poll interval in milliseconds (40ms = 25 Hz) |
 | `--batch-size` | `25` | Number of records to batch before a PostgreSQL commit |
 | `--flush-interval`| `1.0` | Max seconds between database batch flushes |
-| `--db-url` | `$VOLTESSE_DB_URL` | PostgreSQL connection URL (default `postgresql://voltesse@localhost:5432/voltesse_dash`) |
-| `--keep-sessions` | `20` | Keep only the newest N sessions at startup (`0` keeps everything) |
+| `--db-url` | `$VOLTESSE_DB_URL` | PostgreSQL connection URL |
+| `--keep-sessions` | `20` | Keep only newest N sessions at startup (`0` disables pruning) |
 
 ---
 
 ## Running Tests
 
-Execute the automated test suite with Python's built-in `unittest`. The database tests need the local PostgreSQL from `db/` to be running (they create and delete their own temporary schemas inside the `voltesse_test` database) and are skipped if it can't be reached:
+Execute the automated test suites with Python's built-in `unittest`:
 
 ```bash
-export VOLTESSE_TEST_DB_URL=postgresql://voltesse:voltesse@localhost:5432/voltesse_test
+# Run cockpit unit and integration tests (includes 800x480 resolution scaling tests)
 python -m unittest discover tests
+
+# Run technician web app database and simulation tests
+python -m unittest discover technician-gui/tests
 ```
 
 ---

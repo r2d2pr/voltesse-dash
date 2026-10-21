@@ -1,6 +1,8 @@
-"""Unit tests using Python's standard-library unittest."""
-
+from pathlib import Path
+import sys
 import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from data.simulator import (
     SESSIONS, diagnostics_data, live_metrics, live_temperature_history,

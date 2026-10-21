@@ -674,6 +674,13 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertIn("TEST: AUTO ONLY", gui.controls_hint.text())
 
         # Test auto-scaling on different resolutions
+        # 0. 800x480 (Raspberry Pi 7" display)
+        gui.resize(800, 480)
+        gui._apply_dynamic_scale()
+        self.assertGreaterEqual(gui.top_bar.height(), 34)
+        self.assertFalse(gui.controls_hint.isVisible())
+        self.assertIn("POWERTRAIN", gui.right_hdr.text())
+
         # 1. 1024x600 (Raspberry Pi display)
         gui.resize(1024, 600)
         gui._apply_dynamic_scale()

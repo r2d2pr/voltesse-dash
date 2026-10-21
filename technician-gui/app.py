@@ -1,11 +1,13 @@
-"""Voltesse Dash — Technician/Admin Streamlit presentation prototype.
+"""Voltesse Dash — Technician/Admin Streamlit Web Interface v3.0.
 
-Run from the project root: python -m streamlit run app.py
-Uses simulated telemetry only; login is NOT real authentication.
+Communicates with the PostgreSQL database backend to deliver live vehicle telemetry,
+session logs, diagnostics performance charts, and alert threshold settings.
+Run with: streamlit run app.py
 """
 
 import streamlit as st
 
+from data.db import test_connection
 from ui.diagnostics import show_diagnostics
 from ui.live import show_live
 from ui.login import show_login
@@ -38,9 +40,10 @@ def main():
         show_login()
         return
 
-    # These are custom pages, NOT Streamlit's automatic pages/ directory.
+    user = st.session_state.get("user", {"name": "Technician", "role": "TECHNICIAN"})
     st.sidebar.title("VOLTESSE DASH")
-    st.sidebar.caption("Technician / Admin")
+    st.sidebar.caption(f"Technician / Admin • {user.get('name', 'User')}")
+    st.sidebar.badge(user.get("role", "TECHNICIAN"))
     st.sidebar.divider()
 
     page = st.sidebar.radio(
@@ -49,8 +52,9 @@ def main():
     )
     st.sidebar.divider()
 
-    if st.sidebar.button("Sign Out"):
+    if st.sidebar.button("Sign Out", width="stretch"):
         st.session_state.logged_in = False
+        st.session_state.pop("user", None)
         st.rerun()
 
     pages = {

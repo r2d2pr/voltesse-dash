@@ -92,8 +92,9 @@ class SpeedometerDialWidget(QWidget):
         self.transmission_mode = "AUTO"  # "AUTO" or "MANUAL"
         self.drive_mode = "DRIVE"
 
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setMinimumSize(240, 240)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+        self.setMinimumSize(160, 160)
+        self.setMinimumWidth(0)
 
     def set_units(self, unit: str = "KM/H", max_val: float = 180.0) -> None:
         self.unit = unit
@@ -263,14 +264,14 @@ class SpeedometerDialWidget(QWidget):
         painter.drawText(unit_rect, Qt.AlignmentFlag.AlignCenter, self.unit)
 
         # 9. Modern Automotive Transmission Hub (Auto PRNDB with active gear or Manual R/N/1-6)
-        gear_y = cy + side * 0.095
+        gear_y = cy + side * 0.075
         if self.transmission_mode == "MANUAL":
             gears = ["R", "N", "1", "2", "3", "4", "5", "6"]
         else:
             gears = ["P", "R", "N", "D", "B"]
 
-        slot_w = max(20.0, min(38.0, (side * 0.48) / len(gears)))
-        box_h = max(19.0, min(32.0, side * 0.058))
+        slot_w = max(16.0, min(36.0, (side * 0.46) / len(gears)))
+        box_h = max(16.0, min(30.0, side * 0.052))
         total_gear_w = len(gears) * slot_w
         start_gx = cx - (total_gear_w / 2.0)
 
@@ -279,7 +280,7 @@ class SpeedometerDialWidget(QWidget):
         painter.setPen(QPen(QColor(18, 50, 38, 160), 1))
         painter.drawRoundedRect(capsule_rect, 6, 6)
 
-        font_gear = QFont("Segoe UI", max(7, min(13, int(side * 0.028))), QFont.Weight.Bold)
+        font_gear = QFont("Segoe UI", max(7, min(13, int(side * 0.026))), QFont.Weight.Bold)
         painter.setFont(font_gear)
 
         for idx, g in enumerate(gears):
@@ -311,7 +312,8 @@ class SpeedometerDialWidget(QWidget):
             painter.drawText(slot_rect, Qt.AlignmentFlag.AlignCenter, label_text)
 
         # Prominent Gear & Transmission Status Hub Pill directly beneath capsule
-        trans_status_y = gear_y + box_h + 4
+        trans_status_y = gear_y + box_h + max(2.0, side * 0.010)
+        status_h = max(13.0, min(18.0, side * 0.040))
         if self.transmission_mode == "MANUAL":
             if self.active_gear.isdigit():
                 display_gear = f"M{self.active_gear}"
@@ -338,28 +340,31 @@ class SpeedometerDialWidget(QWidget):
                 status_text = f"AUTO  •  {self.active_gear}"
 
         painter.setPen(COLOR_CYAN if self.transmission_mode == "MANUAL" else COLOR_MINT_BRIGHT)
-        font_status = QFont("Segoe UI", max(8, min(13, int(side * 0.026))), QFont.Weight.Bold)
+        font_status = QFont("Segoe UI", max(7, min(12, int(side * 0.024))), QFont.Weight.Bold)
         font_status.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
         painter.setFont(font_status)
-        painter.drawText(QRectF(cx - 110, trans_status_y, 220, 16), Qt.AlignmentFlag.AlignCenter, status_text)
+        status_rect = QRectF(cx - side * 0.44, trans_status_y, side * 0.88, status_h)
+        painter.drawText(status_rect, Qt.AlignmentFlag.AlignCenter, status_text)
 
         # RPM Subtitle
+        rpm_y = trans_status_y + status_h + max(1.0, side * 0.008)
+        rpm_h = max(11.0, min(16.0, side * 0.034))
         painter.setPen(COLOR_TEXT_SECONDARY)
-        font_rpm = QFont("Consolas", max(8, min(15, int(side * 0.026))), QFont.Weight.Normal)
+        font_rpm = QFont("Consolas", max(7, min(13, int(side * 0.024))), QFont.Weight.Normal)
         painter.setFont(font_rpm)
-        rpm_rect = QRectF(cx - side * 0.30, cy + side * 0.19, side * 0.60, side * 0.055)
+        rpm_rect = QRectF(cx - side * 0.35, rpm_y, side * 0.70, rpm_h)
         painter.drawText(rpm_rect, Qt.AlignmentFlag.AlignCenter, f"{self.sub_val_label} {self.sub_val}")
 
         # 10. Dual Horizontal Micro-Meters for Throttle & Brake
-        pedal_y = cy + side * 0.255
-        bar_w = max(45.0, min(110.0, side * 0.16))
-        bar_h = max(4.0, min(8.0, side * 0.015))
+        pedal_y = rpm_y + rpm_h + max(2.0, side * 0.010)
+        bar_w = max(30.0, min(80.0, side * 0.14))
+        bar_h = max(3.5, min(7.0, side * 0.015))
 
         # Brake Micro-Meter (Left side)
-        brk_bx = cx - bar_w - (side * 0.04)
+        brk_bx = cx - bar_w - max(8.0, side * 0.035)
         painter.setPen(COLOR_TEXT_MUTED)
-        painter.setFont(QFont("Segoe UI", max(6, min(11, int(side * 0.022))), QFont.Weight.Bold))
-        painter.drawText(QRectF(brk_bx - 36, pedal_y - 4, 32, 14), Qt.AlignmentFlag.AlignRight, "BRK")
+        painter.setFont(QFont("Segoe UI", max(6, min(10, int(side * 0.020))), QFont.Weight.Bold))
+        painter.drawText(QRectF(brk_bx - 32, pedal_y - 4, 28, 14), Qt.AlignmentFlag.AlignRight, "BRK")
 
         painter.setBrush(QBrush(COLOR_GAUGE_TRACK))
         painter.setPen(Qt.PenStyle.NoPen)
@@ -370,7 +375,7 @@ class SpeedometerDialWidget(QWidget):
             painter.drawRoundedRect(QRectF(brk_bx + bar_w - brk_fill, pedal_y, brk_fill, bar_h), 2, 2)
 
         # Throttle Micro-Meter (Right side)
-        thr_bx = cx + (side * 0.04)
+        thr_bx = cx + max(8.0, side * 0.035)
         painter.setBrush(QBrush(COLOR_GAUGE_TRACK))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(QRectF(thr_bx, pedal_y, bar_w, bar_h), 2, 2)
@@ -380,18 +385,18 @@ class SpeedometerDialWidget(QWidget):
             painter.drawRoundedRect(QRectF(thr_bx, pedal_y, thr_fill, bar_h), 2, 2)
 
         painter.setPen(COLOR_TEXT_MUTED)
-        painter.setFont(QFont("Segoe UI", max(6, min(11, int(side * 0.022))), QFont.Weight.Bold))
-        painter.drawText(QRectF(thr_bx + bar_w + 4, pedal_y - 4, 32, 14), Qt.AlignmentFlag.AlignLeft, "THR")
+        painter.setFont(QFont("Segoe UI", max(6, min(10, int(side * 0.020))), QFont.Weight.Bold))
+        painter.drawText(QRectF(thr_bx + bar_w + 4, pedal_y - 4, 28, 14), Qt.AlignmentFlag.AlignLeft, "THR")
 
         # 11. Center Steering Wheel Angle Indicator
-        steer_y = cy + side * 0.315
+        steer_y = pedal_y + bar_h + max(3.0, side * 0.012)
         angle = self.steering_angle
         steer_txt = f"STR ◄ {abs(int(angle))}°" if angle < -0.5 else (f"STR {int(angle)}° ►" if angle > 0.5 else "STR 0°")
         s_color = COLOR_CYAN if abs(angle) > 1.0 else COLOR_TEXT_MUTED
 
         painter.setPen(s_color)
-        painter.setFont(QFont("Segoe UI", max(7, min(13, int(side * 0.024))), QFont.Weight.Bold))
-        painter.drawText(QRectF(cx - 50, steer_y, 100, 16), Qt.AlignmentFlag.AlignCenter, steer_txt)
+        painter.setFont(QFont("Segoe UI", max(6, min(12, int(side * 0.022))), QFont.Weight.Bold))
+        painter.drawText(QRectF(cx - 50, steer_y, 100, 14), Qt.AlignmentFlag.AlignCenter, steer_txt)
 
         painter.end()
 
@@ -414,8 +419,9 @@ class BatteryStatusWidget(QWidget):
         self.current = 0.0
         self.est_range_km = 340.0
         self.unit_system = "METRIC"
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setMinimumHeight(140)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+        self.setMinimumHeight(80)
+        self.setMinimumWidth(0)
 
     def set_unit_system(self, unit_system: str) -> None:
         self.unit_system = unit_system
@@ -560,8 +566,9 @@ class TPMSWidget(QWidget):
         self.rl_temp = 30.0
         self.rr_temp = 30.0
         self.unit_system = "METRIC"
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setMinimumHeight(140)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+        self.setMinimumHeight(80)
+        self.setMinimumWidth(0)
 
     def set_unit_system(self, unit_system: str) -> None:
         self.unit_system = unit_system
@@ -717,8 +724,9 @@ class AwdTorqueVectorWidget(QWidget):
         self.rear_nm = 0.0
         self.bias_mode = "AWD BALANCED"
         self.unit_system = "METRIC"
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setMinimumHeight(85)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+        self.setMinimumHeight(45)
+        self.setMinimumWidth(0)
 
     def set_unit_system(self, unit_system: str) -> None:
         self.unit_system = unit_system
@@ -823,6 +831,7 @@ class PowerBarWidget(QWidget):
         self.power_kw = 0.0
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setFixedHeight(18)
+        self.setMinimumWidth(0)
 
     def set_power(self, power_kw: float) -> None:
         self.power_kw = power_kw
@@ -873,8 +882,9 @@ class LiveSparklineWidget(QWidget):
         self.speed_history: Deque[float] = deque(maxlen=max_points)
         self.power_history: Deque[float] = deque(maxlen=max_points)
         self.unit_system = "METRIC"
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setMinimumHeight(65)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+        self.setMinimumHeight(45)
+        self.setMinimumWidth(0)
 
         for _ in range(max_points):
             self.speed_history.append(0.0)
@@ -966,7 +976,8 @@ class ThermalMonitorWidget(QWidget):
         self.batt_temp = 0.0
         self.unit_system = "METRIC"
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setMinimumHeight(35)
+        self.setMinimumHeight(28)
+        self.setMinimumWidth(0)
 
     def set_unit_system(self, unit_system: str) -> None:
         self.unit_system = unit_system
@@ -1059,7 +1070,9 @@ class VoltesseDashboard(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Voltesse Dash - Digital Cockpit")
-        self.setMinimumSize(800, 480)
+        # Leave room for the cockpit on smaller embedded displays. The layout
+        # itself scales to the available size, including 800x480 panels.
+        self.setMinimumSize(640, 400)
         self.resize(1280, 720)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
@@ -1177,29 +1190,19 @@ class VoltesseDashboard(QMainWindow):
         self.right_blinker.setStyleSheet("color: #123226;")
 
         self.top_layout.addWidget(self.left_blinker)
-        self.top_layout.addSpacing(6)
         self.top_layout.addWidget(self.brand_label)
-        self.top_layout.addSpacing(8)
         self.top_layout.addWidget(self.ready_badge)
-        self.top_layout.addSpacing(6)
         self.top_layout.addWidget(self.logging_badge)
-        self.top_layout.addSpacing(6)
         self.top_layout.addWidget(self.units_badge)
         self.top_layout.addStretch(1)
         self.top_layout.addWidget(self.op_mode_badge)
-        self.top_layout.addSpacing(6)
         self.top_layout.addWidget(self.trans_mode_badge)
-        self.top_layout.addSpacing(6)
         self.top_layout.addWidget(self.mode_badge)
-        self.top_layout.addSpacing(6)
         self.top_layout.addWidget(self.controls_hint)
-        self.top_layout.addSpacing(6)
         self.top_layout.addWidget(self.status_badge)
         self.top_layout.addStretch(1)
         self.top_layout.addWidget(self.ambient_label)
-        self.top_layout.addSpacing(10)
         self.top_layout.addWidget(self.clock_label)
-        self.top_layout.addSpacing(6)
         self.top_layout.addWidget(self.right_blinker)
 
         self.main_layout.addWidget(self.top_bar)
@@ -1359,6 +1362,24 @@ class VoltesseDashboard(QMainWindow):
 
         self.main_layout.addWidget(self.bottom_bar)
 
+        # Allow proportional scaling without rigid minimum width locks
+        for w in [
+            self.left_wing, self.center_stage, self.right_wing, self.power_pod,
+        ]:
+            w.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
+            w.setMinimumWidth(0)
+
+        for w in [
+            self.right_hdr, self.power_title, self.power_val, self.throttle_label, self.brake_label,
+            self.pedal_frame, self.top_bar, self.bottom_bar, self.brand_label, self.ready_badge,
+            self.logging_badge, self.units_badge, self.op_mode_badge, self.trans_mode_badge,
+            self.mode_badge, self.status_badge, self.ambient_label, self.clock_label,
+            self.controls_hint, self.trip_pod, self.trip_hdr, self.trip_dist_val,
+            self.thermal_widget, self.battery_widget, self.tpms_widget, self.awd_widget,
+            self.sparkline_widget, self.speed_gauge, self.left_blinker, self.right_blinker
+        ]:
+            w.setMinimumWidth(0)
+
         self._apply_dynamic_scale()
 
     def mousePressEvent(self, event) -> None:
@@ -1368,23 +1389,74 @@ class VoltesseDashboard(QMainWindow):
 
     def _apply_dynamic_scale(self) -> None:
         """Dynamically adjusts font sizes and spacings for crisp proportions across resolutions."""
-        w = max(600, self.width())
-        h = max(400, self.height())
-        scale = max(0.80, min(2.0, min(w / 1280.0, h / 720.0)))
+        w = max(1, self.width())
+        h = max(1, self.height())
+        scale = max(0.55, min(2.0, min(w / 1280.0, h / 720.0)))
 
-        top_h = max(36, min(56, int(42 * scale)))
+        # Reduce layout chrome along with typography. This matters on 800x480,
+        # where fixed margins otherwise consume a significant part of the HUD.
+        margin_x = max(4, int(14 * scale))
+        margin_top = max(3, int(8 * scale))
+        margin_bottom = max(3, int(10 * scale))
+        self.main_layout.setContentsMargins(margin_x, margin_top, margin_x, margin_bottom)
+        self.main_layout.setSpacing(max(3, int(8 * scale)))
+        self.top_layout.setContentsMargins(max(4, int(10 * scale)), 0, max(4, int(10 * scale)), 0)
+        self.top_layout.setSpacing(max(2, int(8 * scale)))
+        self.stage_layout.setSpacing(max(4, int(14 * scale)))
+        self.left_wing_layout.setSpacing(max(3, int(10 * scale)))
+        self.right_wing_layout.setSpacing(max(3, int(10 * scale)))
+        self.bottom_layout.setSpacing(max(4, int(12 * scale)))
+
+        top_h = max(34, min(56, int(42 * scale)))
         self.top_bar.setFixedHeight(top_h)
 
-        bot_h = max(42, min(64, int(48 * scale)))
+        bot_h = max(34, min(64, int(48 * scale)))
         self.bottom_bar.setFixedHeight(bot_h)
 
-        self.trip_pod.setFixedWidth(max(120, min(220, int(150 * scale))))
+        self.trip_pod.setFixedWidth(max(90, min(220, int(150 * scale))))
 
-        f_brand = QFont("Segoe UI", max(10, min(18, int(13 * scale))), QFont.Weight.Black)
+        # The full controls legend competes with live status badges for space
+        # on narrow displays (e.g. 800x480 Raspberry Pi); controls remain active when hidden.
+        self.controls_hint.setVisible(w >= 950)
+
+        # Dynamic text compactness on smaller displays
+        if w < 950:
+            self.right_hdr.setText("⚡ POWERTRAIN")
+            self.power_title.setText("NET PWR")
+        else:
+            self.right_hdr.setText("⚡ POWERTRAIN DYNAMICS")
+            self.power_title.setText("NET POWER")
+
+        # Dynamic badge styling with proportional padding and radii
+        pad_y = max(1, int(2 * scale))
+        pad_x = max(2, int(6 * scale))
+        b_rad = max(2, int(4 * scale))
+        self.ready_badge.setStyleSheet(
+            f"color: #00F5A0; background-color: rgba(0, 245, 160, 0.15); padding: {pad_y}px {pad_x}px; border-radius: {b_rad}px; border: 1px solid rgba(0, 245, 160, 0.4);"
+        )
+        self.logging_badge.setStyleSheet(
+            f"color: #00F5A0; background-color: rgba(0, 245, 160, 0.15); padding: {pad_y}px {pad_x}px; border-radius: {b_rad}px; border: 1px solid rgba(0, 245, 160, 0.4); font-weight: bold;"
+        )
+        self.units_badge.setStyleSheet(
+            f"color: #00F5A0; background-color: rgba(0, 245, 160, 0.15); padding: {pad_y}px {pad_x}px; border-radius: {b_rad}px; border: 1px solid rgba(0, 245, 160, 0.4); font-weight: bold;"
+        )
+        self.trans_mode_badge.setStyleSheet(
+            f"background-color: rgba(0, 245, 160, 0.15); color: #5CFFC7; padding: {pad_y}px {pad_x}px; border-radius: {b_rad}px; border: 1px solid rgba(0, 245, 160, 0.4);"
+        )
+        self.mode_badge.setStyleSheet(
+            f"background-color: rgba(0, 245, 160, 0.15); color: #5CFFC7; padding: {pad_y}px {pad_x}px; border-radius: {b_rad}px; border: 1px solid rgba(0, 245, 160, 0.4);"
+        )
+        self.status_badge.setStyleSheet(
+            f"background-color: rgba(0, 245, 160, 0.12); color: #5CFFC7; padding: {pad_y}px {pad_x}px; border-radius: {b_rad}px;"
+        )
+
+        f_brand = QFont("Segoe UI", max(9, min(18, int(12 * scale))), QFont.Weight.Black)
         self.brand_label.setFont(f_brand)
 
-        f_hud = QFont("Segoe UI", max(8, min(13, int(9 * scale))), QFont.Weight.Bold)
+        f_hud = QFont("Segoe UI", max(7, min(13, int(8.5 * scale))), QFont.Weight.Bold)
         self.ready_badge.setFont(f_hud)
+        self.logging_badge.setFont(f_hud)
+        self.units_badge.setFont(f_hud)
         self.op_mode_badge.setFont(f_hud)
         self.trans_mode_badge.setFont(f_hud)
         self.mode_badge.setFont(f_hud)
@@ -1393,27 +1465,27 @@ class VoltesseDashboard(QMainWindow):
         f_hint = QFont("Consolas", max(7, min(11, int(8 * scale))), QFont.Weight.Normal)
         self.controls_hint.setFont(f_hint)
 
-        f_clock = QFont("Consolas", max(9, min(15, int(12 * scale))), QFont.Weight.Bold)
+        f_clock = QFont("Consolas", max(8, min(15, int(11 * scale))), QFont.Weight.Bold)
         self.clock_label.setFont(f_clock)
         self.ambient_label.setFont(f_clock)
 
-        f_blinker = QFont("Segoe UI", max(10, min(16, int(12 * scale))), QFont.Weight.Bold)
+        f_blinker = QFont("Segoe UI", max(9, min(16, int(11 * scale))), QFont.Weight.Bold)
         self.left_blinker.setFont(f_blinker)
         self.right_blinker.setFont(f_blinker)
 
-        f_hdrs = QFont("Segoe UI", max(8, min(13, int(9 * scale))), QFont.Weight.Bold)
+        f_hdrs = QFont("Segoe UI", max(7, min(13, int(8.5 * scale))), QFont.Weight.Bold)
         self.right_hdr.setFont(f_hdrs)
         self.power_title.setFont(f_hdrs)
 
         f_lbl = QFont("Segoe UI", max(6, min(10, int(7 * scale))), QFont.Weight.Bold)
         self.trip_hdr.setFont(f_lbl)
 
-        f_val = QFont("Consolas", max(8, min(14, int(10 * scale))), QFont.Weight.Bold)
+        f_val = QFont("Consolas", max(7, min(14, int(9.5 * scale))), QFont.Weight.Bold)
         self.throttle_label.setFont(f_val)
         self.brake_label.setFont(f_val)
-        self.trip_dist_val.setFont(QFont("Consolas", max(9, min(16, int(12 * scale))), QFont.Weight.Bold))
+        self.trip_dist_val.setFont(QFont("Consolas", max(8, min(16, int(11 * scale))), QFont.Weight.Bold))
 
-        f_pwr = QFont("Consolas", max(11, min(22, int(16 * scale))), QFont.Weight.Bold)
+        f_pwr = QFont("Consolas", max(10, min(22, int(15 * scale))), QFont.Weight.Bold)
         self.power_val.setFont(f_pwr)
 
     def resizeEvent(self, event) -> None:
