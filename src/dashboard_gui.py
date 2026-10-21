@@ -8,10 +8,12 @@ Supports Automatic (PRNDB with dynamic speed-based D1-D6 gear display)
 and 6-Speed Sequential Manual (R, N, 1-6) transmissions.
 """
 
+from __future__ import annotations
+
 from collections import deque
 import math
 import time
-from typing import Deque, List, Optional, Set
+from typing import Deque, List, Optional, Set, Tuple
 
 from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
@@ -1396,7 +1398,7 @@ class PowertrainHeroWidget(QWidget):
         self.max_regen_kw = 60.0
         self.speed = 104.0
         self.unit_system = "METRIC"
-        self.wave_points: list[tuple[float, float]] = []
+        self.wave_points: List[Tuple[float, float]] = []
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(220)
 
