@@ -61,8 +61,8 @@ class VoltesseApp:
             self.gui.setCursor(Qt.CursorShape.BlankCursor)
         if getattr(args, "ui_scale", None) is not None:
             self.gui.set_user_scale(args.ui_scale)
-        if getattr(args, "imperial", False) or getattr(args, "units", "metric").lower() == "imperial":
-            self.gui.set_unit_system("IMPERIAL")
+        # v4.1.0: Imperial is the sole, enforced unit system
+        self.gui.set_unit_system("IMPERIAL")
         if getattr(args, "view", None):
             self.gui.set_hero_view(args.view)
         if getattr(args, "swap_wings", False):
@@ -148,8 +148,8 @@ class VoltesseApp:
         initial_mode = args.mode.upper() if args.mode else "RACE"
         logger.info("Initializing Database Manager...")
         read_only = getattr(args, "read_only", False)
-        no_logging = getattr(args, "no_logging", False)
-        write_enabled = (not read_only) and (not no_logging)
+        # v4.1.0: Database logging is continuous and always active
+        write_enabled = (not read_only)
 
         self.db_manager = DatabaseManager(
             db_url=db_url,
@@ -366,29 +366,24 @@ class VoltesseApp:
         logger.info("Cockpit unit system switched to: %s", self.gui.unit_system)
 
     def _toggle_logging(self) -> None:
-        """Toggles database write access on and off at runtime via hotkey L."""
+        """Database telemetry logging is continuous and always active in v4.1.0."""
         if self.db_manager.read_only:
             self.gui.status_badge.setText("⚠️ DATABASE IN READ-ONLY MODE")
             self.gui.status_badge.setStyleSheet(
                 "background-color: rgba(255, 184, 0, 0.25); color: #FFB800; padding: 2px 8px; border-radius: 4px; font-weight: bold;"
             )
+            self.gui.status_badge.setVisible(True)
             return
 
-        current_state = self.db_manager.is_write_enabled()
-        new_state = self.db_manager.set_write_access(not current_state)
-        self.gui.set_logging_state(new_state, self.db_manager.read_only)
-        if new_state:
-            if self.db_manager._current_session_id is None:
-                self.session_id = self.db_manager.start_session(initial_soc=self._final_soc)
-            self.gui.status_badge.setText("DATABASE LOGGING ACTIVE")
-            self.gui.status_badge.setStyleSheet(
-                "background-color: rgba(0, 245, 160, 0.20); color: #00F5A0; padding: 2px 8px; border-radius: 4px; font-weight: bold;"
-            )
-        else:
-            self.gui.status_badge.setText("DATABASE LOGGING PAUSED")
-            self.gui.status_badge.setStyleSheet(
-                "background-color: rgba(255, 184, 0, 0.20); color: #FFB800; padding: 2px 8px; border-radius: 4px; font-weight: bold;"
-            )
+        self.db_manager.set_write_access(True)
+        self.gui.set_logging_state(True, False)
+        if self.db_manager._current_session_id is None:
+            self.session_id = self.db_manager.start_session(initial_soc=self._final_soc)
+        self.gui.status_badge.setText("DATABASE LOGGING ALWAYS ACTIVE")
+        self.gui.status_badge.setStyleSheet(
+            "background-color: rgba(0, 245, 160, 0.20); color: #00F5A0; padding: 2px 8px; border-radius: 4px; font-weight: bold;"
+        )
+        self.gui.status_badge.setVisible(True)
 
     def _toggle_pause(self) -> None:
         """Pauses or resumes the active stream (Space key)."""
@@ -551,14 +546,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--imperial",
         action="store_true",
-        help="Launch dashboard in Imperial units (mph, mi, °F, psi, lb-ft)",
+        default=True,
+        help="Cockpit is permanently configured in Imperial units (mph, mi, °F, psi, lb-ft)",
     )
     parser.add_argument(
         "--units",
         type=str,
-        default="metric",
-        choices=["metric", "imperial"],
-        help="Initial unit system (metric or imperial, default: metric)",
+        default="imperial",
+        choices=["imperial", "metric"],
+        help="Initial unit system (default: imperial)",
     )
     parser.add_argument(
         "--show-cursor",

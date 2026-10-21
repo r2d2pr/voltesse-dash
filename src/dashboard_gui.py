@@ -78,9 +78,9 @@ class SpeedometerDialWidget(QWidget):
     def __init__(
         self,
         min_val: float = 0.0,
-        max_val: float = 180.0,
+        max_val: float = 120.0,
         title: str = "SPEED",
-        unit: str = "KM/H",
+        unit: str = "MPH",
         parent: Optional[QWidget] = None,
     ):
         super().__init__(parent)
@@ -426,7 +426,7 @@ class BatteryStatusWidget(QWidget):
         self.voltage = 400.0
         self.current = 0.0
         self.est_range_km = 340.0
-        self.unit_system = "METRIC"
+        self.unit_system = "IMPERIAL"
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(80)
         self.setMinimumWidth(0)
@@ -582,7 +582,7 @@ class TPMSWidget(QWidget):
         self.fr_temp = 31.0
         self.rl_temp = 30.0
         self.rr_temp = 30.0
-        self.unit_system = "METRIC"
+        self.unit_system = "IMPERIAL"
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(80)
         self.setMinimumWidth(0)
@@ -825,7 +825,7 @@ class AwdTorqueVectorWidget(QWidget):
         self.front_nm = 0.0
         self.rear_nm = 0.0
         self.bias_mode = "AWD BALANCED"
-        self.unit_system = "METRIC"
+        self.unit_system = "IMPERIAL"
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(45)
         self.setMinimumWidth(0)
@@ -987,7 +987,7 @@ class LiveSparklineWidget(QWidget):
         self.max_points = max_points
         self.speed_history: Deque[float] = deque(maxlen=max_points)
         self.power_history: Deque[float] = deque(maxlen=max_points)
-        self.unit_system = "METRIC"
+        self.unit_system = "IMPERIAL"
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(45)
         self.setMinimumWidth(0)
@@ -1080,7 +1080,7 @@ class ThermalMonitorWidget(QWidget):
         self.motor_temp = 0.0
         self.inverter_temp = 0.0
         self.batt_temp = 0.0
-        self.unit_system = "METRIC"
+        self.unit_system = "IMPERIAL"
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(28)
         self.setMinimumWidth(0)
@@ -1160,8 +1160,8 @@ class CompactSpeedPod(QWidget):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.speed = 0.0
-        self.max_speed = 180.0
-        self.unit = "KM/H"
+        self.max_speed = 120.0
+        self.unit = "MPH"
         self.gear = "D1"
         self.trans_mode = "AUTO"
         self.motor_rpm = 0
@@ -1172,12 +1172,8 @@ class CompactSpeedPod(QWidget):
         self.setMinimumHeight(80)
 
     def set_unit_system(self, unit_system: str) -> None:
-        if unit_system == "IMPERIAL":
-            self.unit = "MPH"
-            self.max_speed = 120.0
-        else:
-            self.unit = "KM/H"
-            self.max_speed = 180.0
+        self.unit = "MPH"
+        self.max_speed = 120.0
         self.update()
 
     def set_speed_data(
@@ -1323,7 +1319,7 @@ class BatteryHeroWidget(QWidget):
         self.current = 145.2
         self.power_kw = 57.8
         self.est_range_km = 372.0
-        self.unit_system = "METRIC"
+        self.unit_system = "IMPERIAL"
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(220)
 
@@ -1339,7 +1335,7 @@ class BatteryHeroWidget(QWidget):
         power_kw: float,
         est_range_km: Optional[float] = None,
         trip_km: Optional[float] = None,
-        unit_system: str = "METRIC",
+        unit_system: str = "IMPERIAL",
     ) -> None:
         self.soc = max(0.0, min(100.0, soc))
         self.voltage = voltage
@@ -1514,7 +1510,7 @@ class PowertrainHeroWidget(QWidget):
         self.max_kw = 120.0
         self.max_regen_kw = 60.0
         self.speed = 104.0
-        self.unit_system = "METRIC"
+        self.unit_system = "IMPERIAL"
         self.wave_points: List[Tuple[float, float]] = []
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(220)
@@ -1539,7 +1535,7 @@ class PowertrainHeroWidget(QWidget):
         bias: Optional[str] = None,
         pwr_kw: Optional[float] = None,
         spd: Optional[float] = None,
-        unit_system: str = "METRIC",
+        unit_system: str = "IMPERIAL",
     ) -> None:
         self.front_pct = f_pct if f_pct is not None else front_pct
         self.rear_pct = r_pct if r_pct is not None else rear_pct
@@ -1611,7 +1607,7 @@ class PowertrainHeroWidget(QWidget):
 
         painter.setFont(val_font)
         painter.setPen(COLOR_TEXT_PRIMARY)
-        painter.drawText(QRectF(w - val_w - 14, y_f - 8, val_w, 18), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, f"{int(self.front_pct)}% {f_val}{t_unit}")
+        painter.drawText(QRectF(w - val_w - 14, y_f - 8, val_w, 18), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, f"{int(self.front_pct)}% {f_val} {t_unit}")
 
         # Rear Row
         y_r = sec1_y + (sec1_h * 0.68)
@@ -1628,7 +1624,7 @@ class PowertrainHeroWidget(QWidget):
 
         painter.setFont(val_font)
         painter.setPen(COLOR_TEXT_PRIMARY)
-        painter.drawText(QRectF(w - val_w - 14, y_r - 8, val_w, 18), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, f"{int(self.rear_pct)}% {r_val}{t_unit}")
+        painter.drawText(QRectF(w - val_w - 14, y_r - 8, val_w, 18), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, f"{int(self.rear_pct)}% {r_val} {t_unit}")
 
         # 2. Bidirectional Power / Regen Bar (Middle 22%)
         sec2_y = sec1_y + sec1_h + 2.0
@@ -1766,7 +1762,7 @@ class VoltesseDashboard(QMainWindow):
         # Active operating mode state
         self.current_mode = "RACE"
         self.current_transmission = "AUTO"
-        self.unit_system = "METRIC"
+        self.unit_system = "IMPERIAL"
         self.user_scale_multiplier = 1.0
         self.current_page_idx = 0
         self.active_hero_view = "SPEED"
@@ -1808,10 +1804,10 @@ class VoltesseDashboard(QMainWindow):
         # 1. TOP AUTOMOTIVE HUD RIBBON
         # -------------------------------------------------------------
         self.top_bar = QFrame()
-        self.top_bar.setStyleSheet("background-color: rgba(6, 14, 10, 0.7); border-radius: 6px;")
+        self.top_bar.setStyleSheet("background-color: rgba(4, 12, 8, 0.65); border-bottom: 1px solid rgba(0, 245, 160, 0.2); border-radius: 4px;")
         self.top_layout = QHBoxLayout(self.top_bar)
         self.top_layout.setContentsMargins(10, 0, 10, 0)
-        self.top_layout.setSpacing(8)
+        self.top_layout.setSpacing(10)
 
         # Turn Signal Left
         self.left_blinker = QLabel("◄")
@@ -1822,30 +1818,26 @@ class VoltesseDashboard(QMainWindow):
         self.brand_label.setStyleSheet("color: #00F5A0; letter-spacing: 2px;")
 
         # Compact Digital Speed Pill (Always visible when away from Speedometer page)
-        self.speed_hud_badge = QLabel("0 KM/H [D1]")
+        self.speed_hud_badge = QLabel("0 MPH [D1]")
         self.speed_hud_badge.setStyleSheet(
             "color: #00F5A0; background-color: rgba(0, 245, 160, 0.18); border: 1px solid #00F5A0; "
             "padding: 2px 8px; border-radius: 4px; font-weight: bold; font-family: Consolas; font-size: 8.5pt;"
         )
         self.speed_hud_badge.setVisible(False)
 
-        # Ready Indicator
+        # Legacy badges preserved as attributes for backward compatibility but hidden from active top bar
         self.ready_badge = QLabel("READY")
-        self.ready_badge.setStyleSheet(
-            "color: #00F5A0; background-color: rgba(0, 245, 160, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4);"
-        )
-
-        # Database Logging Status Badge (REC / LOG OFF / R/O)
+        self.ready_badge.setVisible(False)
         self.logging_badge = QLabel("REC")
-        self.logging_badge.setStyleSheet(
-            "color: #00F5A0; background-color: rgba(0, 245, 160, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4); font-weight: bold;"
-        )
-
-        # Unit System Status Badge (METRIC / IMPERIAL)
-        self.units_badge = QLabel("METRIC")
-        self.units_badge.setStyleSheet(
-            "color: #00F5A0; background-color: rgba(0, 245, 160, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4); font-weight: bold;"
-        )
+        self.logging_badge.setVisible(False)
+        self.units_badge = QLabel("IMPERIAL")
+        self.units_badge.setVisible(False)
+        self.op_mode_badge = QLabel("RACE [CAN]")
+        self.op_mode_badge.setVisible(False)
+        self.trans_mode_badge = QLabel("AUTO [D1]")
+        self.trans_mode_badge.setVisible(False)
+        self.controls_hint = QLabel("")
+        self.controls_hint.setVisible(False)
 
         # Interactive Page Navigator Pill with clickable Left/Right buttons
         self.nav_frame = QFrame()
@@ -1873,41 +1865,25 @@ class VoltesseDashboard(QMainWindow):
         # Hero View Status Badge alias
         self.view_badge = self.page_title_label
 
-        # Operating Mode Ribbon Badge
-        self.op_mode_badge = QLabel("RACE [CAN]")
-
-        # Transmission & Active Gear Badge
-        self.trans_mode_badge = QLabel("AUTO [D1]")
-        self.trans_mode_badge.setStyleSheet(
-            "background-color: rgba(0, 245, 160, 0.15); color: #5CFFC7; padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4);"
-        )
-
         # Drive Mode Pill (ECO / DRIVE / SPORT)
-        self.mode_badge = QLabel("DRIVE")
+        self.mode_badge = QLabel("SPORT")
         self.mode_badge.setStyleSheet(
-            "background-color: rgba(0, 245, 160, 0.15); color: #5CFFC7; padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4);"
+            "background-color: rgba(255, 77, 109, 0.2); color: #FF4D6D; padding: 2px 10px; border-radius: 4px; border: 1px solid rgba(255, 77, 109, 0.5); font-weight: bold;"
         )
-
-        # Controls Hint Pill
-        self.controls_hint = QLabel("[KEYS: ◄/►:PAGE | 1:RACE | 2:SIM | 3:TEST | T:TRANS | E/C:SHIFT | U:UNITS]")
-        self.controls_hint.setStyleSheet(
-            "color: #4E7566; background-color: rgba(12, 26, 20, 0.6); padding: 2px 8px; border-radius: 4px;"
-        )
-        self.controls_hint.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        self.controls_hint.setMinimumWidth(0)
 
         self._update_op_mode_badge_style("RACE")
 
-        # Status / Warning Pill
-        self.status_badge = QLabel("SYSTEM READY")
+        # Status / Warning Pill (Only visible when active vehicle alert exists)
+        self.status_badge = QLabel("")
         self.status_badge.setStyleSheet(
             "background-color: rgba(0, 245, 160, 0.12); color: #5CFFC7; padding: 2px 8px; border-radius: 4px;"
         )
         self.status_badge.setMinimumWidth(0)
+        self.status_badge.setVisible(False)
         self.top_bar.setMinimumWidth(0)
 
         # Ambient Temp
-        self.ambient_label = QLabel("22°C")
+        self.ambient_label = QLabel("72°F")
         self.ambient_label.setStyleSheet("color: #9AE6B4;")
 
         # Live Clock
@@ -1918,20 +1894,15 @@ class VoltesseDashboard(QMainWindow):
         self.right_blinker = QLabel("►")
         self.right_blinker.setStyleSheet("color: #123226;")
 
+        # Streamlined, distraction-free Top Layout
         self.top_layout.addWidget(self.left_blinker)
         self.top_layout.addWidget(self.brand_label)
         self.top_layout.addWidget(self.speed_hud_badge)
-        self.top_layout.addWidget(self.ready_badge)
-        self.top_layout.addWidget(self.logging_badge)
-        self.top_layout.addWidget(self.units_badge)
         self.top_layout.addStretch(1)
         self.top_layout.addWidget(self.nav_frame)
-        self.top_layout.addWidget(self.op_mode_badge)
-        self.top_layout.addWidget(self.trans_mode_badge)
-        self.top_layout.addWidget(self.mode_badge)
-        self.top_layout.addWidget(self.controls_hint)
         self.top_layout.addWidget(self.status_badge)
         self.top_layout.addStretch(1)
+        self.top_layout.addWidget(self.mode_badge)
         self.top_layout.addWidget(self.ambient_label)
         self.top_layout.addWidget(self.clock_label)
         self.top_layout.addWidget(self.right_blinker)
@@ -1944,8 +1915,8 @@ class VoltesseDashboard(QMainWindow):
         self.page_stack = QStackedWidget()
         self.page_stack.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        # Page 0: Full-Width Speedometer Dial
-        self.speed_page = SpeedometerDialWidget(min_val=0.0, max_val=180.0, title="SPEED", unit="KM/H")
+        # Page 0: Full-Width Speedometer Dial (MPH)
+        self.speed_page = SpeedometerDialWidget(min_val=0.0, max_val=120.0, title="SPEED", unit="MPH")
         self.page_stack.addWidget(self.speed_page)      # Index 0
 
         # Page 1: Full-Width Battery & Energy Diagnostics
@@ -2047,7 +2018,7 @@ class VoltesseDashboard(QMainWindow):
         self.trip_hdr = QLabel("TRIP ODOMETER")
         self.trip_hdr.setStyleSheet("color: #4E7566; border: none; background: transparent;")
 
-        self.trip_dist_val = QLabel("0.00 km")
+        self.trip_dist_val = QLabel("0.00 mi")
         self.trip_dist_val.setStyleSheet("color: #FFFFFF; border: none; background: transparent;")
 
         self.trip_layout.addWidget(self.trip_hdr)
@@ -2129,13 +2100,17 @@ class VoltesseDashboard(QMainWindow):
 
         self.trip_pod.setFixedWidth(max(85, min(220, int(140 * scale))))
 
-        # The full controls legend competes with live status badges for space
-        # on narrow displays (e.g. 800x480 Raspberry Pi); controls remain active when hidden.
-        self.controls_hint.setVisible(w >= 1050)
+        # Streamline top ribbon: hide useless clutter badges
+        self.controls_hint.setVisible(False)
+        self.ready_badge.setVisible(False)
+        self.logging_badge.setVisible(False)
+        self.units_badge.setVisible(False)
+        self.op_mode_badge.setVisible(False)
+        self.trans_mode_badge.setVisible(False)
 
-        # On compact screens (< 950px), hide nominal SYSTEM READY badge to give page navigator breathing room
+        # Warning pill only visible when active alert exists
         has_warnings = bool(hasattr(self, "_last_record") and self._last_record and self._last_record.warnings)
-        self.status_badge.setVisible(has_warnings or w >= 950)
+        self.status_badge.setVisible(has_warnings)
 
         # Dynamic text compactness on smaller displays
         if w < 950:
@@ -2262,7 +2237,7 @@ class VoltesseDashboard(QMainWindow):
             self.nav_frame.setStyleSheet("background-color: rgba(12, 26, 20, 0.9); border: 1px solid rgba(0, 245, 160, 0.4); border-radius: 4px;")
             self.page_title_label.setStyleSheet("color: #00F5A0; font-weight: bold; font-size: 8pt;")
             self.speed_hud_badge.setVisible(False)
-            self.ready_badge.setVisible(True)
+            self.ready_badge.setVisible(False)
             self.wing_1_top_stack.setCurrentIndex(0)
             self.wing_2_stack.setCurrentIndex(0)
         elif p_name == "BATTERY":
@@ -2336,41 +2311,27 @@ class VoltesseDashboard(QMainWindow):
         self.wing_swap_changed.emit(self.swap_wings)
 
     def toggle_units(self) -> str:
-        """Toggles between METRIC and IMPERIAL units across all dashboard widgets."""
-        new_mode = "IMPERIAL" if self.unit_system == "METRIC" else "METRIC"
-        self.set_unit_system(new_mode)
-        return new_mode
+        """In v4.1.0, system is locked to IMPERIAL; returns active unit system."""
+        self.set_unit_system("IMPERIAL")
+        return "IMPERIAL"
 
-    def set_unit_system(self, system: str) -> None:
-        """Sets dashboard unit system to METRIC or IMPERIAL across all gauges and widgets."""
-        self.unit_system = "IMPERIAL" if system.upper() == "IMPERIAL" else "METRIC"
-        is_imp = (self.unit_system == "IMPERIAL")
+    def set_unit_system(self, system: str = "IMPERIAL") -> None:
+        """Enforces IMPERIAL system across all dashboard gauges and widgets."""
+        self.unit_system = "IMPERIAL"
+        self.units_badge.setText("IMPERIAL")
+        self.ambient_label.setText("72°F")
+        self.speed_gauge.set_units(unit="MPH", max_val=120.0)
 
-        if is_imp:
-            self.units_badge.setText("IMPERIAL")
-            self.units_badge.setStyleSheet(
-                "color: #00E5FF; background-color: rgba(0, 229, 255, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 229, 255, 0.4); font-weight: bold;"
-            )
-            self.ambient_label.setText("72°F")
-            self.speed_gauge.set_units(unit="MPH", max_val=120.0)
-        else:
-            self.units_badge.setText("METRIC")
-            self.units_badge.setStyleSheet(
-                "color: #00F5A0; background-color: rgba(0, 245, 160, 0.15); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4); font-weight: bold;"
-            )
-            self.ambient_label.setText("22°C")
-            self.speed_gauge.set_units(unit="KM/H", max_val=180.0)
-
-        self.battery_widget.set_unit_system(self.unit_system)
-        self.tpms_widget.set_unit_system(self.unit_system)
-        self.thermal_widget.set_unit_system(self.unit_system)
-        self.awd_widget.set_unit_system(self.unit_system)
-        self.sparkline_widget.set_unit_system(self.unit_system)
-        self.compact_speed_widget.set_unit_system(self.unit_system)
-        self.battery_hero.set_unit_system(self.unit_system)
-        self.powertrain_hero.set_unit_system(self.unit_system)
-        self.battery_widget_alt.set_unit_system(self.unit_system)
-        self.sparkline_widget_alt.set_unit_system(self.unit_system)
+        self.battery_widget.set_unit_system("IMPERIAL")
+        self.tpms_widget.set_unit_system("IMPERIAL")
+        self.thermal_widget.set_unit_system("IMPERIAL")
+        self.awd_widget.set_unit_system("IMPERIAL")
+        self.sparkline_widget.set_unit_system("IMPERIAL")
+        self.compact_speed_widget.set_unit_system("IMPERIAL")
+        self.battery_hero.set_unit_system("IMPERIAL")
+        self.powertrain_hero.set_unit_system("IMPERIAL")
+        self.battery_widget_alt.set_unit_system("IMPERIAL")
+        self.sparkline_widget_alt.set_unit_system("IMPERIAL")
 
         if hasattr(self, "_last_record") and self._last_record is not None:
             self.update_telemetry(self._last_record)
@@ -2405,8 +2366,8 @@ class VoltesseDashboard(QMainWindow):
         trans_mode = record.transmission_mode if hasattr(record, "transmission_mode") and record.transmission_mode else "AUTO"
         self.current_transmission = trans_mode
 
-        is_imp = (self.unit_system == "IMPERIAL")
-        disp_speed = (record.speed_kmh * 0.621371) if is_imp else record.speed_kmh
+        is_imp = True
+        disp_speed = record.speed_kmh * 0.621371
 
         # Central Speedometer Dial
         self.speed_gauge.set_value(disp_speed, sub_val=str(record.motor_rpm))
@@ -2428,7 +2389,7 @@ class VoltesseDashboard(QMainWindow):
             brake=record.brake_pct,
             steering_angle=record.steering_angle,
             transmission_mode=trans_mode,
-            unit="MPH" if is_imp else "KM/H",
+            unit="MPH",
         )
 
         # Transmission Badge in Top Ribbon
@@ -2445,8 +2406,7 @@ class VoltesseDashboard(QMainWindow):
             )
 
         # Compact Speed HUD Badge in Top Ribbon (Visible when away from Speedometer page)
-        spd_u = "MPH" if is_imp else "KM/H"
-        self.speed_hud_badge.setText(f"{int(round(disp_speed))} {spd_u} [{display_gear}]")
+        self.speed_hud_badge.setText(f"{int(round(disp_speed))} MPH [{display_gear}]")
 
         # Battery & Voltage
         self.battery_widget.set_battery_data(
@@ -2461,6 +2421,7 @@ class VoltesseDashboard(QMainWindow):
             current=record.battery_current,
             power_kw=record.battery_power_kw,
             trip_km=record.trip_distance_km,
+            unit_system="IMPERIAL",
         )
         self.volt_val.setText(f"{record.battery_voltage:.1f} V")
         self.amp_val.setText(f"{record.battery_current:+.1f} A")
@@ -2508,7 +2469,7 @@ class VoltesseDashboard(QMainWindow):
             self.status_badge.setStyleSheet(
                 "background-color: rgba(0, 245, 160, 0.12); color: #5CFFC7; padding: 2px 10px; border-radius: 4px;"
             )
-            self.status_badge.setVisible(self.width() >= 950)
+            self.status_badge.setVisible(False)
 
         # Thermals
         self.thermal_widget.set_temperatures(
@@ -2516,9 +2477,8 @@ class VoltesseDashboard(QMainWindow):
         )
 
         # Trip Odometer
-        disp_dist = (record.trip_distance_km * 0.621371) if is_imp else record.trip_distance_km
-        dist_unit = "mi" if is_imp else "km"
-        self.trip_dist_val.setText(f"{disp_dist:.2f} {dist_unit}")
+        disp_dist = record.trip_distance_km * 0.621371
+        self.trip_dist_val.setText(f"{disp_dist:.2f} mi")
 
         # Sparkline trace
         self.sparkline_widget.add_data_point(disp_speed, record.battery_power_kw)

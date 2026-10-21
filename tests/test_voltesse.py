@@ -617,13 +617,13 @@ class TestDashboardGUI(unittest.TestCase):
         )
 
         gui.update_telemetry(rec)
-        self.assertEqual(gui.speed_gauge.current_val, 88.0)
+        self.assertAlmostEqual(gui.speed_gauge.current_val, 88.0 * 0.621371, places=2)
         self.assertEqual(gui.speed_gauge.steering_angle, -12.5)
         self.assertEqual(gui.speed_gauge.active_gear, "4")
         self.assertEqual(gui.speed_gauge.transmission_mode, "MANUAL")
         self.assertIn("MANUAL [M4]", gui.trans_mode_badge.text())
         self.assertEqual(gui.battery_widget.soc, 75.4)
-        self.assertEqual(gui.trip_dist_val.text(), "14.25 km")
+        self.assertEqual(gui.trip_dist_val.text(), f"{(14.25 * 0.621371):.2f} mi")
         self.assertEqual(gui.mode_badge.text(), "SPORT")
         self.assertIn("HIGH SPEED", gui.status_badge.text())
 
@@ -719,14 +719,14 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertTrue(clock_text.endswith("AM") or clock_text.endswith("PM"), f"Clock text {clock_text} does not end with AM/PM")
         self.assertEqual(clock_text.count(":"), 2)
 
-        # 2. Test initial Metric mode
-        self.assertEqual(gui.unit_system, "METRIC")
-        self.assertEqual(gui.units_badge.text(), "METRIC")
-        self.assertEqual(gui.ambient_label.text(), "22°C")
-        self.assertEqual(gui.speed_gauge.unit, "KM/H")
-        self.assertEqual(gui.speed_gauge.max_val, 180.0)
+        # 2. Test initial Imperial mode (Metric removed in v4.1.0)
+        self.assertEqual(gui.unit_system, "IMPERIAL")
+        self.assertEqual(gui.units_badge.text(), "IMPERIAL")
+        self.assertEqual(gui.ambient_label.text(), "72°F")
+        self.assertEqual(gui.speed_gauge.unit, "MPH")
+        self.assertEqual(gui.speed_gauge.max_val, 120.0)
 
-        # Feed sample record
+        # Feed sample record (100 km/h -> ~62 mph, 10 km -> ~6.21 mi)
         rec = TelemetryRecord(
             timestamp=time.time(),
             speed_kmh=100.0,
@@ -748,10 +748,10 @@ class TestDashboardGUI(unittest.TestCase):
             transmission_mode="AUTO",
         )
         gui.update_telemetry(rec)
-        self.assertIn("km", gui.trip_dist_val.text())
-        self.assertEqual(round(gui.speed_gauge.current_val), 100)
+        self.assertIn("mi", gui.trip_dist_val.text())
+        self.assertEqual(round(gui.speed_gauge.current_val), 62)
 
-        # 3. Test Toggle to Imperial via key 'U'
+        # 3. Test that system remains locked to Imperial on toggle
         units_signals = []
         gui.units_changed.connect(lambda u: units_signals.append(u))
 
@@ -768,22 +768,7 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertEqual(gui.thermal_widget.unit_system, "IMPERIAL")
         self.assertEqual(gui.awd_widget.unit_system, "IMPERIAL")
         self.assertEqual(gui.sparkline_widget.unit_system, "IMPERIAL")
-
-        # Telemetry should be converted to imperial values
-        self.assertIn("mi", gui.trip_dist_val.text())
-        # 100 km/h * 0.621371 = ~62.1 mph
-        self.assertEqual(round(gui.speed_gauge.current_val), 62)
         self.assertEqual(units_signals, ["IMPERIAL"])
-
-        # 4. Toggle back to Metric
-        gui.keyPressEvent(event_u)
-        self.assertEqual(gui.unit_system, "METRIC")
-        self.assertEqual(gui.units_badge.text(), "METRIC")
-        self.assertEqual(gui.ambient_label.text(), "22°C")
-        self.assertEqual(gui.speed_gauge.unit, "KM/H")
-        self.assertEqual(round(gui.speed_gauge.current_val), 100)
-        self.assertIn("km", gui.trip_dist_val.text())
-        self.assertEqual(units_signals, ["IMPERIAL", "METRIC"])
 
     def test_transmission_toggle_restriction(self):
         gui = VoltesseDashboard()
@@ -879,7 +864,7 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertIn("1/4", gui.page_title_label.text())
         # On Speedometer page, speed HUD badge is hidden (dial is visible)
         self.assertTrue(gui.speed_hud_badge.isHidden())
-        self.assertFalse(gui.ready_badge.isHidden())
+        self.assertTrue(gui.ready_badge.isHidden())
 
         # 2. Switch Right via Key_Right -> BATTERY page (2/4)
         event_right = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Right, Qt.KeyboardModifier.NoModifier)
@@ -958,7 +943,7 @@ class TestDashboardGUI(unittest.TestCase):
         gui.update_telemetry(rec)
 
         # Verify Speed HUD badge in Top Ribbon received speed and gear
-        self.assertIn("112 KM/H", gui.speed_hud_badge.text())
+        self.assertIn("70 MPH", gui.speed_hud_badge.text())
         self.assertIn("M5", gui.speed_hud_badge.text())
 
         # Verify BatteryHeroWidget received SoC, voltage, current, power
@@ -976,7 +961,7 @@ class TestDashboardGUI(unittest.TestCase):
             self.assertFalse(gui.bottom_bar.isHidden())
             self.assertFalse(gui.trip_pod.isHidden())
             self.assertFalse(gui.thermal_widget.isHidden())
-            self.assertEqual(gui.trip_dist_val.text(), "28.40 km")
+            self.assertEqual(gui.trip_dist_val.text(), f"{(28.4 * 0.621371):.2f} mi")
 
     def test_cli_view_and_swap_flags(self):
         from main import parse_args
