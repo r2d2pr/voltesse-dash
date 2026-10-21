@@ -144,6 +144,9 @@ voltesse-dash/
 | `G` | Cycle Gear (`P-R-N-D-B` in Auto, Upshift in Manual) | Global |
 | `U` | **Toggle Units (Metric ⮂ Imperial)** | Global (Race, Sim, Test) |
 | `L` | **Toggle Database Logging / Write Access** (`REC` ⮂ `LOG OFF`) | Global |
+| `-` / `_` | **Zoom Out UI** (reduce cockpit scale by 5%) | Global |
+| `+` / `=` | **Zoom In UI** (increase cockpit scale by 5%) | Global |
+| `0` | **Reset UI Zoom** to default (100%) | Global |
 | `W` / `Up Arrow` | Accelerate (Throttle ramp-up) | Simulation Mode |
 | `S` / `Down Arrow` | Brake (Regen & Friction brake) | Simulation Mode |
 | `A` / `Left Arrow` | Steer Left | Simulation Mode |
@@ -255,6 +258,7 @@ Generated files are saved directly to `data/exports/`.
 | :--- | :--- | :--- |
 | `--mode` | `RACE` | Initial telemetry mode (`RACE`, `SIMULATION`, `TEST`) |
 | `--windowed` | `False` | Run in windowed mode (default is fullscreen) |
+| `--scale` / `--ui-scale` | `auto` | Custom cockpit UI scale factor (e.g. `0.85` for compact screens) |
 | `--imperial` | `False` | Launch in Imperial units (`MPH`, `mi`, `°F`, `psi`, `lb-ft`) |
 | `--read-only` | `False` | Open the database in strict read-only mode |
 | `--no-logging`| `False` | Launch with database writing paused (toggleable with `L`) |

@@ -135,10 +135,10 @@ class SpeedometerDialWidget(QWidget):
         cx = w / 2.0
         cy = h / 2.0
 
-        padding = max(12.0, side * 0.05)
+        padding = max(14.0, side * 0.065)
         outer_r = (side / 2.0) - padding
         track_r = outer_r - (side * 0.025)
-        track_w = max(5.0, min(14.0, side * 0.030))
+        track_w = max(4.0, min(12.0, side * 0.026))
 
         start_angle_deg = 225.0
         total_span_deg = -270.0
@@ -245,22 +245,22 @@ class SpeedometerDialWidget(QWidget):
 
         # 7. Central Large Digital Speedometer Readout
         speed_int = int(round(self.current_val))
-        font_speed_size = max(28, min(76, int(side * 0.16)))
+        font_speed_size = max(18, min(62, int(side * 0.13)))
         font_speed = QFont("Segoe UI", font_speed_size, QFont.Weight.Bold)
         painter.setFont(font_speed)
         painter.setPen(COLOR_TEXT_PRIMARY)
 
         speed_box_w = side * 0.70
-        speed_box_h = side * 0.28
-        speed_rect = QRectF(cx - (speed_box_w / 2.0), cy - side * 0.23, speed_box_w, speed_box_h)
+        speed_box_h = side * 0.26
+        speed_rect = QRectF(cx - (speed_box_w / 2.0), cy - side * 0.22, speed_box_w, speed_box_h)
         painter.drawText(speed_rect, Qt.AlignmentFlag.AlignCenter, f"{speed_int}")
 
         # 8. Speed Unit Label
         painter.setPen(COLOR_MINT)
-        font_unit = QFont("Segoe UI", max(9, min(18, int(side * 0.036))), QFont.Weight.Bold)
+        font_unit = QFont("Segoe UI", max(7, min(15, int(side * 0.028))), QFont.Weight.Bold)
         font_unit.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, max(1, int(side * 0.005)))
         painter.setFont(font_unit)
-        unit_rect = QRectF(cx - side * 0.20, cy + side * 0.025, side * 0.40, side * 0.065)
+        unit_rect = QRectF(cx - side * 0.20, cy + side * 0.025, side * 0.40, side * 0.055)
         painter.drawText(unit_rect, Qt.AlignmentFlag.AlignCenter, self.unit)
 
         # 9. Modern Automotive Transmission Hub (Auto PRNDB with active gear or Manual R/N/1-6)
@@ -270,17 +270,17 @@ class SpeedometerDialWidget(QWidget):
         else:
             gears = ["P", "R", "N", "D", "B"]
 
-        slot_w = max(16.0, min(36.0, (side * 0.46) / len(gears)))
-        box_h = max(16.0, min(30.0, side * 0.052))
+        slot_w = max(14.0, min(32.0, (side * 0.44) / len(gears)))
+        box_h = max(14.0, min(24.0, side * 0.046))
         total_gear_w = len(gears) * slot_w
         start_gx = cx - (total_gear_w / 2.0)
 
         capsule_rect = QRectF(start_gx - 4, gear_y - 2, total_gear_w + 8, box_h + 4)
         painter.setBrush(QBrush(QColor(6, 14, 10, 200)))
         painter.setPen(QPen(QColor(18, 50, 38, 160), 1))
-        painter.drawRoundedRect(capsule_rect, 6, 6)
+        painter.drawRoundedRect(capsule_rect, 5, 5)
 
-        font_gear = QFont("Segoe UI", max(7, min(13, int(side * 0.026))), QFont.Weight.Bold)
+        font_gear = QFont("Segoe UI", max(6, min(11, int(side * 0.022))), QFont.Weight.Bold)
         painter.setFont(font_gear)
 
         for idx, g in enumerate(gears):
@@ -340,7 +340,7 @@ class SpeedometerDialWidget(QWidget):
                 status_text = f"AUTO  •  {self.active_gear}"
 
         painter.setPen(COLOR_CYAN if self.transmission_mode == "MANUAL" else COLOR_MINT_BRIGHT)
-        font_status = QFont("Segoe UI", max(7, min(12, int(side * 0.024))), QFont.Weight.Bold)
+        font_status = QFont("Segoe UI", max(6, min(11, int(side * 0.020))), QFont.Weight.Bold)
         font_status.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
         painter.setFont(font_status)
         status_rect = QRectF(cx - side * 0.44, trans_status_y, side * 0.88, status_h)
@@ -348,9 +348,9 @@ class SpeedometerDialWidget(QWidget):
 
         # RPM Subtitle
         rpm_y = trans_status_y + status_h + max(1.0, side * 0.008)
-        rpm_h = max(11.0, min(16.0, side * 0.034))
+        rpm_h = max(10.0, min(15.0, side * 0.030))
         painter.setPen(COLOR_TEXT_SECONDARY)
-        font_rpm = QFont("Consolas", max(7, min(13, int(side * 0.024))), QFont.Weight.Normal)
+        font_rpm = QFont("Consolas", max(6, min(11, int(side * 0.020))), QFont.Weight.Normal)
         painter.setFont(font_rpm)
         rpm_rect = QRectF(cx - side * 0.35, rpm_y, side * 0.70, rpm_h)
         painter.drawText(rpm_rect, Qt.AlignmentFlag.AlignCenter, f"{self.sub_val_label} {self.sub_val}")
@@ -461,15 +461,15 @@ class BatteryStatusWidget(QWidget):
         else:
             bar_color = COLOR_RED
 
-        card_content_h = h - 30.0
-        arc_r = min(w * 0.18, card_content_h * 0.38)
-        arc_cx = arc_r + 18.0
-        arc_cy = 28.0 + (card_content_h * 0.42)
+        card_content_h = h - 24.0
+        arc_r = min(w * 0.17, card_content_h * 0.32)
+        arc_cx = arc_r + 14.0
+        arc_cy = 22.0 + (card_content_h * 0.38)
         arc_rect = QRectF(arc_cx - arc_r, arc_cy - arc_r, arc_r * 2, arc_r * 2)
 
         start_ang = 210.0
         span_ang = -240.0
-        pen_w = max(4.0, min(9.0, arc_r * 0.18))
+        pen_w = max(3.5, min(8.0, arc_r * 0.18))
         pen_track = QPen(COLOR_GAUGE_TRACK, pen_w, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
         painter.setPen(pen_track)
         painter.drawArc(arc_rect, int(start_ang * 16), int(span_ang * 16))
@@ -481,7 +481,7 @@ class BatteryStatusWidget(QWidget):
             painter.drawArc(arc_rect, int(start_ang * 16), int(active_span * 16))
 
         painter.setPen(COLOR_TEXT_PRIMARY)
-        font_soc_sz = max(9, min(22, int(arc_r * 0.38)))
+        font_soc_sz = max(7, min(18, int(arc_r * 0.34)))
         font_soc = QFont("Segoe UI", font_soc_sz, QFont.Weight.Bold)
         painter.setFont(font_soc)
         painter.drawText(
@@ -490,21 +490,21 @@ class BatteryStatusWidget(QWidget):
             f"{int(round(self.soc))}%",
         )
 
-        range_x = arc_cx + arc_r + 16.0
-        range_w = max(60.0, w - range_x - 12.0)
+        range_x = arc_cx + arc_r + 12.0
+        range_w = max(50.0, w - range_x - 10.0)
 
         painter.setPen(COLOR_TEXT_MUTED)
-        font_sub_sz = max(7, min(11, int(card_content_h * 0.09)))
+        font_sub_sz = max(6, min(10, int(card_content_h * 0.08)))
         font_sub = QFont("Segoe UI", font_sub_sz, QFont.Weight.DemiBold)
         painter.setFont(font_sub)
         painter.drawText(
-            QRectF(range_x, arc_cy - (card_content_h * 0.30), range_w, card_content_h * 0.22),
+            QRectF(range_x, arc_cy - (card_content_h * 0.28), range_w, card_content_h * 0.22),
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
             "EST. RANGE",
         )
 
         painter.setPen(COLOR_MINT)
-        font_range_sz = max(13, min(26, int(card_content_h * 0.20)))
+        font_range_sz = max(10, min(22, int(card_content_h * 0.17)))
         font_range = QFont("Segoe UI", font_range_sz, QFont.Weight.Bold)
         painter.setFont(font_range)
         if getattr(self, "unit_system", "METRIC") == "IMPERIAL":
@@ -513,22 +513,22 @@ class BatteryStatusWidget(QWidget):
         else:
             range_text = f"{int(round(self.est_range_km))} km"
         painter.drawText(
-            QRectF(range_x, arc_cy - (card_content_h * 0.05), range_w, card_content_h * 0.32),
+            QRectF(range_x, arc_cy - (card_content_h * 0.05), range_w, card_content_h * 0.30),
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
             range_text,
         )
 
-        sub_y = h - max(32.0, h * 0.24)
-        sub_h = h - sub_y - 8.0
-        sub_rect = QRectF(12, sub_y, w - 24, sub_h)
+        sub_y = h - max(26.0, h * 0.20)
+        sub_h = h - sub_y - 5.0
+        sub_rect = QRectF(10, sub_y, w - 20, sub_h)
         painter.setBrush(QBrush(QColor(6, 14, 10, 190)))
         painter.setPen(QPen(COLOR_PANEL_BORDER, 0.8))
         painter.drawRoundedRect(sub_rect, 4, 4)
 
-        font_pod_lbl = QFont("Segoe UI", max(6, min(9, int(sub_h * 0.28))), QFont.Weight.Bold)
-        font_pod_val = QFont("Consolas", max(7, min(12, int(sub_h * 0.40))), QFont.Weight.Bold)
+        font_pod_lbl = QFont("Segoe UI", max(5, min(8, int(sub_h * 0.26))), QFont.Weight.Bold)
+        font_pod_val = QFont("Consolas", max(6, min(11, int(sub_h * 0.38))), QFont.Weight.Bold)
 
-        half_w = (w - 24) / 2.0
+        half_w = (w - 20) / 2.0
         painter.setFont(font_pod_lbl)
         painter.setPen(COLOR_TEXT_MUTED)
         painter.drawText(QRectF(18, sub_y + 2, 40, sub_h - 4), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "VOLT")
@@ -625,22 +625,22 @@ class TPMSWidget(QWidget):
         cx = w / 2.0
         cy = 28.0 + (h - 28.0) / 2.0
 
-        content_h = h - 36.0
-        ch = max(38.0, min(110.0, content_h * 0.58))
-        cw = max(24.0, min(65.0, ch * 0.60))
+        content_h = h - 30.0
+        ch = max(28.0, min(75.0, content_h * 0.46))
+        cw = max(16.0, min(44.0, ch * 0.56))
 
         chassis_rect = QRectF(cx - cw / 2.0, cy - ch / 2.0, cw, ch)
         painter.setBrush(QBrush(QColor(12, 30, 22, 220)))
         painter.setPen(QPen(COLOR_PANEL_BORDER, 1.2))
-        painter.drawRoundedRect(chassis_rect, 6, 6)
+        painter.drawRoundedRect(chassis_rect, 5, 5)
 
         painter.setPen(QPen(QColor(0, 245, 160, 70), 1))
         painter.drawLine(int(cx - cw * 0.35), int(cy - ch * 0.16), int(cx + cw * 0.35), int(cy - ch * 0.16))
 
-        tw = max(4.0, min(10.0, cw * 0.22))
-        th = max(7.0, min(20.0, ch * 0.25))
+        tw = max(3.5, min(7.0, cw * 0.20))
+        th = max(5.0, min(14.0, ch * 0.22))
         wheel_dx = cw * 0.58
-        wheel_dy = ch * 0.28
+        wheel_dy = ch * 0.26
         wheel_coords = [
             (cx - wheel_dx - tw, cy - wheel_dy - th / 2, self.fl_bar),
             (cx + wheel_dx, cy - wheel_dy - th / 2, self.fr_bar),
@@ -652,9 +652,9 @@ class TPMSWidget(QWidget):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRoundedRect(QRectF(wx, wy, tw, th), 2, 2)
 
-        font_bar_sz = max(7, min(13, int(content_h * 0.10)))
-        font_temp_sz = max(6, min(11, int(content_h * 0.08)))
-        left_col_w = max(40.0, cx - wheel_dx - tw - 16.0)
+        font_bar_sz = max(5, min(9, int(content_h * 0.075)))
+        font_temp_sz = max(5, min(8, int(content_h * 0.060)))
+        left_col_w = max(35.0, cx - wheel_dx - tw - 12.0)
 
         is_imp = (getattr(self, "unit_system", "METRIC") == "IMPERIAL")
         if is_imp:
@@ -1072,7 +1072,7 @@ class VoltesseDashboard(QMainWindow):
         self.setWindowTitle("Voltesse Dash - Digital Cockpit")
         # Leave room for the cockpit on smaller embedded displays. The layout
         # itself scales to the available size, including 800x480 panels.
-        self.setMinimumSize(640, 400)
+        self.setMinimumSize(400, 240)
         self.resize(1280, 720)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
@@ -1080,6 +1080,7 @@ class VoltesseDashboard(QMainWindow):
         self.current_mode = "RACE"
         self.current_transmission = "AUTO"
         self.unit_system = "METRIC"
+        self.user_scale_multiplier = 1.0
         self._last_record: Optional[TelemetryRecord] = None
 
         # Track currently held keys for video game simulation
@@ -1382,6 +1383,11 @@ class VoltesseDashboard(QMainWindow):
 
         self._apply_dynamic_scale()
 
+    def set_user_scale(self, multiplier: float) -> None:
+        """Sets an explicit UI zoom scale factor (e.g. 0.85 for denser display, 1.0 for default)."""
+        self.user_scale_multiplier = max(0.35, min(2.0, float(multiplier)))
+        self._apply_dynamic_scale()
+
     def mousePressEvent(self, event) -> None:
         """Ensures cockpit window maintains primary keyboard focus upon clicks."""
         self.setFocus()
@@ -1391,29 +1397,38 @@ class VoltesseDashboard(QMainWindow):
         """Dynamically adjusts font sizes and spacings for crisp proportions across resolutions."""
         w = max(1, self.width())
         h = max(1, self.height())
-        scale = max(0.55, min(2.0, min(w / 1280.0, h / 720.0)))
 
-        # Reduce layout chrome along with typography. This matters on 800x480,
-        # where fixed margins otherwise consume a significant part of the HUD.
-        margin_x = max(4, int(14 * scale))
-        margin_top = max(3, int(8 * scale))
-        margin_bottom = max(3, int(10 * scale))
+        raw_scale = min(w / 1280.0, h / 720.0)
+        # On compact embedded screens (e.g. 800x480 Raspberry Pi), use a denser reference
+        # (1440x840) so all gauges, numbers, and pods have comfortable breathing room.
+        if w <= 950 or h <= 540:
+            base_scale = min(w / 1440.0, h / 840.0)
+        else:
+            base_scale = raw_scale
+
+        user_mult = getattr(self, "user_scale_multiplier", 1.0)
+        scale = max(0.30, min(2.0, base_scale * user_mult))
+
+        # Compact chrome margins tailored for 800x480 and variable displays
+        margin_x = max(2, int(8 * scale))
+        margin_top = max(2, int(4 * scale))
+        margin_bottom = max(2, int(4 * scale))
         self.main_layout.setContentsMargins(margin_x, margin_top, margin_x, margin_bottom)
-        self.main_layout.setSpacing(max(3, int(8 * scale)))
-        self.top_layout.setContentsMargins(max(4, int(10 * scale)), 0, max(4, int(10 * scale)), 0)
-        self.top_layout.setSpacing(max(2, int(8 * scale)))
-        self.stage_layout.setSpacing(max(4, int(14 * scale)))
-        self.left_wing_layout.setSpacing(max(3, int(10 * scale)))
-        self.right_wing_layout.setSpacing(max(3, int(10 * scale)))
-        self.bottom_layout.setSpacing(max(4, int(12 * scale)))
+        self.main_layout.setSpacing(max(2, int(4 * scale)))
+        self.top_layout.setContentsMargins(max(4, int(8 * scale)), 0, max(4, int(8 * scale)), 0)
+        self.top_layout.setSpacing(max(2, int(4 * scale)))
+        self.stage_layout.setSpacing(max(3, int(6 * scale)))
+        self.left_wing_layout.setSpacing(max(2, int(5 * scale)))
+        self.right_wing_layout.setSpacing(max(2, int(5 * scale)))
+        self.bottom_layout.setSpacing(max(2, int(5 * scale)))
 
         top_h = max(34, min(56, int(42 * scale)))
         self.top_bar.setFixedHeight(top_h)
 
-        bot_h = max(34, min(64, int(48 * scale)))
+        bot_h = max(32, min(64, int(44 * scale)))
         self.bottom_bar.setFixedHeight(bot_h)
 
-        self.trip_pod.setFixedWidth(max(90, min(220, int(150 * scale))))
+        self.trip_pod.setFixedWidth(max(85, min(220, int(140 * scale))))
 
         # The full controls legend competes with live status badges for space
         # on narrow displays (e.g. 800x480 Raspberry Pi); controls remain active when hidden.
@@ -1423,9 +1438,11 @@ class VoltesseDashboard(QMainWindow):
         if w < 950:
             self.right_hdr.setText("⚡ POWERTRAIN")
             self.power_title.setText("NET PWR")
+            self.trip_hdr.setText("TRIP")
         else:
             self.right_hdr.setText("⚡ POWERTRAIN DYNAMICS")
             self.power_title.setText("NET POWER")
+            self.trip_hdr.setText("TRIP ODOMETER")
 
         # Dynamic badge styling with proportional padding and radii
         pad_y = max(1, int(2 * scale))
@@ -1804,6 +1821,23 @@ class VoltesseDashboard(QMainWindow):
             return
         elif key == Qt.Key.Key_Space:
             self.pause_requested.emit()
+            return
+
+        # Real-time interactive UI zoom controls (- to zoom out, +/= to zoom in, 0 to reset)
+        elif key in (Qt.Key.Key_Minus, Qt.Key.Key_Underscore):
+            self.user_scale_multiplier = max(0.35, round(self.user_scale_multiplier - 0.05, 2))
+            self._apply_dynamic_scale()
+            self.status_badge.setText(f"ZOOM: {int(round(self.user_scale_multiplier * 100))}%")
+            return
+        elif key in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
+            self.user_scale_multiplier = min(2.0, round(self.user_scale_multiplier + 0.05, 2))
+            self._apply_dynamic_scale()
+            self.status_badge.setText(f"ZOOM: {int(round(self.user_scale_multiplier * 100))}%")
+            return
+        elif key in (Qt.Key.Key_0, Qt.Key.Key_ParenRight) and not event.isAutoRepeat():
+            self.user_scale_multiplier = 1.0
+            self._apply_dynamic_scale()
+            self.status_badge.setText("ZOOM: 100%")
             return
 
         # Video Game Driving Inputs (W/A/S/D and Arrow Keys)

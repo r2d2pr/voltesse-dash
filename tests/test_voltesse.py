@@ -832,6 +832,41 @@ class TestDashboardGUI(unittest.TestCase):
         gui.keyPressEvent(event_k2)
         self.assertEqual(modes_switched, ["RACE", "SIMULATION"])
 
+    def test_gui_user_scaling_and_hotkeys(self):
+        gui = VoltesseDashboard()
+        gui.resize(800, 480)
+        self.assertEqual(gui.user_scale_multiplier, 1.0)
+
+        # Explicit set_user_scale
+        gui.set_user_scale(0.85)
+        self.assertAlmostEqual(gui.user_scale_multiplier, 0.85)
+
+        # Clamping
+        gui.set_user_scale(0.1)
+        self.assertGreaterEqual(gui.user_scale_multiplier, 0.35)
+        gui.set_user_scale(5.0)
+        self.assertLessEqual(gui.user_scale_multiplier, 2.0)
+
+        # Reset via '0'
+        gui.set_user_scale(0.85)
+        event_0 = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_0, Qt.KeyboardModifier.NoModifier)
+        gui.keyPressEvent(event_0)
+        self.assertEqual(gui.user_scale_multiplier, 1.0)
+        self.assertIn("ZOOM: 100%", gui.status_badge.text())
+
+        # Zoom out via '-'
+        event_minus = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Minus, Qt.KeyboardModifier.NoModifier)
+        gui.keyPressEvent(event_minus)
+        self.assertAlmostEqual(gui.user_scale_multiplier, 0.95)
+        self.assertIn("ZOOM: 95%", gui.status_badge.text())
+
+        # Zoom in via '+' / '='
+        event_plus = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Plus, Qt.KeyboardModifier.NoModifier)
+        gui.keyPressEvent(event_plus)
+        self.assertAlmostEqual(gui.user_scale_multiplier, 1.0)
+        self.assertIn("ZOOM: 100%", gui.status_badge.text())
+
+
 
 @SKIP_NO_DB
 class TestVoltesseAppModes(unittest.TestCase):

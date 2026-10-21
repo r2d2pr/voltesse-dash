@@ -9,9 +9,16 @@ as well as runtime write access controls and session export capabilities.
 
 import argparse
 import logging
+import os
 import signal
 import sys
 from typing import Optional
+
+# Prevent Qt from auto-zooming or applying fractional High-DPI scaling
+# on embedded touchscreens (e.g. Raspberry Pi 800x480).
+os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "0")
+os.environ.setdefault("QT_AUTO_SCREEN_SCALE_FACTOR", "0")
+os.environ.setdefault("QT_SCALE_FACTOR", "1.0")
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
@@ -39,6 +46,10 @@ class VoltesseApp:
 
     def __init__(self, args: argparse.Namespace):
         self.args = args
+        if hasattr(Qt, "HighDpiScaleFactorRoundingPolicy"):
+            QApplication.setHighDpiScaleFactorRoundingPolicy(
+                Qt.HighDpiScaleFactorRoundingPolicy.Floor
+            )
         self.app = QApplication.instance() or QApplication(sys.argv)
         self.app.setApplicationName("Voltesse Dash")
 
@@ -70,6 +81,8 @@ class VoltesseApp:
         # 2. Initialize Distraction-Free Cockpit GUI
         logger.info("Initializing Cockpit GUI...")
         self.gui = VoltesseDashboard()
+        if getattr(args, "ui_scale", None) is not None:
+            self.gui.set_user_scale(args.ui_scale)
         if getattr(args, "imperial", False) or getattr(args, "units", "metric").lower() == "imperial":
             self.gui.set_unit_system("IMPERIAL")
 
@@ -85,6 +98,7 @@ class VoltesseApp:
             self.gui.show()
         else:
             logger.info("Launching in fullscreen cockpit mode...")
+            self.gui.setWindowFlags(self.gui.windowFlags() | Qt.WindowType.FramelessWindowHint)
             self.gui.showFullScreen()
 
         # 3. Initialize Three Telemetry Sources
@@ -440,6 +454,14 @@ def parse_args() -> argparse.Namespace:
         "--windowed",
         action="store_true",
         help="Launch in windowed mode rather than fullscreen (default: fullscreen)",
+    )
+    parser.add_argument(
+        "--scale",
+        "--ui-scale",
+        dest="ui_scale",
+        type=float,
+        default=None,
+        help="Custom cockpit UI scaling factor (e.g. 0.85 for compact/Raspberry Pi screens, default: auto)",
     )
     parser.add_argument(
         "--imperial",
