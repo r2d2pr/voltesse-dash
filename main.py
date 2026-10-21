@@ -81,6 +81,9 @@ class VoltesseApp:
         # 2. Initialize Distraction-Free Cockpit GUI
         logger.info("Initializing Cockpit GUI...")
         self.gui = VoltesseDashboard()
+        if not getattr(args, "show_cursor", False):
+            QApplication.setOverrideCursor(Qt.CursorShape.BlankCursor)
+            self.gui.setCursor(Qt.CursorShape.BlankCursor)
         if getattr(args, "ui_scale", None) is not None:
             self.gui.set_user_scale(args.ui_scale)
         if getattr(args, "imperial", False) or getattr(args, "units", "metric").lower() == "imperial":
@@ -550,6 +553,11 @@ def parse_args() -> argparse.Namespace:
         default="metric",
         choices=["metric", "imperial"],
         help="Initial unit system (metric or imperial, default: metric)",
+    )
+    parser.add_argument(
+        "--show-cursor",
+        action="store_true",
+        help="Keep mouse cursor visible (default: hidden for distraction-free cockpit)",
     )
     return parser.parse_args()
 

@@ -1102,6 +1102,7 @@ class VoltesseDashboard(QMainWindow):
         else:
             self.resize(800, 480)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setCursor(Qt.CursorShape.BlankCursor)
 
         # Active operating mode state
         self.current_mode = "RACE"
