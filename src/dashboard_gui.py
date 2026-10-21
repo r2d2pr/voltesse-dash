@@ -449,13 +449,16 @@ class BatteryStatusWidget(QWidget):
         painter.setPen(QPen(COLOR_PANEL_BORDER, 1))
         painter.drawRoundedRect(QRectF(0, 0, w - 1, h - 1), 8, 8)
 
-        hdr_font_sz = max(7, min(11, int(w * 0.026)))
-        painter.setPen(COLOR_TEXT_SECONDARY)
+        # Responsive card header
+        hdr_font_sz = max(7, min(11, int(w * 0.032)))
         painter.setFont(QFont("Segoe UI", hdr_font_sz, QFont.Weight.Bold))
-        painter.drawText(QRectF(14, 8, w - 28, 18), Qt.AlignmentFlag.AlignLeft, "⚡ ENERGY & BATTERY")
+        title_str = "⚡ BATTERY" if w < 260 else "⚡ ENERGY & BATTERY"
+        status_str = "● NOMINAL" if w < 260 else "● PACK NOMINAL"
 
+        painter.setPen(COLOR_TEXT_SECONDARY)
+        painter.drawText(QRectF(12, 7, w * 0.52, 16), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, title_str)
         painter.setPen(COLOR_MINT)
-        painter.drawText(QRectF(14, 8, w - 28, 18), Qt.AlignmentFlag.AlignRight, "● PACK NOMINAL")
+        painter.drawText(QRectF(w * 0.48, 7, w * 0.52 - 12, 16), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, status_str)
 
         if self.soc > 30.0:
             bar_color = COLOR_MINT
@@ -465,14 +468,14 @@ class BatteryStatusWidget(QWidget):
             bar_color = COLOR_RED
 
         card_content_h = h - 24.0
-        arc_r = min(w * 0.17, card_content_h * 0.32)
-        arc_cx = arc_r + 14.0
-        arc_cy = 22.0 + (card_content_h * 0.38)
+        arc_r = min(w * 0.17, card_content_h * 0.28)
+        arc_cx = arc_r + max(10.0, w * 0.04)
+        arc_cy = 22.0 + (card_content_h * 0.36)
         arc_rect = QRectF(arc_cx - arc_r, arc_cy - arc_r, arc_r * 2, arc_r * 2)
 
         start_ang = 210.0
         span_ang = -240.0
-        pen_w = max(3.5, min(8.0, arc_r * 0.18))
+        pen_w = max(3.5, min(7.5, arc_r * 0.17))
         pen_track = QPen(COLOR_GAUGE_TRACK, pen_w, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
         painter.setPen(pen_track)
         painter.drawArc(arc_rect, int(start_ang * 16), int(span_ang * 16))
@@ -484,69 +487,75 @@ class BatteryStatusWidget(QWidget):
             painter.drawArc(arc_rect, int(start_ang * 16), int(active_span * 16))
 
         painter.setPen(COLOR_TEXT_PRIMARY)
-        font_soc_sz = max(7, min(18, int(arc_r * 0.34)))
-        font_soc = QFont("Segoe UI", font_soc_sz, QFont.Weight.Bold)
-        painter.setFont(font_soc)
+        font_soc_sz = max(7, min(15, int(arc_r * 0.35)))
+        painter.setFont(QFont("Segoe UI", font_soc_sz, QFont.Weight.Bold))
         painter.drawText(
             QRectF(arc_cx - arc_r + 2, arc_cy - arc_r * 0.5, (arc_r - 2) * 2, arc_r),
             Qt.AlignmentFlag.AlignCenter,
             f"{int(round(self.soc))}%",
         )
 
-        range_x = arc_cx + arc_r + 12.0
+        range_x = arc_cx + arc_r + max(8.0, w * 0.04)
         range_w = max(50.0, w - range_x - 10.0)
 
         painter.setPen(COLOR_TEXT_MUTED)
-        font_sub_sz = max(6, min(10, int(card_content_h * 0.08)))
-        font_sub = QFont("Segoe UI", font_sub_sz, QFont.Weight.DemiBold)
-        painter.setFont(font_sub)
+        font_sub_sz = max(6, min(9, int(card_content_h * 0.05)))
+        painter.setFont(QFont("Segoe UI", font_sub_sz, QFont.Weight.DemiBold))
         painter.drawText(
-            QRectF(range_x, arc_cy - (card_content_h * 0.28), range_w, card_content_h * 0.22),
+            QRectF(range_x, arc_cy - (card_content_h * 0.22), range_w, card_content_h * 0.18),
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
             "EST. RANGE",
         )
 
         painter.setPen(COLOR_MINT)
-        font_range_sz = max(10, min(22, int(card_content_h * 0.17)))
-        font_range = QFont("Segoe UI", font_range_sz, QFont.Weight.Bold)
-        painter.setFont(font_range)
+        font_range_sz = max(11, min(18, int(card_content_h * 0.095)))
+        painter.setFont(QFont("Segoe UI", font_range_sz, QFont.Weight.Bold))
         if getattr(self, "unit_system", "METRIC") == "IMPERIAL":
             range_val = int(round(self.est_range_km * 0.621371))
             range_text = f"{range_val} mi"
         else:
             range_text = f"{int(round(self.est_range_km))} km"
         painter.drawText(
-            QRectF(range_x, arc_cy - (card_content_h * 0.05), range_w, card_content_h * 0.30),
+            QRectF(range_x, arc_cy - (card_content_h * 0.02), range_w, card_content_h * 0.24),
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
             range_text,
         )
 
-        sub_y = h - max(26.0, h * 0.20)
-        sub_h = h - sub_y - 5.0
+        # Bottom Pod: Balanced dual-column electrical diagnostics
+        sub_y = h - max(26.0, min(38.0, h * 0.18))
+        sub_h = h - sub_y - 6.0
         sub_rect = QRectF(10, sub_y, w - 20, sub_h)
         painter.setBrush(QBrush(QColor(6, 14, 10, 190)))
         painter.setPen(QPen(COLOR_PANEL_BORDER, 0.8))
         painter.drawRoundedRect(sub_rect, 4, 4)
 
-        font_pod_lbl = QFont("Segoe UI", max(5, min(8, int(sub_h * 0.26))), QFont.Weight.Bold)
-        font_pod_val = QFont("Consolas", max(6, min(11, int(sub_h * 0.38))), QFont.Weight.Bold)
+        font_pod_lbl = QFont("Segoe UI", max(6, min(8, int(sub_h * 0.30))), QFont.Weight.Bold)
+        font_pod_val = QFont("Consolas", max(7, min(10, int(sub_h * 0.36))), QFont.Weight.Bold)
 
-        half_w = (w - 20) / 2.0
+        col_w = (w - 28.0) / 2.0
+        col1_x = 14.0
+        col2_x = 14.0 + col_w
+
+        # Subtle separator line between columns
+        painter.setPen(QPen(COLOR_PANEL_BORDER, 0.6))
+        painter.drawLine(int(col2_x), int(sub_y + 4), int(col2_x), int(sub_y + sub_h - 4))
+
+        # VOLT
         painter.setFont(font_pod_lbl)
         painter.setPen(COLOR_TEXT_MUTED)
-        painter.drawText(QRectF(18, sub_y + 2, 40, sub_h - 4), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "VOLT")
+        painter.drawText(QRectF(col1_x + 2, sub_y, 30, sub_h), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "VOLT")
         painter.setFont(font_pod_val)
         painter.setPen(COLOR_TEXT_PRIMARY)
-        painter.drawText(QRectF(58, sub_y + 2, half_w - 50, sub_h - 4), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"{self.voltage:.1f} V")
+        painter.drawText(QRectF(col1_x + 32, sub_y, col_w - 34, sub_h), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"{self.voltage:.1f} V")
 
-        rx = 12 + half_w
+        # CURR
         painter.setFont(font_pod_lbl)
         painter.setPen(COLOR_TEXT_MUTED)
-        painter.drawText(QRectF(rx + 6, sub_y + 2, 40, sub_h - 4), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "CURR")
+        painter.drawText(QRectF(col2_x + 6, sub_y, 30, sub_h), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "CURR")
         painter.setFont(font_pod_val)
         c_color = COLOR_MINT if self.current < -0.5 else (COLOR_AMBER if self.current > 70.0 else COLOR_TEXT_PRIMARY)
         painter.setPen(c_color)
-        painter.drawText(QRectF(rx + 46, sub_y + 2, half_w - 52, sub_h - 4), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"{self.current:+.1f} A")
+        painter.drawText(QRectF(col2_x + 36, sub_y, col_w - 38, sub_h), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"{self.current:+.1f} A")
 
         painter.end()
 
@@ -762,28 +771,32 @@ class AwdTorqueVectorWidget(QWidget):
         painter.setPen(QPen(COLOR_PANEL_BORDER, 1))
         painter.drawRoundedRect(QRectF(0, 0, w - 1, h - 1), 8, 8)
 
-        hdr_font_sz = max(7, min(11, int(w * 0.026)))
-        painter.setPen(COLOR_TEXT_SECONDARY)
+        # Responsive card header
+        hdr_font_sz = max(7, min(11, int(w * 0.032)))
         painter.setFont(QFont("Segoe UI", hdr_font_sz, QFont.Weight.Bold))
-        painter.drawText(QRectF(14, 8, w - 28, 18), Qt.AlignmentFlag.AlignLeft, "AWD TORQUE VECTORING")
+        title_str = "AWD TORQUE" if w < 260 else "AWD TORQUE VECTORING"
+        bias_clean = self.bias_mode.replace("AWD ", "") if w < 260 else self.bias_mode
 
+        painter.setPen(COLOR_TEXT_SECONDARY)
+        painter.drawText(QRectF(12, 7, w * 0.52, 16), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, title_str)
         painter.setPen(COLOR_MINT_BRIGHT)
-        painter.drawText(QRectF(14, 8, w - 28, 18), Qt.AlignmentFlag.AlignRight, f"● {self.bias_mode}")
+        painter.drawText(QRectF(w * 0.48, 7, w * 0.52 - 12, 16), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, f"● {bias_clean}")
 
-        bar_left = max(60.0, w * 0.22)
-        val_w = max(70.0, w * 0.28)
-        bar_right = w - val_w - 8.0
-        bar_w = max(40.0, bar_right - bar_left)
-        bar_h = max(5.0, min(12.0, h * 0.10))
+        lbl_w = max(44.0, min(56.0, w * 0.18))
+        bar_left = 12.0 + lbl_w + 4.0
+        val_w = max(82.0, min(110.0, w * 0.38))
+        bar_right = w - val_w - 6.0
+        bar_w = max(35.0, bar_right - bar_left)
+        bar_h = max(5.0, min(9.0, h * 0.07))
 
-        lbl_font_sz = max(6, min(11, int(h * 0.11)))
-        val_font_sz = max(7, min(12, int(h * 0.12)))
+        lbl_font_sz = max(7, min(10, int(h * 0.075)))
+        val_font_sz = max(7, min(10, int(h * 0.075)))
 
         content_h = h - 28.0
-        y1 = 28.0 + (content_h * 0.32)
+        y1 = 28.0 + (content_h * 0.28)
         painter.setPen(COLOR_TEXT_SECONDARY)
         painter.setFont(QFont("Segoe UI", lbl_font_sz, QFont.Weight.Bold))
-        painter.drawText(QRectF(12, y1 - 4, bar_left - 16, 16), Qt.AlignmentFlag.AlignLeft, "F-AXLE")
+        painter.drawText(QRectF(12, y1 - 8, lbl_w, 20), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "F-AXLE")
 
         painter.setBrush(QBrush(COLOR_GAUGE_TRACK))
         painter.setPen(Qt.PenStyle.NoPen)
@@ -797,12 +810,12 @@ class AwdTorqueVectorWidget(QWidget):
         f_val_str = f"{int(self.front_pct)}% {int(self.front_nm * 0.73756)}lb-ft" if is_imp else f"{int(self.front_pct)}% {int(self.front_nm)}Nm"
         painter.setPen(COLOR_TEXT_PRIMARY)
         painter.setFont(QFont("Consolas", val_font_sz, QFont.Weight.Bold))
-        painter.drawText(QRectF(w - val_w - 8, y1 - 4, val_w, 16), Qt.AlignmentFlag.AlignRight, f_val_str)
+        painter.drawText(QRectF(w - val_w - 6, y1 - 8, val_w, 20), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, f_val_str)
 
-        y2 = 28.0 + (content_h * 0.70)
+        y2 = 28.0 + (content_h * 0.68)
         painter.setPen(COLOR_TEXT_SECONDARY)
         painter.setFont(QFont("Segoe UI", lbl_font_sz, QFont.Weight.Bold))
-        painter.drawText(QRectF(12, y2 - 4, bar_left - 16, 16), Qt.AlignmentFlag.AlignLeft, "R-AXLE")
+        painter.drawText(QRectF(12, y2 - 8, lbl_w, 20), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "R-AXLE")
 
         painter.setBrush(QBrush(COLOR_GAUGE_TRACK))
         painter.setPen(Qt.PenStyle.NoPen)
@@ -816,7 +829,7 @@ class AwdTorqueVectorWidget(QWidget):
         r_val_str = f"{int(self.rear_pct)}% {int(self.rear_nm * 0.73756)}lb-ft" if is_imp else f"{int(self.rear_pct)}% {int(self.rear_nm)}Nm"
         painter.setPen(COLOR_TEXT_PRIMARY)
         painter.setFont(QFont("Consolas", val_font_sz, QFont.Weight.Bold))
-        painter.drawText(QRectF(w - val_w - 8, y2 - 4, val_w, 16), Qt.AlignmentFlag.AlignRight, r_val_str)
+        painter.drawText(QRectF(w - val_w - 6, y2 - 8, val_w, 20), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, r_val_str)
 
         painter.end()
 
