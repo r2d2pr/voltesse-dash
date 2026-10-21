@@ -866,6 +866,134 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertAlmostEqual(gui.user_scale_multiplier, 1.0)
         self.assertIn("ZOOM: 100%", gui.status_badge.text())
 
+    def test_gui_hero_views_and_wing_swapping(self):
+        gui = VoltesseDashboard()
+        gui.resize(800, 480)
+
+        # 1. Default initial state is SPEED hero view with unswapped wings
+        self.assertEqual(gui.active_hero_view, "SPEED")
+        self.assertFalse(gui.swap_wings)
+        self.assertEqual(gui.center_stack.currentIndex(), 0)      # Speed Dial
+        self.assertEqual(gui.wing_1_top_stack.currentIndex(), 0)  # Battery Widget
+        self.assertEqual(gui.wing_2_stack.currentIndex(), 0)      # Dynamics Group
+        self.assertEqual(gui.view_badge.text(), "VIEW: SPEED")
+
+        # 2. Cycle view via hotkey 'V' -> BATTERY Hero
+        event_v = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_V, Qt.KeyboardModifier.NoModifier)
+        gui.keyPressEvent(event_v)
+        self.assertEqual(gui.active_hero_view, "BATTERY")
+        self.assertEqual(gui.center_stack.currentIndex(), 1)      # Battery Hero
+        self.assertEqual(gui.wing_1_top_stack.currentIndex(), 1)  # Compact Speed Pod
+        self.assertEqual(gui.wing_2_stack.currentIndex(), 0)      # Dynamics Group
+        self.assertEqual(gui.view_badge.text(), "VIEW: BATT")
+
+        # 3. Cycle view via hotkey 'V' -> POWERTRAIN Hero
+        gui.keyPressEvent(event_v)
+        self.assertEqual(gui.active_hero_view, "POWERTRAIN")
+        self.assertEqual(gui.center_stack.currentIndex(), 2)      # Powertrain Hero
+        self.assertEqual(gui.wing_1_top_stack.currentIndex(), 1)  # Compact Speed Pod
+        self.assertEqual(gui.wing_2_stack.currentIndex(), 1)      # Battery & Sparkline Alt Group
+        self.assertEqual(gui.view_badge.text(), "VIEW: PWR")
+
+        # 4. Cycle view via hotkey 'V' -> back to SPEED Hero
+        gui.keyPressEvent(event_v)
+        self.assertEqual(gui.active_hero_view, "SPEED")
+        self.assertEqual(gui.center_stack.currentIndex(), 0)
+        self.assertEqual(gui.wing_1_top_stack.currentIndex(), 0)
+        self.assertEqual(gui.wing_2_stack.currentIndex(), 0)
+        self.assertEqual(gui.view_badge.text(), "VIEW: SPEED")
+
+        # 5. Toggle Wing Swap via hotkey 'X'
+        event_x = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_X, Qt.KeyboardModifier.NoModifier)
+        gui.keyPressEvent(event_x)
+        self.assertTrue(gui.swap_wings)
+        self.assertEqual(gui.view_badge.text(), "VIEW: SPEED [⇄]")
+
+        # Check stage layout child order: wing_2 is now first, wing_1 is third
+        self.assertEqual(gui.stage_layout.itemAt(0).widget(), gui.wing_2)
+        self.assertEqual(gui.stage_layout.itemAt(1).widget(), gui.center_stage)
+        self.assertEqual(gui.stage_layout.itemAt(2).widget(), gui.wing_1)
+
+        # Toggle back via hotkey 'X'
+        gui.keyPressEvent(event_x)
+        self.assertFalse(gui.swap_wings)
+        self.assertEqual(gui.view_badge.text(), "VIEW: SPEED")
+        self.assertEqual(gui.stage_layout.itemAt(0).widget(), gui.wing_1)
+        self.assertEqual(gui.stage_layout.itemAt(1).widget(), gui.center_stage)
+        self.assertEqual(gui.stage_layout.itemAt(2).widget(), gui.wing_2)
+
+        # 6. Feed Telemetry & verify active hero pods update
+        rec = TelemetryRecord(
+            timestamp=time.time(),
+            speed_kmh=112.0,
+            motor_rpm=7200,
+            battery_soc=82.5,
+            battery_voltage=396.0,
+            battery_current=64.0,
+            battery_power_kw=25.3,
+            battery_temp_c=31.0,
+            motor_temp_c=62.0,
+            inverter_temp_c=48.0,
+            throttle_pct=70.0,
+            brake_pct=0.0,
+            drive_mode="SPORT",
+            trip_distance_km=28.4,
+            warnings=[],
+            steering_angle=8.5,
+            gear="5",
+            transmission_mode="MANUAL",
+        )
+        gui.update_telemetry(rec)
+
+        # Verify CompactSpeedPod received speed, gear, rpm, pedals, steering
+        self.assertEqual(gui.compact_speed_widget.speed, 112.0)
+        self.assertEqual(gui.compact_speed_widget.gear, "5")
+        self.assertEqual(gui.compact_speed_widget.motor_rpm, 7200)
+        self.assertEqual(gui.compact_speed_widget.throttle_pct, 70.0)
+        self.assertEqual(gui.compact_speed_widget.steer_angle, 8.5)
+
+        # Verify BatteryHeroWidget received SoC, voltage, current, power
+        self.assertEqual(gui.battery_hero.soc, 82.5)
+        self.assertEqual(gui.battery_hero.voltage, 396.0)
+        self.assertEqual(gui.battery_hero.power_kw, 25.3)
+
+        # Verify PowertrainHeroWidget received torque data
+        self.assertEqual(gui.powertrain_hero.power_kw, 25.3)
+        self.assertEqual(gui.powertrain_hero.bias_mode, "RWD BIAS")
+
+        # 7. Constant Pinned Deck: Verify bottom deck remains visible and intact across all views
+        for view in ["SPEED", "BATTERY", "POWERTRAIN"]:
+            gui.set_hero_view(view)
+            self.assertFalse(gui.bottom_bar.isHidden())
+            self.assertFalse(gui.trip_pod.isHidden())
+            self.assertFalse(gui.thermal_widget.isHidden())
+            self.assertEqual(gui.trip_dist_val.text(), "28.40 km")
+
+    def test_cli_view_and_swap_flags(self):
+        from main import parse_args
+        import sys
+
+        # Test defaults
+        old_argv = sys.argv
+        try:
+            sys.argv = ["main.py"]
+            args = parse_args()
+            self.assertEqual(args.view, "speed")
+            self.assertFalse(args.swap_wings)
+
+            # Test explicit --view battery --swap-wings
+            sys.argv = ["main.py", "--view", "battery", "--swap-wings"]
+            args = parse_args()
+            self.assertEqual(args.view, "battery")
+            self.assertTrue(args.swap_wings)
+
+            # Test --view powertrain
+            sys.argv = ["main.py", "--view", "powertrain"]
+            args = parse_args()
+            self.assertEqual(args.view, "powertrain")
+        finally:
+            sys.argv = old_argv
+
 
 
 @SKIP_NO_DB

@@ -88,6 +88,10 @@ class VoltesseApp:
             self.gui.set_user_scale(args.ui_scale)
         if getattr(args, "imperial", False) or getattr(args, "units", "metric").lower() == "imperial":
             self.gui.set_unit_system("IMPERIAL")
+        if getattr(args, "view", None):
+            self.gui.set_hero_view(args.view)
+        if getattr(args, "swap_wings", False):
+            self.gui.set_wing_swap(args.swap_wings)
 
         # Reflect database write logging state on top HUD ribbon
         self.gui.set_logging_state(
@@ -558,6 +562,18 @@ def parse_args() -> argparse.Namespace:
         "--show-cursor",
         action="store_true",
         help="Keep mouse cursor visible (default: hidden for distraction-free cockpit)",
+    )
+    parser.add_argument(
+        "--view",
+        type=str,
+        default="speed",
+        choices=["speed", "battery", "powertrain"],
+        help="Initial hero view for central cluster (speed, battery, powertrain; default: speed)",
+    )
+    parser.add_argument(
+        "--swap-wings",
+        action="store_true",
+        help="Swap left and right cockpit wings (default: false)",
     )
     return parser.parse_args()
 

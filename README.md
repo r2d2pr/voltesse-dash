@@ -1,6 +1,6 @@
-# Voltesse Dash ⚡ v3.0.1
+# Voltesse Dash ⚡ v4.0.0
 
-[![Version](https://img.shields.io/badge/version-3.0.1-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
+[![Version](https://img.shields.io/badge/version-4.0.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/PyQt-6-green.svg)](https://riverbankcomputing.com/software/pyqt/)
 [![Web](https://img.shields.io/badge/Streamlit-1.65-red.svg)](https://streamlit.io/)
@@ -8,26 +8,28 @@
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 3.0.1 delivers pixel-perfect **800x480 Raspberry Pi auto-scaling** with collision-free central dial sequencing, zero-clipping card typography, distraction-free cursor suppression under Wayland, and a dedicated **Streamlit technician/admin web view** connected to the PostgreSQL database. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
+A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 4.0 delivers **Zoomed-In Interchangeable Hero Views** (Speedometer, Battery & Energy Diagnostics, Powertrain Dynamics), **Left ⇄ Right Wing Swapping**, distraction-free compact speed pods, and a **pinned constant bottom telemetry deck** (trip odometer and powertrain thermals). Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
 
 ---
 
-## What's New in Version 3.0.1 🚀
+## What's New in Version 4.0 🚀
 
-- 🎯 **Collision-Free Speedometer Dial & Pedal Sequencing**:
-  - Centered dual pedal micro-meters (`BRK`/`THR`) and elevated the gauge stack, completely eliminating visual overlap with the `0` and `180` graduation tick marks on 800×480 displays.
-  - Pulled graduation tick numbers outward closer to their tick marks to maximize central dial headroom.
-- 📐 **Proportional Card Font Scaling & Zero-Clipping Layouts**:
-  - **AWD Torque Vectoring Pod**: Expanded label and value bounding boxes with proportional font scaling, ensuring axle labels (`F-AXLE` / `R-AXLE`) and full torque readouts (e.g. `42% 185Nm` / `42% 136lb-ft`) render crisply with zero letter or number truncation. Responsive header adapts to `AWD TORQUE` and `● REAR BIAS` on compact widths.
-  - **Energy & Battery Pod**: Balanced range typography (`EST. RANGE` and `km`/`mi`) and redesigned the bottom diagnostics row into a dedicated dual-column layout with separator line, guaranteeing pack voltage (`VOLT`) and current draw (`CURR`) numbers and unit symbols (`A`, `V`) are 100% legible without clipping.
-- 🖱️ **Distraction-Free Kiosk Cursor Suppression**:
-  - Automatically suppresses the mouse cursor via `BlankCursor` across the entire application lifecycle, cleanly clearing pointer graphics under Wayland/Cage and Raspberry Pi kiosks.
-  - Added `--show-cursor` CLI flag for development and bench testing.
-- 🖥️ **Smart Display Target Selection & Hardware Priority**:
-  - Hardware enumeration prioritizes embedded DSI / 800×480 panels over dummy/headless HDMI-A outputs.
-  - Added `--screen` CLI parameter to explicitly target display by name (e.g. `DSI-1`, `HDMI-A-1`) or index (`0`, `1`).
-- 🌐 **Technician/Admin Streamlit Web Portal (v3.0)**: Dedicated local web server communicating directly with the **PostgreSQL** database backend via `psycopg 3` with live telemetry, session history inspection, 5 deep Plotly diagnostic charts, and technician authentication.
-- 🚀 **Cage Kiosk & Technician Systemd Services**: Production systemd service configurations (`voltesse-dash.service` and `voltesse-technician.service`) with Wayland Cage kiosk automation and local network binding (`0.0.0.0:8501`).
+- 🔍 **Zoomed-In Interchangeable Hero Views (Center Stage)**:
+  - **Speedometer Hero (Default)**: Central radial dial with digital numerals, RPM, gear pill, pedals, and steering angle.
+  - **Battery & Energy Diagnostics Hero**: Magnified SoC arc, prominent range HUD (`km`/`mi`), 96S architecture pack status, and a 4-quadrant diagnostic grid (Pack Voltage, Current Draw, Net Power, Energy Consumption).
+  - **Powertrain Dynamics Hero**: Dual-motor AWD front/rear torque split bars with Nm/lb-ft readouts, bidirectional Power/Regen bar with center zero mark, and wide rolling telemetry oscilloscope.
+  - **Driver Safety Compact Speed Pod (`CompactSpeedPod`)**: Automatically activates in the wing when Battery or Powertrain hero views are active, ensuring velocity, gear, RPM, throttle, brake, and steering indicators are NEVER lost.
+  - **Hotkey `V`**: Distraction-free driver cycling across Hero Views (`SPEED` ➔ `BATT` ➔ `PWR`).
+- ⇄ **Interchangeable Left ⇄ Right Wing Swapping**:
+  - **Hotkey `X`**: Dynamically mirrors and swaps Left and Right cockpit wings with zero flicker.
+  - Top HUD ribbon actively reflects swapped state with badge indicator (`VIEW: SPEED [⇄]`, `VIEW: BATT [⇄]`, `VIEW: PWR [⇄]`).
+- ⚓ **Pinned Constant Telemetry Deck**:
+  - The bottom deck (Trip Odometer + Powertrain Temperatures: Motor, Inverter, Battery Pack) remains fixed, visible, and constant across all Hero views and layouts.
+- ⚙️ **CLI Flags for Custom Views & Layouts**:
+  - Added `--view {speed,battery,powertrain}` to configure the initial center stage hero view on startup.
+  - Added `--swap-wings` to launch with left and right cockpit wings swapped.
+- 🎯 **Preserved Version 3.0.1 Optimizations**:
+  - Collision-free central dial sequencing, zero-clipping proportional card typography, cursor suppression under Wayland/Cage kiosks, and technician web portal.
 
 ---
 
@@ -140,6 +142,8 @@ voltesse-dash/
 | `C` | **Downshift** (`6` ➔ `1` ➔ `N` ➔ `R` in Manual, or selector in Auto) | Global |
 | `G` | Cycle Gear (`P-R-N-D-B` in Auto, Upshift in Manual) | Global |
 | `U` | **Toggle Units (Metric ⮂ Imperial)** | Global (Race, Sim, Test) |
+| `V` | **Cycle Hero Views** (`Speed` ➔ `Battery` ➔ `Powertrain`) | Global (Race, Sim, Test) |
+| `X` | **Swap Left ⮂ Right Cockpit Wings** | Global (Race, Sim, Test) |
 | `L` | **Toggle Database Logging / Write Access** (`REC` ⮂ `LOG OFF`) | Global |
 | `-` / `_` | **Zoom Out UI** (reduce cockpit scale by 5%) | Global |
 | `+` / `=` | **Zoom In UI** (increase cockpit scale by 5%) | Global |
@@ -263,6 +267,8 @@ Generated files are saved directly to `data/exports/`.
 | `--scale` / `--ui-scale` | `auto` | Custom cockpit UI scale factor (e.g. `0.85` for compact screens) |
 | `--show-cursor` | `False` | Keep mouse cursor visible (default: hidden for distraction-free cockpit) |
 | `--imperial` | `False` | Launch in Imperial units (`MPH`, `mi`, `°F`, `psi`, `lb-ft`) |
+| `--view` | `speed` | Initial central hero view (`speed`, `battery`, `powertrain`) |
+| `--swap-wings` | `False` | Swap left and right cockpit wings |
 | `--read-only` | `False` | Open the database in strict read-only mode |
 | `--no-logging`| `False` | Launch with database writing paused (toggleable with `L`) |
 | `--export-csv` | `None` | Export a specific vehicle session ID to CSV and exit |
