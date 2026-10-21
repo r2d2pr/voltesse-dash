@@ -1,6 +1,6 @@
-# Voltesse Dash ⚡ v3.0.0
+# Voltesse Dash ⚡ v3.0.1
 
-[![Version](https://img.shields.io/badge/version-3.0.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
+[![Version](https://img.shields.io/badge/version-3.0.1-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/PyQt-6-green.svg)](https://riverbankcomputing.com/software/pyqt/)
 [![Web](https://img.shields.io/badge/Streamlit-1.65-red.svg)](https://streamlit.io/)
@@ -8,29 +8,26 @@
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 3.0.0 features the PyQt6 driver cockpit with responsive **800x480 Raspberry Pi auto-scaling** and a dedicated **Streamlit technician/admin web view** connected to the PostgreSQL database. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
+A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 3.0.1 delivers pixel-perfect **800x480 Raspberry Pi auto-scaling** with collision-free central dial sequencing, zero-clipping card typography, distraction-free cursor suppression under Wayland, and a dedicated **Streamlit technician/admin web view** connected to the PostgreSQL database. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
 
 ---
 
-## What's New in Version 3.0.0 🚀
+## What's New in Version 3.0.1 🚀
 
-- 🌐 **Technician/Admin Streamlit Web Portal**: Dedicated local web server communicating directly with the **PostgreSQL** database backend via `psycopg 3`:
-  - **Live Vehicle Telemetry**: Real-time readouts of speed, RPM, battery SoC, pack voltage, current draw, gear, drive mode, and motor temperature trend.
-  - **Session History & Inspection**: Queries real sessions from `vehicle_session` with start/end timestamps, duration, source type (`CAN_BUS`, `SIMULATION`, `TEST`), driver ID, peak thermals, and max velocity.
-  - **Deep Vehicle Diagnostics**: Five interactive Plotly performance charts plotting energy efficiency vs. speed, power draw vs. motor temperature, battery consumption vs. distance, power vs. RPM, and motor temperature rise over time.
-  - **Technician Authentication**: Authenticates against the `technician_user` table in PostgreSQL with demo credentials fallback.
-  - **Alert Threshold Configuration**: Interactive warning limits (`warning_temp`, `warning_battery`) driving live warnings and graph threshold markers.
-  - **Fault-Tolerant Fallback Mode**: Gracefully switches to interactive simulation if PostgreSQL is offline, ensuring reliable bench testing.
-- 📱 **800x480 Raspberry Pi Display Auto-Scaling Engine**: Complete overhaul of the cockpit scaling system for the standard Raspberry Pi 7" touchscreen (800x480) and compact displays:
-  - **Balanced Symmetrical Wings**: Proportional 3-column layout (230px Left Wing : 308px Center Stage : 230px Right Wing) eliminating layout skewing and text clipping.
-  - **Collision-Free Speedometer Dial**: Dynamically sequenced transmission capsule, gear status hub pill (`AUTO • D1 (GEAR 1)`), RPM subtitle, dual throttle/brake micro-meters, and steering angle indicator with zero overlap.
-  - **Responsive HUD Ribbon**: Compact badge padding, proportional typography, and auto-hidden controls hint on compact screens (`w < 950px`).
-- 🌐 **Dual Metric & Imperial Unit System**: Runtime switching between **Metric** (`km/h`, `km`, `°C`, `bar`, `Nm`) and **Imperial** (`mph`, `mi`, `°F`, `psi`, `lb-ft`) across all modes via hotkey `U` or CLI flag `--imperial`.
-- 🕒 **12-Hour AM/PM Automotive Clock**: High-visibility digital clock in the top HUD ribbon formatted in 12-hour AM/PM (`hh:mm:ss AM/PM`) with live 1-second precision across all modes.
-- 🏎️ **Tri-Mode Operating Architecture**: Instant switching between **Race Mode** (CAN bus), **Simulation Mode** (interactive keyboard video-game controls), and **Test Mode** (autonomous mock telemetry).
-- ⚙️ **Dynamic Automatic Gear Display (`D1`–`D6`)**: In Auto mode, vehicle speed dynamically drives active gear calculation across 6 EV gear ratios (`D1` to `D6`) displayed on the central capsule, gear status hub, and HUD ribbon.
-- 🕹️ **6-Speed Sequential Manual Transmission**: Driver-controlled shifting (`E` for upshift, `C` for downshift) covering gears `1`–`6`, `N`, and `R` in both Race and Simulation modes.
-- 💾 **Granular Database Write Access Controls**: Pre-flight write permission verification, runtime logging toggle (`L` key), strict read-only execution mode (`--read-only`), and direct session export to CSV and JSON.
+- 🎯 **Collision-Free Speedometer Dial & Pedal Sequencing**:
+  - Centered dual pedal micro-meters (`BRK`/`THR`) and elevated the gauge stack, completely eliminating visual overlap with the `0` and `180` graduation tick marks on 800×480 displays.
+  - Pulled graduation tick numbers outward closer to their tick marks to maximize central dial headroom.
+- 📐 **Proportional Card Font Scaling & Zero-Clipping Layouts**:
+  - **AWD Torque Vectoring Pod**: Expanded label and value bounding boxes with proportional font scaling, ensuring axle labels (`F-AXLE` / `R-AXLE`) and full torque readouts (e.g. `42% 185Nm` / `42% 136lb-ft`) render crisply with zero letter or number truncation. Responsive header adapts to `AWD TORQUE` and `● REAR BIAS` on compact widths.
+  - **Energy & Battery Pod**: Balanced range typography (`EST. RANGE` and `km`/`mi`) and redesigned the bottom diagnostics row into a dedicated dual-column layout with separator line, guaranteeing pack voltage (`VOLT`) and current draw (`CURR`) numbers and unit symbols (`A`, `V`) are 100% legible without clipping.
+- 🖱️ **Distraction-Free Kiosk Cursor Suppression**:
+  - Automatically suppresses the mouse cursor via `BlankCursor` across the entire application lifecycle, cleanly clearing pointer graphics under Wayland/Cage and Raspberry Pi kiosks.
+  - Added `--show-cursor` CLI flag for development and bench testing.
+- 🖥️ **Smart Display Target Selection & Hardware Priority**:
+  - Hardware enumeration prioritizes embedded DSI / 800×480 panels over dummy/headless HDMI-A outputs.
+  - Added `--screen` CLI parameter to explicitly target display by name (e.g. `DSI-1`, `HDMI-A-1`) or index (`0`, `1`).
+- 🌐 **Technician/Admin Streamlit Web Portal (v3.0)**: Dedicated local web server communicating directly with the **PostgreSQL** database backend via `psycopg 3` with live telemetry, session history inspection, 5 deep Plotly diagnostic charts, and technician authentication.
+- 🚀 **Cage Kiosk & Technician Systemd Services**: Production systemd service configurations (`voltesse-dash.service` and `voltesse-technician.service`) with Wayland Cage kiosk automation and local network binding (`0.0.0.0:8501`).
 
 ---
 
@@ -106,7 +103,7 @@ voltesse-dash/
 ├── data/
 │   └── exports/               # Generated CSV & JSON session dumps (auto-created)
 ├── src/
-│   ├── __init__.py            # Package version (v3.0.0)
+│   ├── __init__.py            # Package version (v3.0.1)
 │   ├── can_bus_source.py      # CAN Bus interface, frame decoders, and synchronized mock transmitter
 │   ├── simulation_source.py   # Video-game interactive EV dynamics engine (W/A/S/D, 6-speed manual, D1-D6 auto)
 │   ├── telemetry_source.py    # Autonomous EV driving cycle telemetry stream (Test Mode, D1-D6 auto)
@@ -262,7 +259,9 @@ Generated files are saved directly to `data/exports/`.
 | `--mode` | `RACE` | Initial telemetry mode (`RACE`, `SIMULATION`, `TEST`) |
 | `--windowed` | `False` | Run in windowed mode (default is fullscreen) |
 | `--geometry` | `auto` | Force explicit window resolution `WxH` (e.g. `800x480` on Raspberry Pi) |
+| `--screen` | `auto` | Target display name or index (e.g. `DSI-1`, `HDMI-A-1`, `0`, `1`; default: auto-prefer DSI) |
 | `--scale` / `--ui-scale` | `auto` | Custom cockpit UI scale factor (e.g. `0.85` for compact screens) |
+| `--show-cursor` | `False` | Keep mouse cursor visible (default: hidden for distraction-free cockpit) |
 | `--imperial` | `False` | Launch in Imperial units (`MPH`, `mi`, `°F`, `psi`, `lb-ft`) |
 | `--read-only` | `False` | Open the database in strict read-only mode |
 | `--no-logging`| `False` | Launch with database writing paused (toggleable with `L`) |
