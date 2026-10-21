@@ -92,20 +92,52 @@ class VoltesseApp:
             read_only=self.db_manager.read_only,
         )
 
-        # Screen geometry detection & logging
-        screen = self.app.primaryScreen()
+        # Screen enumeration & hardware detection
+        screens = self.app.screens()
+        for i, s in enumerate(screens):
+            g = s.geometry()
+            logger.info(
+                "Display %d: '%s' %dx%d (offset +%d+%d, DPI: %.1f, DPR: %.2f)",
+                i, s.name(), g.width(), g.height(), g.x(), g.y(),
+                s.logicalDotsPerInch(), s.devicePixelRatio(),
+            )
+
+        # Select target display: CLI flag --screen or auto-detect DSI / 800x480 embedded cluster
+        selected_screen = self.app.primaryScreen()
+        target_scr = getattr(args, "screen", None)
+        if target_scr is not None:
+            for i, s in enumerate(screens):
+                if target_scr == str(i) or target_scr.lower() in s.name().lower():
+                    selected_screen = s
+                    logger.info("Selected display '%s' via --screen %s", s.name(), target_scr)
+                    break
+        else:
+            # Auto-detect embedded cluster display (prefer DSI or 800x480 panel over external HDMI)
+            for s in screens:
+                g = s.geometry()
+                if "dsi" in s.name().lower() or (g.width() == 800 and g.height() == 480):
+                    selected_screen = s
+                    logger.info(
+                        "Auto-detected embedded cluster display: '%s' (%dx%d)",
+                        s.name(), g.width(), g.height()
+                    )
+                    break
+
         screen_w, screen_h = 800, 480
         dpi = 96.0
         dpr = 1.0
-        if screen:
-            geom = screen.geometry()
+        geom_x, geom_y = 0, 0
+        if selected_screen:
+            geom = selected_screen.geometry()
             screen_w, screen_h = geom.width(), geom.height()
-            dpi = screen.logicalDotsPerInch()
-            dpr = screen.devicePixelRatio()
+            geom_x, geom_y = geom.x(), geom.y()
+            dpi = selected_screen.logicalDotsPerInch()
+            dpr = selected_screen.devicePixelRatio()
 
         logger.info(
-            "Screen hardware detected: %dx%d (DPI: %.1f, DPR: %.2f)",
-            screen_w, screen_h, dpi, dpr,
+            "Active display target: '%s' %dx%d at +%d+%d (DPI: %.1f, DPR: %.2f)",
+            selected_screen.name() if selected_screen else "Default",
+            screen_w, screen_h, geom_x, geom_y, dpi, dpr,
         )
 
         # Allow user to force specific resolution via --geometry WxH (e.g. 800x480)
@@ -125,8 +157,12 @@ class VoltesseApp:
             logger.info("Launching in windowed development mode (%dx%d)...", screen_w, screen_h)
             self.gui.show()
         else:
-            logger.info("Launching in fullscreen cockpit mode (%dx%d)...", screen_w, screen_h)
-            self.gui.setGeometry(0, 0, screen_w, screen_h)
+            logger.info(
+                "Launching in fullscreen cockpit mode on '%s' (%dx%d at +%d+%d)...",
+                selected_screen.name() if selected_screen else "Default",
+                screen_w, screen_h, geom_x, geom_y,
+            )
+            self.gui.setGeometry(geom_x, geom_y, screen_w, screen_h)
             self.gui.showFullScreen()
 
         # 3. Initialize Three Telemetry Sources
@@ -488,6 +524,12 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="Explicit window resolution WxH (e.g. 800x480 for Raspberry Pi displays)",
+    )
+    parser.add_argument(
+        "--screen",
+        type=str,
+        default=None,
+        help="Target display name or index (e.g. DSI-1, HDMI-A-1, 0, 1; default: auto-prefer DSI/800x480)",
     )
     parser.add_argument(
         "--scale",

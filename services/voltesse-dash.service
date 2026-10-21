@@ -16,8 +16,8 @@ Environment="QT_ENABLE_HIGHDPI_SCALING=0"
 Environment="QT_SCALE_FACTOR=1.0"
 Environment="VOLTESSE_DB_URL=postgresql://voltesse:voltesse@localhost:5432/voltesse_dash"
 # Fullscreen kiosk launch via Cage Wayland compositor with explicit 800x480 resolution
-ExecStart=/usr/bin/cage -s -- /home/admin/voltesse-dash/venv/bin/python main.py --mode TEST --geometry 800x480
-#ExecStart=/usr/bin/cage -s -- /home/admin/voltesse-dash/venv/bin/python main.py --geometry 800x480
+ExecStart=/usr/bin/cage -s -- /home/admin/voltesse-dash/venv/bin/python main.py --mode TEST --screen DSI-1 --geometry 800x480
+#ExecStart=/usr/bin/cage -s -- /home/admin/voltesse-dash/venv/bin/python main.py --screen DSI-1 --geometry 800x480
 Restart=always
 RestartSec=5
 
