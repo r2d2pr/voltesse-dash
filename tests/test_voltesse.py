@@ -955,6 +955,27 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertEqual(gui.powertrain_hero.power_kw, 25.3)
         self.assertEqual(gui.powertrain_hero.bias_mode, "RWD BIAS")
 
+        # Verify Compact Speed Pods on all non-speedometer pages received telemetry
+        self.assertAlmostEqual(gui.battery_speed_pod.speed, 112.0 * 0.621371, places=1)
+        self.assertEqual(gui.battery_speed_pod.unit, "MPH")
+        self.assertEqual(gui.battery_speed_pod.gear, "5")
+        self.assertEqual(gui.battery_speed_pod.trans_mode, "MANUAL")
+        self.assertAlmostEqual(gui.powertrain_speed_pod.speed, 112.0 * 0.621371, places=1)
+        self.assertAlmostEqual(gui.tpms_speed_pod.speed, 112.0 * 0.621371, places=1)
+        self.assertEqual(gui.compact_speed_widget, gui.battery_speed_pod)
+
+        # Verify compact speed pod visibility on non-speed pages
+        gui.set_page(1)
+        self.assertFalse(gui.battery_speed_pod.isHidden())
+        self.assertEqual(gui.page1_layout.itemAt(0).widget(), gui.battery_speed_pod)
+
+        # Verify wing swap reorders compact speed view and hero view
+        gui.set_wing_swap(True)
+        self.assertEqual(gui.page1_layout.itemAt(0).widget(), gui.battery_page)
+        self.assertEqual(gui.page1_layout.itemAt(1).widget(), gui.battery_speed_pod)
+        gui.set_wing_swap(False)
+        self.assertEqual(gui.page1_layout.itemAt(0).widget(), gui.battery_speed_pod)
+
         # 9. Constant Pinned Deck: Verify bottom deck remains visible and intact across all 4 pages
         for page_name in ["SPEED", "BATTERY", "POWERTRAIN", "TPMS"]:
             gui.set_hero_view(page_name)
