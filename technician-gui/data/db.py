@@ -8,6 +8,7 @@ Provides real-time packet freshness checks and Imperial (°F / MPH / mi) telemet
 from datetime import datetime, timezone
 import json
 import logging
+import math
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -389,6 +390,99 @@ def get_live_telemetry_traces(limit: int = 60) -> Tuple[Dict[str, List[Any]], bo
         "inverter_temps_f": [],
         "battery_temps_f": [],
         "timestamps": [],
+    }, False
+
+
+def get_session_telemetry_traces(session_id: Any, total_points: int = 60) -> Tuple[Dict[str, List[Any]], bool]:
+    """
+    Fetch or synthesize high-resolution time-series telemetry frames for a specific session.
+    Returns (trace_dict, is_from_db).
+    """
+    raw_id = None
+    if isinstance(session_id, dict):
+        raw_id = session_id.get("raw_id") or session_id.get("id")
+    else:
+        raw_id = session_id
+    if isinstance(raw_id, str):
+        raw_id = raw_id.replace("#", "").strip()
+
+    db_url = get_db_url()
+    try:
+        if raw_id and str(raw_id).isdigit():
+            with psycopg.connect(db_url, connect_timeout=2, row_factory=dict_row) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT 
+                            log_id, "timestamp", speed_mph, motor_rpm,
+                            throttle_pct, brake_pct, power_draw_watts,
+                            motor_temperature, inverter_temp_c, battery_temp_c
+                        FROM telemetry_log
+                        WHERE session_id = %s
+                        ORDER BY log_id ASC
+                        LIMIT 300
+                        """,
+                        (int(raw_id),),
+                    )
+                    rows = cur.fetchall()
+                    if rows and len(rows) > 5:
+                        indices = list(range(len(rows)))
+                        speeds = [round(float(r["speed_mph"] or 0.0), 1) for r in rows]
+                        rpms = [int(r["motor_rpm"] or 0) for r in rows]
+                        throttles = [round(float(r["throttle_pct"] or 0.0), 1) for r in rows]
+                        brakes = [round(float(r["brake_pct"] or 0.0), 1) for r in rows]
+                        powers_kw = [round(float(r["power_draw_watts"] or 0.0) / 1000.0, 2) for r in rows]
+                        motor_temps_f = [c_to_f(r["motor_temperature"]) for r in rows]
+                        timestamps = [r["timestamp"] for r in rows]
+                        return {
+                            "indices": indices,
+                            "speeds": speeds,
+                            "rpms": rpms,
+                            "throttles": throttles,
+                            "brakes": brakes,
+                            "powers_kw": powers_kw,
+                            "motor_temps_f": motor_temps_f,
+                            "timestamps": timestamps,
+                        }, True
+    except Exception as e:
+        logger.warning("Failed to fetch session traces from PostgreSQL: %s", e)
+
+    # Deterministic high-resolution synthesis based on session_id
+    seed = int(str(raw_id).replace("#", "") or 14) if str(raw_id).replace("#", "").isdigit() else 14
+    pts = max(30, total_points)
+    indices = list(range(pts))
+    speeds = []
+    rpms = []
+    throttles = []
+    brakes = []
+    powers_kw = []
+    motor_temps_f = []
+
+    for t in range(pts):
+        phase = (t + seed * 3) / 8.0
+        spd = round(max(0.0, min(120.0, 48.0 + 32.0 * math.sin(phase) + (seed % 5) * 4.0)), 1)
+        rpm = int(1200 + spd * 55 + 200 * math.cos(phase * 1.5))
+        thr = round(max(0.0, min(100.0, 50.0 + 45.0 * math.sin(phase + 0.3))), 1)
+        brk = round(max(0.0, min(100.0, 40.0 * max(0.0, -math.sin(phase + 0.3)))), 1)
+        pwr = round(max(-35.0, min(115.0, (spd * 0.95) - (brk * 0.6) + 10.0 * math.sin(phase * 2.0))), 2)
+        mot_temp = round(95.0 + (t / max(1, pts)) * 42.0 + (seed % 3) * 6.0 + 4.0 * math.sin(phase * 0.5), 1)
+
+        speeds.append(spd)
+        rpms.append(rpm)
+        throttles.append(thr)
+        brakes.append(brk)
+        powers_kw.append(pwr)
+        motor_temps_f.append(mot_temp)
+
+    return {
+        "indices": indices,
+        "speeds": speeds,
+        "rpms": rpms,
+        "throttles": throttles,
+        "brakes": brakes,
+        "powers_kw": powers_kw,
+        "motor_temps_f": motor_temps_f,
+        "timestamps": None,
     }, False
 
 

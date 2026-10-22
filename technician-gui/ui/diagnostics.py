@@ -180,3 +180,154 @@ def show_diagnostics():
         yaxis=dict(range=[60, max(180, data.get("peak_temp", 140) + 15, warn_temp + 15)]),
     )
     bottom_cols[1].plotly_chart(compact_chart(fig_temp), width="stretch")
+
+    # Diagnostic DTC Fault Code Simulation Console
+    render_dtc_console()
+
+
+def render_dtc_console():
+    """Renders the standardized EV Diagnostic Trouble Code (DTC) injection console."""
+    st.divider()
+    st.markdown(
+        """
+        <div style="margin-bottom: 10px;">
+            <div style="font-size: 1.05rem; font-weight: 800; color: #00F5D4; letter-spacing: 0.04em;">
+                ⚡ DIAGNOSTIC TROUBLE CODE (DTC) INJECTION CONSOLE
+            </div>
+            <p style="margin: 0; padding: 0; font-size: 0.82rem; color: #94A3B8;">
+                Inject standardized automotive EV diagnostic faults to validate cluster alerts, safe shutdown routines, and telemetry warnings.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if "injected_dtcs" not in st.session_state:
+        st.session_state.injected_dtcs = []
+
+    dtc_specs = [
+        {
+            "code": "P0A38",
+            "name": "INVERTER_OVERTEMP",
+            "system": "POWERTRAIN",
+            "severity": "CRITICAL",
+            "desc": "Inverter thermal limit exceeded (≥ 175°F)",
+            "action": "Reduce drive output; check cooling pump flow.",
+        },
+        {
+            "code": "P0A80",
+            "name": "BATT_CELL_IMBALANCE",
+            "system": "HV PACK",
+            "severity": "WARNING",
+            "desc": "Pack module delta > 120mV across bricks",
+            "action": "Schedule cell balancing cycle at bench charger.",
+        },
+        {
+            "code": "C1A20",
+            "name": "TPMS_RAPID_DEFLATE_FL",
+            "system": "CHASSIS",
+            "severity": "CRITICAL",
+            "desc": "Front-Left tire pressure drop rate > 0.4 psi/s",
+            "action": "Pit immediately; verify tire sidewall integrity.",
+        },
+        {
+            "code": "P0A44",
+            "name": "MOTOR_RESOLVER_FAULT",
+            "system": "POWERTRAIN",
+            "severity": "CRITICAL",
+            "desc": "Traction motor rotor phase angular error",
+            "action": "Calibrate resolver offset; inspect harness shielding.",
+        },
+        {
+            "code": "C1201",
+            "name": "BRAKE_SYSTEM_DEGRADATION",
+            "system": "BRAKES",
+            "severity": "WARNING",
+            "desc": "Blended regen cutback; hydraulic threshold alert",
+            "action": "Verify brake fluid level and vacuum booster pressure.",
+        },
+    ]
+
+    # Quick Inject Buttons
+    cols = st.columns(len(dtc_specs))
+    for idx, dtc in enumerate(dtc_specs):
+        badge_color = "#FF4D6D" if dtc["severity"] == "CRITICAL" else "#FFB800"
+        with cols[idx]:
+            st.markdown(
+                f"<div style='font-size: 0.72rem; font-weight: 700; color: {badge_color}; text-align: center; margin-bottom: 4px;'>"
+                f"{dtc['code']} [{dtc['severity']}]</div>",
+                unsafe_allow_html=True,
+            )
+            if st.button(f"⚡ {dtc['name']}", key=f"inject_{dtc['code']}", width="stretch", help=dtc["desc"]):
+                # Append if not already present
+                existing = [x["code"] for x in st.session_state.injected_dtcs]
+                if dtc["code"] not in existing:
+                    st.session_state.injected_dtcs.append(dtc)
+                    st.rerun()
+
+    # Console Status & Reset Bar
+    c_status, c_clear = st.columns([4, 1.2])
+    active_count = len(st.session_state.injected_dtcs)
+    
+    with c_status:
+        if active_count == 0:
+            st.markdown(
+                """
+                <div style="background: rgba(0, 245, 212, 0.08); border: 1px solid rgba(0, 245, 212, 0.3); 
+                            border-radius: 6px; padding: 8px 14px; margin-top: 10px;">
+                    <span class="v-pill v-pill-active">🟢 DTC STATUS: ALL SYSTEMS NOMINAL</span>
+                    <span style="margin-left: 10px; font-size: 0.82rem; color: #E2E8F0;">
+                        No simulated diagnostic faults injected. Clean vehicle health record.
+                    </span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f"""
+                <div style="background: rgba(255, 77, 109, 0.12); border: 1px solid rgba(255, 77, 109, 0.4); 
+                            border-radius: 6px; padding: 8px 14px; margin-top: 10px;">
+                    <span class="v-pill" style="background: rgba(255, 77, 109, 0.3); color: #FF4D6D; border: 1px solid #FF4D6D;">
+                        🔴 ACTIVE FAULTS: {active_count} DTC(s) INJECTED
+                    </span>
+                    <span style="margin-left: 10px; font-size: 0.82rem; color: #FFFFFF;">
+                        Simulated EV safety warning active.
+                    </span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with c_clear:
+        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+        if st.button("🧹 Clear All DTCs", key="clear_all_dtcs", width="stretch", disabled=(active_count == 0)):
+            st.session_state.injected_dtcs = []
+            st.rerun()
+
+    # Active DTC Cards List
+    if active_count > 0:
+        st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+        for dtc in st.session_state.injected_dtcs:
+            border_c = "#FF4D6D" if dtc["severity"] == "CRITICAL" else "#FFB800"
+            st.markdown(
+                f"""
+                <div style="background: rgba(13, 22, 26, 0.85); border-left: 4px solid {border_c}; 
+                            border-radius: 4px; padding: 10px 14px; margin-bottom: 6px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="font-weight: 800; color: {border_c}; font-family: Consolas;">
+                            [{dtc['code']}] {dtc['name']}
+                        </span>
+                        <span style="font-size: 0.75rem; color: #94A3B8;">SYSTEM: {dtc['system']}</span>
+                    </div>
+                    <div style="font-size: 0.82rem; color: #E2E8F0; margin-top: 3px;">
+                        {dtc['desc']}
+                    </div>
+                    <div style="font-size: 0.75rem; color: #5CFFC7; margin-top: 4px;">
+                        <strong>Technician Action:</strong> {dtc['action']}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+

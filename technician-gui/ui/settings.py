@@ -90,3 +90,6 @@ def show_settings():
         delta_color="off",
         border=True,
     )
+
+    from ui.diagnostics import render_dtc_console
+    render_dtc_console()

@@ -24,6 +24,7 @@ from PyQt6.QtCore import (
     QRectF,
     Qt,
     QTimer,
+    QVariantAnimation,
     pyqtSignal,
 )
 from PyQt6.QtGui import (
@@ -140,10 +141,49 @@ class SpeedometerDialWidget(QWidget):
         self.inverter_temp_c = 48.0
         self.trip_dist_mi = 9999.0
         self.cluster_theme = "OLED"  # "OLED" or "CLASSIC"
+        self.is_sweeping = False
+        self.sweep_progress = 0.0
+        self._sweep_anim: Optional[QVariantAnimation] = None
 
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
         self.setMinimumSize(160, 160)
         self.setMinimumWidth(0)
+
+    def startup_needle_sweep(self) -> None:
+        """Triggers a 1.2-second startup needle sweep sequence across all binnacle gauges."""
+        if hasattr(self, "_sweep_anim") and self._sweep_anim is not None:
+            self._sweep_anim.stop()
+        self.is_sweeping = True
+        self.sweep_progress = 0.0
+
+        anim = QVariantAnimation(self)
+        anim.setDuration(1200)
+        anim.setStartValue(0.0)
+        anim.setEndValue(1.0)
+        anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
+
+        def _on_value(val):
+            self.sweep_progress = float(val)
+            self.update()
+
+        def _on_finish():
+            self.is_sweeping = False
+            self.sweep_progress = 1.0
+            self.update()
+
+        anim.valueChanged.connect(_on_value)
+        anim.finished.connect(_on_finish)
+        self._sweep_anim = anim
+        anim.start()
+
+    def finish_sweep(self) -> None:
+        """Immediately finishes or aborts the sweep sequence to display live telemetry."""
+        if getattr(self, "is_sweeping", False):
+            if hasattr(self, "_sweep_anim") and self._sweep_anim is not None:
+                self._sweep_anim.stop()
+            self.is_sweeping = False
+            self.sweep_progress = 1.0
+            self.update()
 
     def set_units(self, unit: str = "KM/H", max_val: float = 180.0) -> None:
         self.unit = unit
@@ -376,7 +416,15 @@ class SpeedometerDialWidget(QWidget):
         effective_rpm = self.motor_rpm
         if effective_rpm <= 0 and self.current_val > 0.5:
             effective_rpm = int(min(8000.0, (self.current_val / max(1.0, self.max_val)) * 7200.0))
-        rpm_ratio = min(1.0, max(0.0, effective_rpm / 8000.0))
+        live_rpm_ratio = min(1.0, max(0.0, effective_rpm / 8000.0))
+        if getattr(self, "is_sweeping", False):
+            p = getattr(self, "sweep_progress", 0.0)
+            if p < 0.5:
+                rpm_ratio = p * 2.0
+            else:
+                rpm_ratio = 1.0 - (1.0 - live_rpm_ratio) * ((p - 0.5) * 2.0)
+        else:
+            rpm_ratio = live_rpm_ratio
         needle_ang = start_angle_deg + (total_span_deg * rpm_ratio)
         needle_rad = -math.radians(needle_ang)
 
@@ -464,7 +512,15 @@ class SpeedometerDialWidget(QWidget):
         painter.drawText(QRectF(h_x - 12, h_y - 10, 24, 20), Qt.AlignmentFlag.AlignCenter, "H")
 
         inv_temp_f = self.inverter_temp_c * 9.0 / 5.0 + 32.0
-        temp_ratio = min(1.0, max(0.0, (inv_temp_f - 60.0) / (200.0 - 60.0)))
+        live_temp_ratio = min(1.0, max(0.0, (inv_temp_f - 60.0) / (200.0 - 60.0)))
+        if getattr(self, "is_sweeping", False):
+            p = getattr(self, "sweep_progress", 0.0)
+            if p < 0.5:
+                temp_ratio = p * 2.0
+            else:
+                temp_ratio = 1.0 - (1.0 - live_temp_ratio) * ((p - 0.5) * 2.0)
+        else:
+            temp_ratio = live_temp_ratio
         t_ang = 150.0 - 120.0 * temp_ratio
         t_rad = -math.radians(t_ang)
         t_tip_x = cx + math.cos(t_rad) * (r_track * 0.86)
@@ -498,7 +554,15 @@ class SpeedometerDialWidget(QWidget):
         painter.fillRect(QRectF(icon_x + 14, icon_y + 2, 2, 4), COLOR_MINT)
         painter.fillRect(QRectF(icon_x + 2, icon_y + 2, 9, 4), COLOR_MINT)
 
-        soc_ratio = min(1.0, max(0.0, self.battery_soc / 100.0))
+        live_soc_ratio = min(1.0, max(0.0, self.battery_soc / 100.0))
+        if getattr(self, "is_sweeping", False):
+            p = getattr(self, "sweep_progress", 0.0)
+            if p < 0.5:
+                soc_ratio = p * 2.0
+            else:
+                soc_ratio = 1.0 - (1.0 - live_soc_ratio) * ((p - 0.5) * 2.0)
+        else:
+            soc_ratio = live_soc_ratio
         b_ang = 210.0 + 120.0 * soc_ratio
         b_rad = -math.radians(b_ang)
         b_tip_x = cx + math.cos(b_rad) * (r_track * 0.86)
@@ -516,9 +580,14 @@ class SpeedometerDialWidget(QWidget):
     def _draw_center_pod(self, painter: QPainter, cx: float, cy: float, r: float) -> None:
         """Center Pod: Speedometer with Glass Reflection, Speed Needle, Digital Readout, Ribbon Meter, Gear, Odo."""
         # 1. Bezel Ring Halo Glow
+        glow_alpha = 50
+        if getattr(self, "is_sweeping", False):
+            p = getattr(self, "sweep_progress", 0.0)
+            pulse = math.sin(p * math.pi)
+            glow_alpha = int(50 + 110 * pulse)
         glow_grad = QRadialGradient(QPointF(cx, cy), r * 1.12)
         glow_grad.setColorAt(0.82, QColor(0, 0, 0, 0))
-        glow_grad.setColorAt(0.94, QColor(0, 229, 255, 50))
+        glow_grad.setColorAt(0.94, QColor(0, 229, 255, glow_alpha))
         glow_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
         painter.setBrush(QBrush(glow_grad))
         painter.setPen(Qt.PenStyle.NoPen)
@@ -601,7 +670,15 @@ class SpeedometerDialWidget(QWidget):
                 painter.drawLine(QPointF(hx1, hy1), QPointF(hx2, hy2))
 
         # 4. Luminous Speed Needle (Pointing to current speed)
-        spd_fraction = min(1.0, max(0.0, self.current_val / dial_max))
+        live_spd_fraction = min(1.0, max(0.0, self.current_val / dial_max))
+        if getattr(self, "is_sweeping", False):
+            p = getattr(self, "sweep_progress", 0.0)
+            if p < 0.5:
+                spd_fraction = p * 2.0
+            else:
+                spd_fraction = 1.0 - (1.0 - live_spd_fraction) * ((p - 0.5) * 2.0)
+        else:
+            spd_fraction = live_spd_fraction
         needle_ang = start_angle_deg + (total_span_deg * spd_fraction)
         needle_rad = -math.radians(needle_ang)
 
@@ -638,7 +715,10 @@ class SpeedometerDialWidget(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawPolygon(chv_up)
 
-        spd_val = int(round(self.current_val))
+        if getattr(self, "is_sweeping", False):
+            spd_val = int(round(spd_fraction * dial_max))
+        else:
+            spd_val = int(round(self.current_val))
         font_spd = QFont("Segoe UI", max(26, min(68, int(r * 0.34))), QFont.Weight.Bold)
         painter.setFont(font_spd)
         painter.setPen(COLOR_TEXT_PRIMARY)
@@ -1210,9 +1290,14 @@ class TPMSWidget(QWidget):
         self.rl_temp = 30.0
         self.rr_temp = 30.0
         self.unit_system = "IMPERIAL"
+        self.cluster_theme = "OLED"
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(80)
         self.setMinimumWidth(0)
+
+    def set_cluster_theme(self, theme: str) -> None:
+        self.cluster_theme = theme.upper().strip()
+        self.update()
 
     def set_unit_system(self, unit_system: str) -> None:
         self.unit_system = unit_system
@@ -1254,9 +1339,10 @@ class TPMSWidget(QWidget):
         w = self.width()
         h = self.height()
 
-        painter.setBrush(QBrush(COLOR_PANEL_BG))
-        painter.setPen(QPen(COLOR_PANEL_BORDER, 1))
-        painter.drawRoundedRect(QRectF(0, 0, w - 1, h - 1), 8, 8)
+        if getattr(self, "cluster_theme", "OLED") != "OLED":
+            painter.setBrush(QBrush(COLOR_PANEL_BG))
+            painter.setPen(QPen(COLOR_PANEL_BORDER, 1))
+            painter.drawRoundedRect(QRectF(0, 0, w - 1, h - 1), 8, 8)
 
         # Header
         hdr_font_sz = max(7, min(11, int(w * 0.024)))
@@ -1279,8 +1365,12 @@ class TPMSWidget(QWidget):
             cw = max(24.0, min(95.0, ch * 0.52))
 
             chassis_rect = QRectF(cx - cw / 2.0, cy - ch / 2.0, cw, ch)
-            painter.setBrush(QBrush(QColor(10, 24, 18, 230)))
-            painter.setPen(QPen(COLOR_PANEL_BORDER, 1.4))
+            if getattr(self, "cluster_theme", "OLED") == "OLED":
+                painter.setBrush(QBrush(QColor(0, 0, 0, 0)))
+                painter.setPen(QPen(QColor(0, 229, 255, 140), 1.5))
+            else:
+                painter.setBrush(QBrush(QColor(10, 24, 18, 230)))
+                painter.setPen(QPen(COLOR_PANEL_BORDER, 1.4))
             painter.drawRoundedRect(chassis_rect, 10, 10)
 
             # Windshield & cockpit details
@@ -1333,9 +1423,10 @@ class TPMSWidget(QWidget):
                 c_y = (cy - wheel_dy - card_h / 2.0) if is_front else (cy + wheel_dy - card_h / 2.0)
 
                 c_rect = QRectF(c_x, c_y, card_w, card_h)
-                painter.setBrush(QBrush(QColor(8, 18, 14, 210)))
-                painter.setPen(QPen(COLOR_PANEL_BORDER, 0.8))
-                painter.drawRoundedRect(c_rect, 6, 6)
+                if getattr(self, "cluster_theme", "OLED") != "OLED":
+                    painter.setBrush(QBrush(QColor(8, 18, 14, 210)))
+                    painter.setPen(QPen(COLOR_PANEL_BORDER, 0.8))
+                    painter.drawRoundedRect(c_rect, 6, 6)
 
                 painter.setFont(QFont("Segoe UI", max(6, min(8, int(card_h * 0.16))), QFont.Weight.Bold))
                 painter.setPen(COLOR_TEXT_MUTED)
@@ -1349,7 +1440,8 @@ class TPMSWidget(QWidget):
                 painter.setPen(COLOR_TEXT_SECONDARY)
                 painter.drawText(QRectF(c_x + 8, c_y + card_h * 0.66, card_w - 16, card_h * 0.30), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"{temp_str} • NOMINAL")
 
-                painter.setPen(QPen(QColor(18, 50, 38, 140), 1, Qt.PenStyle.DashLine))
+                dash_pen = QColor(0, 229, 255, 60) if getattr(self, "cluster_theme", "OLED") == "OLED" else QColor(18, 50, 38, 140)
+                painter.setPen(QPen(dash_pen, 1, Qt.PenStyle.DashLine))
                 start_lx = (c_x + card_w) if is_left else c_x
                 target_lx = (cx - wheel_dx - tw) if is_left else (cx + wheel_dx + tw)
                 painter.drawLine(int(start_lx), int(c_y + card_h / 2.0), int(target_lx), int(c_y + card_h / 2.0))
@@ -1850,10 +1942,15 @@ class CompactSpeedPod(QWidget):
         self.brake_pct = 0.0
         self.steer_angle = 0.0
         self.cluster_theme = "OLED"
+        self.is_right_wing = False
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(80)
         self.setMinimumWidth(170)
         self.setMaximumWidth(260)
+
+    def set_right_wing(self, is_right: bool) -> None:
+        self.is_right_wing = bool(is_right)
+        self.update()
 
     def set_cluster_theme(self, theme: str) -> None:
         self.cluster_theme = theme.upper().strip()
@@ -1931,15 +2028,22 @@ class CompactSpeedPod(QWidget):
 
         # Panel styling based on cluster theme
         if getattr(self, "cluster_theme", "OLED") == "OLED":
-            painter.setBrush(QBrush(QColor(0, 0, 0)))
-            painter.setPen(QPen(QColor(0, 229, 255, 60), 1))
+            is_right = getattr(self, "is_right_wing", False)
+            seam_x = 0.0 if is_right else (w - 1.0)
+            seam_grad = QLinearGradient(seam_x, 0, seam_x, h)
+            seam_grad.setColorAt(0.0, QColor(0, 229, 255, 0))
+            seam_grad.setColorAt(0.2, QColor(0, 229, 255, 180))
+            seam_grad.setColorAt(0.8, QColor(0, 245, 160, 180))
+            seam_grad.setColorAt(1.0, QColor(0, 229, 255, 0))
+            painter.setPen(QPen(QBrush(seam_grad), 1.5))
+            painter.drawLine(int(seam_x), 10, int(seam_x), int(h - 10))
         else:
             grad = QLinearGradient(0, 0, 0, h)
             grad.setColorAt(0.0, QColor(8, 20, 15, 245))
             grad.setColorAt(1.0, QColor(4, 10, 8, 250))
             painter.setBrush(QBrush(grad))
             painter.setPen(QPen(QColor(0, 245, 160, 75), 1))
-        painter.drawRoundedRect(QRectF(0, 0, w - 1, h - 1), 8, 8)
+            painter.drawRoundedRect(QRectF(0, 0, w - 1, h - 1), 8, 8)
 
         # Header: Icon + SPEED and Gear Pill
         hdr_y = 8.0
@@ -2006,9 +2110,10 @@ class CompactSpeedPod(QWidget):
         sub_y = h - max(28.0, min(40.0, h * 0.22))
         sub_h = h - sub_y - 6.0
         sub_rect = QRectF(8, sub_y, w - 16, sub_h)
-        painter.setBrush(QBrush(QColor(6, 16, 12, 220)))
-        painter.setPen(QPen(COLOR_PANEL_BORDER, 0.8))
-        painter.drawRoundedRect(sub_rect, 4, 4)
+        if getattr(self, "cluster_theme", "OLED") != "OLED":
+            painter.setBrush(QBrush(QColor(6, 16, 12, 220)))
+            painter.setPen(QPen(COLOR_PANEL_BORDER, 0.8))
+            painter.drawRoundedRect(sub_rect, 4, 4)
 
         font_pedal = QFont("Consolas", max(6, min(9, int(sub_h * 0.38))), QFont.Weight.Bold)
         painter.setFont(font_pedal)
@@ -2037,8 +2142,13 @@ class BatteryHeroWidget(QWidget):
         self.power_kw = 57.8
         self.est_range_km = 372.0
         self.unit_system = "IMPERIAL"
+        self.cluster_theme = "OLED"
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(220)
+
+    def set_cluster_theme(self, theme: str) -> None:
+        self.cluster_theme = theme.upper().strip()
+        self.update()
 
     def set_unit_system(self, unit_system: str) -> None:
         self.unit_system = unit_system
@@ -2073,9 +2183,10 @@ class BatteryHeroWidget(QWidget):
         w = self.width()
         h = self.height()
 
-        painter.setBrush(QBrush(COLOR_PANEL_BG))
-        painter.setPen(QPen(COLOR_PANEL_BORDER, 1))
-        painter.drawRoundedRect(QRectF(0, 0, w - 1, h - 1), 10, 10)
+        if getattr(self, "cluster_theme", "OLED") != "OLED":
+            painter.setBrush(QBrush(COLOR_PANEL_BG))
+            painter.setPen(QPen(COLOR_PANEL_BORDER, 1))
+            painter.drawRoundedRect(QRectF(0, 0, w - 1, h - 1), 10, 10)
 
         # Header: clean responsive text
         hdr_font_sz = max(7, min(10, int(w * 0.028)))
@@ -2161,9 +2272,10 @@ class BatteryHeroWidget(QWidget):
             cy_pos = upper_y + 6.0 + c_row * (chip_h + 6.0)
 
             c_rect = QRectF(cx_pos, cy_pos, chip_w, chip_h)
-            painter.setBrush(QBrush(QColor(6, 14, 10, 190)))
-            painter.setPen(QPen(COLOR_PANEL_BORDER, 0.8))
-            painter.drawRoundedRect(c_rect, 4, 4)
+            if getattr(self, "cluster_theme", "OLED") != "OLED":
+                painter.setBrush(QBrush(QColor(6, 14, 10, 190)))
+                painter.setPen(QPen(COLOR_PANEL_BORDER, 0.8))
+                painter.drawRoundedRect(c_rect, 4, 4)
 
             painter.setFont(f_ch_lbl)
             painter.setPen(COLOR_TEXT_MUTED)
@@ -2196,9 +2308,10 @@ class BatteryHeroWidget(QWidget):
             qy = grid_y + row * (quad_h + 6.0)
             q_rect = QRectF(qx, qy, quad_w, quad_h)
 
-            painter.setBrush(QBrush(QColor(6, 14, 10, 190)))
-            painter.setPen(QPen(COLOR_PANEL_BORDER, 0.8))
-            painter.drawRoundedRect(q_rect, 4, 4)
+            if getattr(self, "cluster_theme", "OLED") != "OLED":
+                painter.setBrush(QBrush(QColor(6, 14, 10, 190)))
+                painter.setPen(QPen(COLOR_PANEL_BORDER, 0.8))
+                painter.drawRoundedRect(q_rect, 4, 4)
 
             painter.setFont(f_q_lbl)
             painter.setPen(COLOR_TEXT_MUTED)
@@ -2228,9 +2341,14 @@ class PowertrainHeroWidget(QWidget):
         self.max_regen_kw = 60.0
         self.speed = 104.0
         self.unit_system = "IMPERIAL"
+        self.cluster_theme = "OLED"
         self.wave_points: List[Tuple[float, float]] = []
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(220)
+
+    def set_cluster_theme(self, theme: str) -> None:
+        self.cluster_theme = theme.upper().strip()
+        self.update()
 
     def set_unit_system(self, unit_system: str) -> None:
         self.unit_system = unit_system
@@ -2275,9 +2393,10 @@ class PowertrainHeroWidget(QWidget):
         w = self.width()
         h = self.height()
 
-        painter.setBrush(QBrush(COLOR_PANEL_BG))
-        painter.setPen(QPen(COLOR_PANEL_BORDER, 1))
-        painter.drawRoundedRect(QRectF(0, 0, w - 1, h - 1), 10, 10)
+        if getattr(self, "cluster_theme", "OLED") != "OLED":
+            painter.setBrush(QBrush(COLOR_PANEL_BG))
+            painter.setPen(QPen(COLOR_PANEL_BORDER, 1))
+            painter.drawRoundedRect(QRectF(0, 0, w - 1, h - 1), 10, 10)
 
         # Header
         hdr_font_sz = max(7, min(10, int(w * 0.028)))
@@ -2389,9 +2508,10 @@ class PowertrainHeroWidget(QWidget):
         sec3_h = h - sec3_y - 8.0
         wave_rect = QRectF(14, sec3_y, w - 28, sec3_h)
 
-        painter.setBrush(QBrush(QColor(6, 14, 10, 190)))
-        painter.setPen(QPen(COLOR_PANEL_BORDER, 0.8))
-        painter.drawRoundedRect(wave_rect, 4, 4)
+        if getattr(self, "cluster_theme", "OLED") != "OLED":
+            painter.setBrush(QBrush(QColor(6, 14, 10, 190)))
+            painter.setPen(QPen(COLOR_PANEL_BORDER, 0.8))
+            painter.drawRoundedRect(wave_rect, 4, 4)
 
         painter.setFont(QFont("Segoe UI", max(6, min(8, int(sec3_h * 0.15))), QFont.Weight.Bold))
         painter.setPen(COLOR_TEXT_MUTED)
@@ -2404,7 +2524,8 @@ class PowertrainHeroWidget(QWidget):
 
         # Draw Grid Line
         mid_y = sec3_y + (sec3_h * 0.55)
-        painter.setPen(QPen(QColor(18, 50, 38, 120), 1, Qt.PenStyle.DashLine))
+        dash_pen = QColor(0, 229, 255, 60) if getattr(self, "cluster_theme", "OLED") == "OLED" else QColor(18, 50, 38, 120)
+        painter.setPen(QPen(dash_pen, 1, Qt.PenStyle.DashLine))
         painter.drawLine(int(18), int(mid_y), int(w - 18), int(mid_y))
 
         # Plot Waves if points exist
@@ -2924,6 +3045,13 @@ class VoltesseDashboard(QMainWindow):
         self.powertrain_hero = self.powertrain_page
         self.tpms_widget = self.tpms_page
 
+        # Sync initial theme to hero widgets and pods
+        self.battery_hero.set_cluster_theme(self.cluster_theme)
+        self.powertrain_hero.set_cluster_theme(self.cluster_theme)
+        self.tpms_widget.set_cluster_theme(self.cluster_theme)
+        for pod in self.compact_speed_pods:
+            pod.set_cluster_theme(self.cluster_theme)
+
         # Preserved widgets and dummy hierarchies for legacy telemetry / test assertions
         self.battery_widget = BatteryStatusWidget()
         self.battery_widget_alt = BatteryStatusWidget()
@@ -3373,6 +3501,10 @@ class VoltesseDashboard(QMainWindow):
             self.stage_layout.addWidget(self.center_stage, stretch=4)
             self.stage_layout.addWidget(self.wing_1, stretch=3)
 
+        for pod in getattr(self, "compact_speed_pods", []):
+            if hasattr(pod, "set_right_wing"):
+                pod.set_right_wing(self.swap_wings)
+
         self.set_page(self.current_page_idx)
         self.wing_swap_changed.emit(self.swap_wings)
 
@@ -3384,6 +3516,9 @@ class VoltesseDashboard(QMainWindow):
         for pod in getattr(self, "compact_speed_pods", []):
             if hasattr(pod, "set_cluster_theme"):
                 pod.set_cluster_theme(self.cluster_theme)
+        for hero in (getattr(self, "battery_hero", None), getattr(self, "powertrain_hero", None), getattr(self, "tpms_widget", None)):
+            if hero and hasattr(hero, "set_cluster_theme"):
+                hero.set_cluster_theme(self.cluster_theme)
         self._apply_cluster_theme_styles()
 
     def toggle_cluster_theme(self) -> str:
@@ -3686,9 +3821,18 @@ class VoltesseDashboard(QMainWindow):
         steer_r = (Qt.Key.Key_D in self._held_keys)
         self.simulation_input_changed.emit(thr, brk, steer_l, steer_r)
 
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if hasattr(self, "speed_gauge") and hasattr(self.speed_gauge, "startup_needle_sweep"):
+            self.speed_gauge.startup_needle_sweep()
+
     def keyPressEvent(self, event) -> None:
         """Handles mode switching, auto/manual transmission, and video-game controls."""
         key = event.key()
+
+        # Interupt startup needle sweep on interactive driving/navigation input
+        if hasattr(self, "speed_gauge") and hasattr(self.speed_gauge, "finish_sweep"):
+            self.speed_gauge.finish_sweep()
 
         # Prevent OS auto-repeat for one-shot action hotkeys
         if event.isAutoRepeat():

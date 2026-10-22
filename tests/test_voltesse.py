@@ -1203,10 +1203,16 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertEqual(gui.cluster_theme, "CLASSIC")
         self.assertEqual(gui.speed_gauge.cluster_theme, "CLASSIC")
         self.assertEqual(gui.compact_speed_widget.cluster_theme, "CLASSIC")
+        self.assertEqual(gui.battery_hero.cluster_theme, "CLASSIC")
+        self.assertEqual(gui.powertrain_hero.cluster_theme, "CLASSIC")
+        self.assertEqual(gui.tpms_widget.cluster_theme, "CLASSIC")
 
         theme = gui.toggle_cluster_theme()
         self.assertEqual(theme, "OLED")
         self.assertEqual(gui.cluster_theme, "OLED")
+        self.assertEqual(gui.battery_hero.cluster_theme, "OLED")
+        self.assertEqual(gui.powertrain_hero.cluster_theme, "OLED")
+        self.assertEqual(gui.tpms_widget.cluster_theme, "OLED")
 
         # 5. Hotkey 'B' Theme Toggle
         b_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_B, Qt.KeyboardModifier.NoModifier)
@@ -1221,6 +1227,35 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertEqual(gui.cluster_theme, "CLASSIC")
         gui.set_cluster_theme("oled")
         self.assertEqual(gui.cluster_theme, "OLED")
+
+    def test_gui_startup_needle_sweep_and_borderless_pages(self):
+        gui = VoltesseDashboard()
+        gui.resize(800, 480)
+
+        # 1. Startup Needle Sweep invocation
+        self.assertFalse(gui.speed_gauge.is_sweeping)
+        gui.speed_gauge.startup_needle_sweep()
+        self.assertTrue(gui.speed_gauge.is_sweeping)
+        self.assertEqual(gui.speed_gauge.sweep_progress, 0.0)
+
+        # 2. Finish sweep restores live telemetry state
+        gui.speed_gauge.finish_sweep()
+        self.assertFalse(gui.speed_gauge.is_sweeping)
+        self.assertEqual(gui.speed_gauge.sweep_progress, 1.0)
+
+        # 3. Interruption on driving input
+        gui.speed_gauge.startup_needle_sweep()
+        self.assertTrue(gui.speed_gauge.is_sweeping)
+        w_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_W, Qt.KeyboardModifier.NoModifier)
+        gui.keyPressEvent(w_event)
+        self.assertFalse(gui.speed_gauge.is_sweeping)
+
+        # 4. Wing swapping updates is_right_wing on compact speed pods
+        self.assertFalse(gui.swap_wings)
+        self.assertFalse(gui.compact_speed_widget.is_right_wing)
+        gui.toggle_wing_swap()
+        self.assertTrue(gui.swap_wings)
+        self.assertTrue(gui.compact_speed_widget.is_right_wing)
 
 
 

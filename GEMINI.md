@@ -86,6 +86,26 @@ Voltesse Dash is a production-grade, distraction-free automotive digital instrum
   - Hotkey `B` instantly toggles between **OLED Beta** and **Classic** themes with an animated on-screen HUD badge.
   - CLI argument `--theme [oled|classic]` defaults to `oled`.
 
+### 🌌 Borderless OLED Cockpit Experience Across All Pages (v5.3.0+)
+- **Zero Card / Box Overhead Across Hero Pages**:
+  - In OLED mode, all secondary hero views ([`BatteryHeroWidget`](file:///c:/Users/david/PycharmProjects/voltesse-dash/src/dashboard_gui.py), [`PowertrainHeroWidget`](file:///c:/Users/david/PycharmProjects/voltesse-dash/src/dashboard_gui.py), [`TPMSWidget`](file:///c:/Users/david/PycharmProjects/voltesse-dash/src/dashboard_gui.py)) strip outer container rectangles, background bounding cards, and dark grey boxes.
+  - Telemetry metrics, neon chassis wireframe, and SoC arcs float freely over pure `#000000` pitch black OLED void.
+- **Vertical Accent Seam for CompactSpeedPod**:
+  - Side `CompactSpeedPod` is rendered completely borderless with floating white numerals and a vertical glowing cyan accent seam line separating it from the hero diagnostic stage.
+  - Automatically flips the accent seam line between right edge (`x = w - 1`) and left edge (`x = 0`) when wing swapping is toggled (`X` key).
+
+### ⚡ 1.2-Second Automotive Startup Needle Sweep (v5.3.0+)
+- On ignition / display initialization (`showEvent`), a 1.2-second automotive needle sweep sequence animates:
+  - Tachometer needle sweeps to peak (8k RPM), Speedometer needle to peak (180 MPH), and Dual Thermal/SoC needles sweep to max limits with expanding cyan bezel glow pulses before smoothly settling to live vehicle telemetry.
+  - Rapid driver inputs (`keyPressEvent` or telemetry changes) call `finish_sweep()` to immediately settle the animation for instant telemetry visibility.
+
+### 🎬 Pit-Wall Session Replay Scrubber & Ghost Overlays (v5.3.0+)
+- Interactive timeline scrubber inside the Sessions channel with Play/Pause, 1x/2x/5x speed multiplier, snapshot metric cards with live $\Delta$ readouts, and synchronized Plotly charts with vertical cursor tracking.
+- Benchmark ghost run selector overlays translucent dotted silver traces directly over active session charts with live $\Delta$ readouts ($\Delta$ MPH, $\Delta$ kW, $\Delta$ °F).
+
+### 🛠️ Diagnostic DTC Fault Code Injection Console (v5.3.0+)
+- Standardized EV diagnostic trouble code triggers (`P0A38`, `P0A80`, `C1A20`, `P0A44`, `C1201`) with single-click testing and a `Clear All DTCs` reset routine integrated across Diagnostics and Settings channels.
+
 ### ⚡ Always-Visible Speed Pod on Non-Speed Pages
 - When navigated away from Page 0 (`SPEED`) to Page 1 (`BATTERY`), Page 2 (`POWERTRAIN`), or Page 3 (`TPMS`), an integrated `CompactSpeedPod` MUST remain permanently visible.
 - Displays: Speed (`MPH`), dynamic cyan-to-mint speed bar, RPM, transmission mode & dynamic gear pill (e.g. `AUTO [4]`, `MANUAL [5]`), and micro-indicators for throttle (`THR %`), brake (`BRK %`), and steering (`STR °`).
@@ -147,14 +167,14 @@ Voltesse Dash is a production-grade, distraction-free automotive digital instrum
 - **Local Python Environment**: `.\.venv\Scripts\python.exe`
 - **Unit Test Discovery**:
   ```powershell
-  # Cockpit GUI and telemetry tests (31 tests)
+  # Cockpit GUI and telemetry tests (32 tests)
   .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 
-  # Technician web portal tests (12 tests)
+  # Technician web portal tests (14 tests)
   .\.venv\Scripts\python.exe -m unittest discover -s technician-gui/tests -v
   ```
 - **Requirements for PRs / Changes**:
-  - **100% Green**: All tests across both test suites must pass with zero failures or errors (43 total tests).
+  - **100% Green**: All tests across both test suites must pass with zero failures or errors (46 total tests).
   - **Preserve Existing Attributes**: Do NOT break legacy or test-inspected attributes on `VoltesseDashboard` (`page_stack`, `center_stack`, `speed_gauge`, `battery_hero`, `powertrain_hero`, `tpms_widget`, `compact_speed_widget`, `compact_speed_pods`, `trip_pod`, `thermal_widget`, `bottom_bar`).
   - **QTimer & Thread Safety**: Always supply a context QObject when scheduling single-shot timers to prevent dangling callbacks on destructed widgets.
 

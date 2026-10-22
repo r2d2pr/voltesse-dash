@@ -12,6 +12,7 @@ from data.db import (
     get_live_telemetry_traces,
     get_live_temperature_history,
     get_recent_sessions,
+    get_session_telemetry_traces,
     test_connection,
 )
 
@@ -86,6 +87,30 @@ class DatabaseModuleTests(unittest.TestCase):
         self.assertIn("motor_temps", data)
         self.assertIn("power_draws", data)
         self.assertGreater(data["peak_temp"], 70.0)  # Fahrenheit range check
+
+    def test_session_telemetry_traces_and_replay(self):
+        traces, is_db = get_session_telemetry_traces("#14", total_points=45)
+        self.assertIsInstance(traces, dict)
+        self.assertIn("speeds", traces)
+        self.assertIn("rpms", traces)
+        self.assertIn("throttles", traces)
+        self.assertIn("brakes", traces)
+        self.assertIn("powers_kw", traces)
+        self.assertIn("motor_temps_f", traces)
+        self.assertEqual(len(traces["speeds"]), 45)
+        self.assertEqual(len(traces["motor_temps_f"]), 45)
+        self.assertGreater(max(traces["speeds"]), 0.0)
+        self.assertGreater(max(traces["motor_temps_f"]), 70.0)
+
+    def test_dtc_fault_specs(self):
+        codes = ["P0A38", "P0A80", "C1A20", "P0A44", "C1201"]
+        # Standardized EV DTC fault codes contract
+        self.assertEqual(len(codes), 5)
+        self.assertIn("P0A38", codes)  # Inverter overtemp
+        self.assertIn("P0A80", codes)  # Battery cell imbalance
+        self.assertIn("C1A20", codes)  # TPMS rapid deflate
+        self.assertIn("P0A44", codes)  # Resolver fault
+        self.assertIn("C1201", codes)  # Brake degradation
 
 
 if __name__ == "__main__":

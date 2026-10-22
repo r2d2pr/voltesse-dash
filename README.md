@@ -1,6 +1,6 @@
-# Voltesse Dash ⚡ v5.2.1
+# Voltesse Dash ⚡ v5.3.0
 
-[![Version](https://img.shields.io/badge/version-5.2.1-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
+[![Version](https://img.shields.io/badge/version-5.3.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/PyQt-6-green.svg)](https://riverbankcomputing.com/software/pyqt/)
 [![Web](https://img.shields.io/badge/Streamlit-1.66-red.svg)](https://streamlit.io/)
@@ -8,25 +8,25 @@
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 5.2.1 introduces the **Full Black Mint OLED Beta Theme** for the digital cluster GUI (`src/dashboard_gui.py`), engineered for pure pitch-black OLED contrast with an ethereal 3-pod binnacle, curved cowl brow, glass reflection highlight crescent, speed needle with bold digital numerals, dynamic Accel/Brake ribbon meter, twin-needle thermal/battery gauge, and permanent removal of the LED shift light strips. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
+A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 5.3.0 establishes the **Borderless Black Mint OLED Cockpit Experience** across all cluster pages (`Speed`, `Battery`, `Powertrain`, `TPMS`), introduces a 1.2-second startup needle sweep sequence, and expands the technician portal with session replay scrubbing, dual-run ghost telemetry overlays, and a standardized EV diagnostic trouble code (DTC) fault injection console. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
 
 ---
 
-## What's New in Version 5.2.1 🚀
+## What's New in Version 5.3.0 🚀
 
-- 🖤 **Full Black Mint OLED Beta Theme**:
-  - Engineered for pure pitch-black OLED automotive displays (`#000000` true black) with zero grey/carbon card clutter.
-  - Three-pod illuminated binnacle contoured with an ethereal Voltesse cyan/mint hood cowl brow.
-  - **Left Pod**: Tachometer (0–8 x1000 RPM) with luminous needle, 7–8 redline zone in race coral, and vertical coolant/motor temperature sub-gauge (`100–320°F`).
-  - **Center Pod**: Speedometer centerpiece with concentric glowing cyan bezel rings, curved glass reflection highlight crescent, speed graduation (0–180 MPH), glowing white needle, bold digital numerals (`70` / `MPH`), vector chevrons (`▲`/`▼`), gear `D3`, odometer `009999 mi`, and flanking curved vertical `ACCEL` / `BRAKE` dynamic ribbon meter.
-  - **Right Pod**: Dual-meter gauge with Powertrain Thermal scale (`C` to `H`), Battery SoC (`E` to `F`), vector EV battery icon, and twin needles.
-- 🚫 **LED Shift Light Strip Removal**:
-  - Permanently removed the top 15-LED shift array from `SpeedometerDialWidget` and 10-LED mini strip from `CompactSpeedPod` for a clean, distraction-free cockpit aesthetic.
-- ⌨️ **Live Theme Toggling & CLI Flag**:
-  - Hotkey `B` instantly toggles between **OLED Beta** and **Classic** themes with animated on-screen HUD badge feedback.
-  - New CLI argument `--theme [oled|classic]` (default: `oled`).
-- 🧪 **Expanded Automated Verification**:
-  - Enhanced automated unit test suites to 43 tests (31 cockpit tests + 12 technician portal tests), 100% passing.
+- 🖤 **Borderless Black Mint OLED Experience Across All Cockpit Pages**:
+  - Completely stripped card background rectangles, dark boxes, and container outlines across all secondary hero views (`BatteryHeroWidget`, `PowertrainHeroWidget`, `TPMSWidget`). Telemetry metrics, neon chassis wireframe, and SoC arcs float freely over pure `#000000` pitch black OLED void.
+  - Side `CompactSpeedPod` rendered borderless with floating white numerals and a vertical glowing cyan accent seam line separating it from the hero diagnostic stage. Seamlessly adapts to wing swapping (`X` key).
+- ⚡ **1.2-Second Automotive Startup Needle Sweep**:
+  - On ignition/display initialization, needles for Tachometer (8k RPM), Speedometer (180 MPH), and Dual Thermal/SoC sweep to peak with expanding cyan bezel glow pulses before smoothly settling to live vehicle telemetry. Rapid driver inputs immediately settle the animation for instant telemetry visibility.
+- 🎬 **Pit-Wall Session Replay Scrubbing**:
+  - Interactive timeline scrubber inside the Sessions channel with Play/Pause, 1x/2x/5x speed selector, and synchronized race traces with vertical cursor tracking.
+- 👻 **Dual-Run Ghost Telemetry Overlays**:
+  - Dropdown overlaying selected benchmark ghost runs as translucent dotted silver traces directly over active session charts with live $\Delta$ readouts ($\Delta$ MPH, $\Delta$ kW, $\Delta$ °F).
+- 🛠️ **Diagnostic DTC Fault Code Injection Console**:
+  - Standardized EV fault triggers (`P0A38`, `P0A80`, `C1A20`, `P0A44`, `C1201`) with single-click testing and a `Clear All DTCs` reset routine across Diagnostics and Settings.
+- 🧪 **Expanded Automated Test Verification**:
+  - 46 unit tests passing with 100% green status (32 cockpit GUI tests + 14 technician portal tests).
 
 ---
 
@@ -170,13 +170,13 @@ streamlit run technician-gui/app.py
 
 ## Running Tests
 
-Execute the automated test suites with Python's built-in `unittest` (43 total tests):
+Execute the automated test suites with Python's built-in `unittest` (46 total tests):
 
 ```bash
-# Run cockpit unit and integration tests (31 tests)
+# Run cockpit unit and integration tests (32 tests)
 python -m unittest discover tests
 
-# Run technician web app database and simulation tests (12 tests)
+# Run technician web app database and simulation tests (14 tests)
 python -m unittest discover technician-gui/tests
 ```
 
