@@ -1058,6 +1058,89 @@ class TestDashboardGUI(unittest.TestCase):
         gui.page_stack.finish_animation()
         self.assertEqual(gui.page_stack.currentIndex(), 3)
 
+    def test_gui_race_cockpit_display(self):
+        gui = VoltesseDashboard()
+        gui.resize(800, 480)
+
+        # 1. Test SpeedometerDialWidget RPM tracking and shift light setup
+        gauge = gui.speed_gauge
+        self.assertTrue(hasattr(gauge, "motor_rpm"))
+        self.assertTrue(hasattr(gauge, "max_rpm"))
+        self.assertEqual(gauge.max_rpm, 8000)
+
+        # Test setting numeric and comma-formatted RPM values
+        gauge.set_value(65.0, sub_val="5,400")
+        self.assertEqual(gauge.motor_rpm, 5400)
+        self.assertEqual(gauge.sub_val, "5,400")
+
+        gauge.set_motor_rpm(7200)
+        self.assertEqual(gauge.motor_rpm, 7200)
+        self.assertEqual(gauge.sub_val, "7200")
+
+        # Test set_pedals_and_gear with optional motor_rpm
+        gauge.set_pedals_and_gear(
+            throttle=85.0,
+            brake=15.0,
+            gear="5",
+            mode="SPORT",
+            steering_angle=-8.0,
+            transmission_mode="MANUAL",
+            motor_rpm=7900,
+        )
+        self.assertEqual(gauge.throttle_pct, 85.0)
+        self.assertEqual(gauge.brake_pct, 15.0)
+        self.assertEqual(gauge.active_gear, "5")
+        self.assertEqual(gauge.transmission_mode, "MANUAL")
+        self.assertEqual(gauge.motor_rpm, 7900)
+
+        # 2. Test CompactSpeedPod RPM tracking and mini shift light synchronization
+        pod = gui.compact_speed_widget
+        self.assertTrue(hasattr(pod, "motor_rpm"))
+        pod.set_speed_and_status(
+            speed=72.0,
+            gear="D4",
+            rpm=6800,
+            throttle=90.0,
+            brake=0.0,
+            steering_angle=3.5,
+            transmission_mode="AUTO",
+            unit="MPH",
+        )
+        self.assertEqual(pod.speed, 72.0)
+        self.assertEqual(pod.gear, "D4")
+        self.assertEqual(pod.motor_rpm, 6800)
+        self.assertEqual(pod.throttle_pct, 90.0)
+        self.assertEqual(pod.brake_pct, 0.0)
+        self.assertEqual(pod.steer_angle, 3.5)
+
+        # 3. Test full telemetry pipeline updates both gauge and compact speed pods
+        rec_race = TelemetryRecord(
+            timestamp=time.time(),
+            speed_kmh=110.0,
+            motor_rpm=7950,
+            battery_soc=68.0,
+            battery_voltage=385.0,
+            battery_current=65.0,
+            battery_power_kw=25.0,
+            battery_temp_c=34.0,
+            motor_temp_c=65.0,
+            inverter_temp_c=52.0,
+            throttle_pct=95.0,
+            brake_pct=0.0,
+            drive_mode="SPORT",
+            trip_distance_km=22.0,
+            warnings=[],
+            steering_angle=5.0,
+            gear="6",
+            transmission_mode="MANUAL",
+        )
+        gui.update_telemetry(rec_race)
+        self.assertEqual(gui.speed_gauge.motor_rpm, 7950)
+        self.assertEqual(gui.compact_speed_widget.motor_rpm, 7950)
+        self.assertEqual(gui.speed_gauge.active_gear, "6")
+        self.assertEqual(gui.compact_speed_widget.gear, "6")
+
+
 
 
 @SKIP_NO_DB
