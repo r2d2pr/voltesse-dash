@@ -1,6 +1,6 @@
 """
 Adjustable warning thresholds and PostgreSQL database connection management.
-Exclusively standardized on Imperial units (°F) with Mercedes-AMG F1 pit-wall aesthetics.
+Exclusively standardized on Imperial units (°F) with Voltesse cyber styling.
 """
 
 import streamlit as st
@@ -13,10 +13,10 @@ def show_settings():
         """
         <div style="margin-bottom: 12px;">
             <h2 style="margin: 0; padding: 0; font-weight: 800; letter-spacing: 0.05em; color: #FFFFFF;">
-                ⚙️ F1 SYSTEM & RACE SETTINGS
+                ⚙️ SYSTEM & TELEMETRY SETTINGS
             </h2>
             <p style="margin: 0; padding: 0; font-size: 0.82rem; color: #94A3B8;">
-                Configure pit-wall telemetry alert limits, database connectivity, and technician profiles.
+                Configure telemetry alert limits, database connectivity, and technician calibration parameters.
             </p>
         </div>
         """,
@@ -35,7 +35,7 @@ def show_settings():
             f"""
             <div style="background: rgba(0, 245, 212, 0.08); border: 1px solid rgba(0, 245, 212, 0.4); 
                         border-radius: 6px; padding: 8px 14px; margin-bottom: 14px;">
-                <span class="f1-pill f1-pill-active">🟢 POSTGRESQL 16 CONNECTED</span>
+                <span class="v-pill v-pill-active">🟢 POSTGRESQL 16 CONNECTED</span>
                 <span style="margin-left: 10px; font-size: 0.85rem; color: #E2E8F0;">{msg}</span>
             </div>
             """,
@@ -46,7 +46,7 @@ def show_settings():
             f"""
             <div style="background: rgba(255, 184, 0, 0.08); border: 1px solid rgba(255, 184, 0, 0.4); 
                         border-radius: 6px; padding: 8px 14px; margin-bottom: 14px;">
-                <span class="f1-pill f1-pill-standby">🟡 DATABASE STANDBY</span>
+                <span class="v-pill v-pill-standby">🟡 DATABASE STANDBY</span>
                 <span style="margin-left: 10px; font-size: 0.85rem; color: #E2E8F0;">{msg}</span>
                 <div style="margin-top: 6px; font-size: 0.78rem; color: #94A3B8;">
                     Launch local PostgreSQL container via Docker: <code>cd db && docker compose up -d</code>
@@ -59,7 +59,7 @@ def show_settings():
     st.divider()
 
     st.subheader("Telemetry Warning Thresholds (Imperial)")
-    st.caption("Configure vehicle alert limits. These settings drive live warnings, pit-wall notifications, and diagnostic chart thresholds.")
+    st.caption("Configure vehicle alert limits. These settings drive live warnings, notifications, and diagnostic chart thresholds.")
 
     st.session_state.warning_temp = st.slider(
         "Motor Temperature Warning Limit (°F)",

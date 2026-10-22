@@ -1,6 +1,6 @@
 """
 Recent vehicle session list and timing-board review querying PostgreSQL.
-Standardized on Imperial units (°F, MPH, miles) with Mercedes-AMG F1 timing board styling.
+Standardized on Imperial units (°F, MPH, miles) with Voltesse timing board styling.
 """
 
 import streamlit as st
@@ -13,7 +13,7 @@ def show_sessions():
         """
         <div style="margin-bottom: 12px;">
             <h2 style="margin: 0; padding: 0; font-weight: 800; letter-spacing: 0.05em; color: #FFFFFF;">
-                🏎️ F1 SESSIONS & TIMING LOG
+                ⚡ VEHICLE SESSIONS & TIMING LOG
             </h2>
             <p style="margin: 0; padding: 0; font-size: 0.82rem; color: #94A3B8;">
                 Historical vehicle stints and test runs logged into PostgreSQL persistence engine.
@@ -30,7 +30,7 @@ def show_sessions():
             """
             <div style="background: rgba(0, 245, 212, 0.08); border: 1px solid rgba(0, 245, 212, 0.3); 
                         border-radius: 6px; padding: 6px 12px; margin-bottom: 12px;">
-                <span class="f1-pill f1-pill-active">🟢 POSTGRESQL VEHICLE_SESSION LOG</span>
+                <span class="v-pill v-pill-active">🟢 POSTGRESQL VEHICLE_SESSION LOG</span>
                 <span style="margin-left: 8px; font-size: 0.8rem; color: #E2E8F0;">
                     Live session records loaded from database.
                 </span>
@@ -43,9 +43,9 @@ def show_sessions():
             """
             <div style="background: rgba(255, 184, 0, 0.08); border: 1px solid rgba(255, 184, 0, 0.3); 
                         border-radius: 6px; padding: 6px 12px; margin-bottom: 12px;">
-                <span class="f1-pill f1-pill-standby">🟡 BENCH SESSIONS</span>
+                <span class="v-pill v-pill-standby">🟡 BENCH SESSIONS</span>
                 <span style="margin-left: 8px; font-size: 0.8rem; color: #E2E8F0;">
-                    PostgreSQL offline. Showing Mercedes-AMG F1 benchmark session history.
+                    PostgreSQL offline. Showing Voltesse benchmark session history.
                 </span>
             </div>
             """,
@@ -66,8 +66,8 @@ def show_sessions():
         cols[1].write(session["date"])
         
         src = session.get("source_type", "CAN_BUS")
-        pill_class = "f1-pill-active" if src in ("CAN_BUS", "RACE") else "f1-pill-standby"
-        cols[2].markdown(f"<span class='f1-pill {pill_class}'>{src}</span>", unsafe_allow_html=True)
+        pill_class = "v-pill-active" if src in ("CAN_BUS", "RACE") else "v-pill-standby"
+        cols[2].markdown(f"<span class='v-pill {pill_class}'>{src}</span>", unsafe_allow_html=True)
         
         cols[3].write(session["duration"])
         cols[4].write(f"{session['max_temp']} °F")
@@ -90,7 +90,7 @@ def show_sessions():
                         ACTIVE INSPECTION: SESSION {selected['id']}
                     </div>
                     <div>
-                        <span class="f1-pill f1-pill-active">READY FOR TELEMETRY ANALYSIS</span>
+                        <span class="v-pill v-pill-active">READY FOR TELEMETRY ANALYSIS</span>
                     </div>
                 </div>
                 <div style="margin-top: 8px; font-size: 0.85rem; color: #E2E8F0;">

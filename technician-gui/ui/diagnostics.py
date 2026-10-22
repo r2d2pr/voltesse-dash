@@ -1,6 +1,6 @@
 """
 Five session-specific performance charts arranged 3 + 2, querying PostgreSQL with fallback.
-Exclusively standardized on Imperial units (°F, MPH, miles) with Mercedes-AMG F1 aesthetics.
+Exclusively standardized on Imperial units (°F, MPH, miles) with Voltesse cyber pit-wall aesthetics.
 """
 
 import plotly.graph_objects as go
@@ -10,7 +10,7 @@ from data.db import get_diagnostics_data
 
 
 def compact_chart(figure):
-    """Style charts with Mercedes-AMG F1 dark pit-wall aesthetics."""
+    """Style charts with Voltesse dark pit-wall aesthetics."""
     figure.update_layout(
         height=240,
         showlegend=False,
@@ -44,7 +44,7 @@ def show_diagnostics():
         """
         <div style="margin-bottom: 12px;">
             <h2 style="margin: 0; padding: 0; font-weight: 800; letter-spacing: 0.05em; color: #FFFFFF;">
-                🏎️ TELEMETRY DIAGNOSTICS & BENCHMARKING
+                ⚡ TELEMETRY DIAGNOSTICS & BENCHMARKING
             </h2>
             <p style="margin: 0; padding: 0; font-size: 0.82rem; color: #94A3B8;">
                 Historical and session-specific vehicle performance curves derived from PostgreSQL persistence logs.
@@ -62,7 +62,7 @@ def show_diagnostics():
             """
             <div style="background: rgba(0, 245, 212, 0.08); border: 1px solid rgba(0, 245, 212, 0.3); 
                         border-radius: 6px; padding: 6px 12px; margin-bottom: 12px;">
-                <span class="f1-pill f1-pill-active">🟢 POSTGRESQL LINKED</span>
+                <span class="v-pill v-pill-active">🟢 POSTGRESQL LINKED</span>
                 <span style="margin-left: 8px; font-size: 0.8rem; color: #E2E8F0;">
                     Analyzing high-resolution telemetry frames from vehicle session database.
                 </span>
@@ -75,9 +75,9 @@ def show_diagnostics():
             """
             <div style="background: rgba(255, 184, 0, 0.08); border: 1px solid rgba(255, 184, 0, 0.3); 
                         border-radius: 6px; padding: 6px 12px; margin-bottom: 12px;">
-                <span class="f1-pill f1-pill-standby">🟡 BENCHMARK PROFILE</span>
+                <span class="v-pill v-pill-standby">🟡 BENCHMARK PROFILE</span>
                 <span style="margin-left: 8px; font-size: 0.8rem; color: #E2E8F0;">
-                    PostgreSQL offline or no active session selected. Showing Mercedes-AMG F1 benchmark baseline.
+                    PostgreSQL offline or no active session selected. Showing Voltesse benchmark baseline.
                 </span>
             </div>
             """,
@@ -172,7 +172,7 @@ def show_diagnostics():
     ))
     fig_temp.add_hline(
         y=warn_temp, line_dash="dash", line_color="#FF4D6D",
-        annotation_text=f"Race Warning Limit ({warn_temp}°F)", annotation_position="top right",
+        annotation_text=f"Warning Limit ({warn_temp}°F)", annotation_position="top right",
     )
     fig_temp.update_layout(
         xaxis_title="Session Elapsed Time (minutes)",

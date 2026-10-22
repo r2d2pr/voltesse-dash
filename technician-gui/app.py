@@ -1,7 +1,7 @@
-"""Voltesse Dash — Mercedes-AMG Formula 1 Pit-Wall Telemetry Interface (v5.0.0).
+"""Voltesse Dash — Telemetry Command Center (v5.0.0).
 
 Communicates directly with the PostgreSQL persistence engine to deliver real-time
-vehicle telemetry, synchronized F1 telemetry traces, session analysis, and diagnostic logs.
+vehicle telemetry, synchronized telemetry traces, session analysis, and diagnostic logs.
 Run with: streamlit run app.py
 """
 
@@ -15,35 +15,35 @@ from ui.sessions import show_sessions
 from ui.settings import show_settings
 
 st.set_page_config(
-    page_title="Voltesse | F1 Telemetry Pit-Wall",
+    page_title="Voltesse | Telemetry Command Center",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 
-def inject_mercedes_f1_theme():
-    """Inject Mercedes-AMG Petronas F1 styling: deep obsidian void, emerald cyan accents, silver metallic badges."""
+def inject_voltesse_theme():
+    """Inject Voltesse automotive cyber styling: deep obsidian void, emerald cyan accents, silver metallic badges."""
     custom_css = """
     <style>
-    /* Mercedes-AMG Petronas F1 Pit-Wall Palette */
+    /* Voltesse Cyber-Mint & Obsidian Palette */
     :root {
-        --petronas-cyan: #00F5D4;
-        --petronas-emerald: #00A19B;
-        --f1-silver: #E2E8F0;
-        --f1-obsidian: #080C0E;
-        --f1-dark-card: #0D1418;
-        --f1-border: rgba(0, 245, 212, 0.22);
-        --f1-red: #FF4D6D;
-        --f1-amber: #FFB800;
+        --v-cyan: #00F5D4;
+        --v-emerald: #00A19B;
+        --v-silver: #E2E8F0;
+        --v-obsidian: #080C0E;
+        --v-dark-card: #0D1418;
+        --v-border: rgba(0, 245, 212, 0.22);
+        --v-red: #FF4D6D;
+        --v-amber: #FFB800;
         --font-mono: 'Consolas', 'SF Mono', 'Courier New', monospace;
     }
 
     /* Main background */
     .stApp {
-        background-color: var(--f1-obsidian);
+        background-color: var(--v-obsidian);
         background-image: radial-gradient(circle at 50% 0%, rgba(0, 245, 212, 0.04) 0%, transparent 60%);
-        color: var(--f1-silver);
+        color: var(--v-silver);
     }
 
     /* Top header bar */
@@ -72,7 +72,7 @@ def inject_mercedes_f1_theme():
         transition: transform 0.15s ease, border-color 0.15s ease;
     }
     div[data-testid="stMetric"]:hover {
-        border-color: var(--petronas-cyan);
+        border-color: var(--v-cyan);
         transform: translateY(-2px);
     }
     div[data-testid="stMetric"] label {
@@ -88,8 +88,8 @@ def inject_mercedes_f1_theme():
         font-weight: 700 !important;
     }
 
-    /* F1 Pit-Wall pill badges */
-    .f1-pill {
+    /* Voltesse Command pill badges */
+    .v-pill {
         display: inline-block;
         padding: 4px 10px;
         font-size: 0.72rem;
@@ -99,17 +99,17 @@ def inject_mercedes_f1_theme():
         border-radius: 4px;
         font-family: var(--font-mono);
     }
-    .f1-pill-active {
+    .v-pill-active {
         background-color: rgba(0, 245, 212, 0.15);
         color: #00F5D4;
         border: 1px solid rgba(0, 245, 212, 0.4);
     }
-    .f1-pill-standby {
+    .v-pill-standby {
         background-color: rgba(255, 184, 0, 0.15);
         color: #FFB800;
         border: 1px solid rgba(255, 184, 0, 0.4);
     }
-    .f1-pill-alert {
+    .v-pill-alert {
         background-color: rgba(255, 77, 109, 0.15);
         color: #FF4D6D;
         border: 1px solid rgba(255, 77, 109, 0.4);
@@ -153,13 +153,13 @@ def initialize_state():
 
 def main():
     initialize_state()
-    inject_mercedes_f1_theme()
+    inject_voltesse_theme()
 
     if not st.session_state.logged_in:
         show_login()
         return
 
-    user = st.session_state.get("user", {"name": "Race Engineer", "role": "F1 TECHNICIAN"})
+    user = st.session_state.get("user", {"name": "Telemetry Engineer", "role": "LEAD TECHNICIAN"})
     
     st.sidebar.markdown(
         """
@@ -168,19 +168,19 @@ def main():
                 ⚡ VOLTESSE
             </div>
             <div style="font-size: 0.70rem; font-weight: 700; letter-spacing: 0.15em; color: #94A3B8;">
-                MERCEDES-AMG F1 PIT-WALL
+                TELEMETRY COMMAND CENTER
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
     
-    st.sidebar.caption(f"Telemetry Station • {user.get('name', 'Race Engineer')}")
-    st.sidebar.badge(user.get("role", "RACE ENGINEER"))
+    st.sidebar.caption(f"Telemetry Station • {user.get('name', 'Telemetry Engineer')}")
+    st.sidebar.badge(user.get("role", "LEAD TECHNICIAN"))
     st.sidebar.divider()
 
     page = st.sidebar.radio(
-        "PIT-WALL CHANNELS",
+        "TELEMETRY CHANNELS",
         ["Live Telemetry", "Diagnostics", "Sessions", "Settings"],
     )
     st.sidebar.divider()

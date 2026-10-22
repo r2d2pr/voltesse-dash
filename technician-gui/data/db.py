@@ -180,7 +180,7 @@ def get_recent_sessions(limit: int = 25) -> Tuple[List[Dict[str, Any]], bool]:
         item["source_type"] = "SIMULATED"
         item["status"] = "COMPLETED"
         item["driver"] = "demo_driver"
-        item["notes"] = "Mercedes-AMG F1 Simulation Benchmark"
+        item["notes"] = "Voltesse Telemetry Simulation Benchmark"
         item["max_speed_mph"] = 68.5
         item["total_distance_mi"] = 8.8
         item["total_distance_km"] = 14.2
@@ -317,7 +317,7 @@ def get_live_metrics() -> Tuple[Dict[str, Any], bool]:
 
 def get_live_telemetry_traces(limit: int = 60) -> Tuple[Dict[str, List[Any]], bool]:
     """
-    Fetch synchronized multi-channel telemetry time-series traces for the stacked F1 graphs.
+    Fetch synchronized multi-channel telemetry time-series traces for the stacked telemetry graphs.
     Returns (channels_dict, is_from_db).
     """
     db_url = get_db_url()

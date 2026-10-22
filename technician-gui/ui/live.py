@@ -1,9 +1,10 @@
 """
-Mercedes-AMG Formula 1 Pit-Wall Telemetry Interface (v5.0.0).
+Voltesse Telemetry Command Center (v5.0.0).
 
 Live vehicle telemetry streamed directly from PostgreSQL 16 persistence engine.
 Interactive simulation sliders are completely deprecated in v5.0.0.
 Telemetry is refreshed in real time via automated 1-second Streamlit fragments.
+Optimized with fixed axis bounds and uirevision for rock-solid, stutter-free live rendering.
 """
 
 from datetime import datetime, timezone
@@ -18,7 +19,7 @@ from data.db import (
 )
 
 
-def render_pitwall_content():
+def render_live_telemetry_content():
     """Inner telemetry content rendered on every fragment pulse."""
     values, is_db = get_live_metrics()
     traces, traces_is_db = get_live_telemetry_traces(limit=60)
@@ -39,7 +40,7 @@ def render_pitwall_content():
                         border-radius: 6px; padding: 8px 14px; margin-bottom: 14px; display: flex; 
                         justify-content: space-between; align-items: center; flex-wrap: wrap;">
                 <div>
-                    <span class="f1-pill f1-pill-active">🟢 TELEMETRY LINK: ACTIVE (CAN-0)</span>
+                    <span class="v-pill v-pill-active">🟢 TELEMETRY LINK: ACTIVE (CAN-0)</span>
                     <span style="margin-left: 10px; font-size: 0.82rem; font-weight: 600; color: #E2E8F0;">
                         PACKET AGE: <strong style="color: #00F5D4;">{packet_age:.1f}s</strong> &nbsp;|&nbsp; 
                         FRAME ID: <strong style="color: #FFFFFF;">#{log_id}</strong> &nbsp;|&nbsp; 
@@ -47,8 +48,8 @@ def render_pitwall_content():
                     </span>
                 </div>
                 <div>
-                    <span class="f1-pill f1-pill-active">MODE: {drive_mode}</span>
-                    <span class="f1-pill f1-pill-active" style="margin-left: 6px;">TRANS: {gear} [{trans_mode}]</span>
+                    <span class="v-pill v-pill-active">MODE: {drive_mode}</span>
+                    <span class="v-pill v-pill-active" style="margin-left: 6px;">TRANS: {gear} [{trans_mode}]</span>
                 </div>
             </div>
             """,
@@ -62,7 +63,7 @@ def render_pitwall_content():
                         border-radius: 6px; padding: 8px 14px; margin-bottom: 14px; display: flex; 
                         justify-content: space-between; align-items: center; flex-wrap: wrap;">
                 <div>
-                    <span class="f1-pill f1-pill-standby">🟠 TELEMETRY LINK: STANDBY</span>
+                    <span class="v-pill v-pill-standby">🟠 TELEMETRY LINK: STANDBY</span>
                     <span style="margin-left: 10px; font-size: 0.82rem; font-weight: 600; color: #E2E8F0;">
                         LAST PACKET: <strong style="color: #FFB800;">{age_display} AGO</strong> &nbsp;|&nbsp; 
                         SESSION: <strong style="color: #FFFFFF;">#{session_id}</strong> &nbsp;|&nbsp; 
@@ -70,7 +71,7 @@ def render_pitwall_content():
                     </span>
                 </div>
                 <div>
-                    <span class="f1-pill f1-pill-standby">AWAITING CAN FRAME</span>
+                    <span class="v-pill v-pill-standby">AWAITING CAN FRAME</span>
                 </div>
             </div>
             """,
@@ -83,13 +84,13 @@ def render_pitwall_content():
                         border-radius: 6px; padding: 8px 14px; margin-bottom: 14px; display: flex; 
                         justify-content: space-between; align-items: center; flex-wrap: wrap;">
                 <div>
-                    <span class="f1-pill f1-pill-alert">🔴 TELEMETRY LINK: DISCONNECTED</span>
+                    <span class="v-pill v-pill-alert">🔴 TELEMETRY LINK: DISCONNECTED</span>
                     <span style="margin-left: 10px; font-size: 0.82rem; font-weight: 600; color: #E2E8F0;">
                         POSTGRESQL RECONNECTING... (SHOWING BENCH BASELINE)
                     </span>
                 </div>
                 <div>
-                    <span class="f1-pill f1-pill-alert">DB OFFLINE</span>
+                    <span class="v-pill v-pill-alert">DB OFFLINE</span>
                 </div>
             </div>
             """,
@@ -106,11 +107,11 @@ def render_pitwall_content():
     is_low_soc = battery_soc <= warn_battery
 
     if is_hot:
-        st.error(f"🚨 CRITICAL THERMAL LIMIT: Motor Core Temperature {mot_temp:.1f} °F exceeds race threshold ({warn_temp} °F)!")
+        st.error(f"🚨 CRITICAL THERMAL LIMIT: Motor Core Temperature {mot_temp:.1f} °F exceeds calibrated threshold ({warn_temp} °F)!")
     if is_low_soc:
         st.warning(f"⚠️ LOW ENERGY ALERT: Battery State-of-Charge at {battery_soc:.1f}% (Limit: {warn_battery}%)!")
 
-    # 3. Primary F1 6-Card Telemetry Strip
+    # 3. Primary 6-Card Telemetry Strip
     c1, c2, c3, c4, c5, c6 = st.columns(6)
 
     # Card 1: Speed
@@ -165,129 +166,191 @@ def render_pitwall_content():
 
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
-    # 4. Stacked F1 Telemetry Traces
-    st.subheader("F1 Synchronized Telemetry Traces")
+    # 4. Synchronized Telemetry Traces (Stutter-Free Architecture)
+    st.subheader("Real-Time Telemetry Traces")
 
     if traces_is_db and len(traces.get("indices", [])) >= 3:
-        indices = traces["indices"]
+        raw_indices = traces["indices"]
+        num_pts = len(raw_indices)
+        # Relative rolling time window in seconds: rightmost point is 0s (now), earlier points are negative seconds
+        time_seconds = [- (num_pts - 1 - i) for i in range(num_pts)]
+
         speeds = traces["speeds"]
         rpms = traces["rpms"]
         throttles = traces["throttles"]
         brakes = traces["brakes"]
         powers = traces["powers_kw"]
-        motor_temps = traces["motor_temps_f"]
 
-        # 3-Stack Synchronized Pit-Wall Subplots
-        fig = make_subplots(
-            rows=3, cols=1,
-            shared_xaxes=True,
-            vertical_spacing=0.06,
-            subplot_titles=(
-                "SPEED (MPH) & MOTOR RPM",
-                "DRIVER INPUT DEMAND (THROTTLE & BRAKE %)",
-                "NET POWER FLOW (kW) & MOTOR CORE TEMPERATURE (°F)",
-            ),
-            specs=[[{"secondary_y": True}], [{"secondary_y": False}], [{"secondary_y": True}]],
-        )
-
-        # Subplot 1: Speed & RPM
-        fig.add_trace(
+        # Upper Chart: Velocity (MPH) & Motor Velocity (RPM) Dual-Axis Trace
+        fig_speed = make_subplots(specs=[[{"secondary_y": True}]])
+        fig_speed.add_trace(
             go.Scatter(
-                x=indices, y=speeds, name="Speed (MPH)",
+                x=time_seconds, y=speeds, name="Speed (MPH)",
                 line=dict(color="#00F5D4", width=2.5),
             ),
-            row=1, col=1, secondary_y=False,
+            secondary_y=False,
         )
-        fig.add_trace(
+        fig_speed.add_trace(
             go.Scatter(
-                x=indices, y=rpms, name="Motor RPM",
+                x=time_seconds, y=rpms, name="Motor RPM",
                 line=dict(color="#E2E8F0", width=1.5, dash="dot"),
             ),
-            row=1, col=1, secondary_y=True,
+            secondary_y=True,
         )
-
-        # Subplot 2: Throttle & Brake Overlaid
-        fig.add_trace(
-            go.Scatter(
-                x=indices, y=throttles, name="Throttle %",
-                line=dict(color="#00F5A0", width=2),
-                fill="tozeroy", fillcolor="rgba(0, 245, 160, 0.15)",
-            ),
-            row=2, col=1,
-        )
-        fig.add_trace(
-            go.Scatter(
-                x=indices, y=brakes, name="Brake %",
-                line=dict(color="#FF4D6D", width=2),
-                fill="tozeroy", fillcolor="rgba(255, 77, 109, 0.25)",
-            ),
-            row=2, col=1,
-        )
-
-        # Subplot 3: Net Power & Thermal
-        fig.add_trace(
-            go.Scatter(
-                x=indices, y=powers, name="Power (kW)",
-                line=dict(color="#00E5FF", width=2),
-            ),
-            row=3, col=1, secondary_y=False,
-        )
-        fig.add_trace(
-            go.Scatter(
-                x=indices, y=motor_temps, name="Motor Temp (°F)",
-                line=dict(color="#FFB800", width=2),
-            ),
-            row=3, col=1, secondary_y=True,
-        )
-        # Warning limit line
-        fig.add_hline(
-            y=warn_temp, line_dash="dash", line_color="#FF4D6D",
-            row=3, col=1, secondary_y=True,
-            annotation_text=f"Limit ({warn_temp}°F)", annotation_position="top right",
-        )
-
-        # Layout styling
-        fig.update_layout(
-            height=580,
+        fig_speed.update_layout(
+            title=dict(text="SPEED & MOTOR VELOCITY TRACE", font=dict(size=12, color="#00F5D4")),
+            height=260,
             template="plotly_dark",
             paper_bgcolor="#090E11",
             plot_bgcolor="#070B0D",
             margin=dict(l=50, r=50, t=35, b=25),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0),
             hovermode="x unified",
+            uirevision="telemetry_stream",
+            transition=dict(duration=0),
         )
-        fig.update_xaxes(showgrid=True, gridcolor="rgba(0, 245, 212, 0.08)", zeroline=False)
-        fig.update_yaxes(showgrid=True, gridcolor="rgba(0, 245, 212, 0.08)", zeroline=False)
-
-        fig.update_yaxes(title_text="Speed (MPH)", row=1, col=1, secondary_y=False)
-        fig.update_yaxes(title_text="RPM", row=1, col=1, secondary_y=True)
-        fig.update_yaxes(title_text="Demand (%)", range=[0, 105], row=2, col=1)
-        fig.update_yaxes(title_text="Power (kW)", row=3, col=1, secondary_y=False)
-        fig.update_yaxes(title_text="Temp (°F)", row=3, col=1, secondary_y=True)
-
-        st.plotly_chart(fig, width="stretch")
-    else:
-        # Fallback Temperature Trace
-        times, temps, _ = get_live_temperature_history(seconds=60)
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=times, y=temps, mode="lines+markers", name="Motor Temp (°F)",
-            line=dict(color="#00F5D4", width=3), marker=dict(size=4),
-        ))
-        fig.add_hline(
-            y=warn_temp, line_dash="dash", line_color="#FF4D6D",
-            annotation_text=f"Warning Limit ({warn_temp}°F)", annotation_position="top right",
+        fig_speed.update_xaxes(
+            range=[-59, 1],
+            fixedrange=True,
+            showgrid=True,
+            gridcolor="rgba(0, 245, 212, 0.08)",
+            ticksuffix="s",
+            nticks=7,
         )
-        fig.update_layout(
-            xaxis_title="Telemetry Packet Sequence",
-            yaxis_title="Motor Temperature (°F)",
-            height=320,
+        fig_speed.update_yaxes(
+            title_text="Speed (MPH)",
+            range=[0, 120],
+            fixedrange=True,
+            showgrid=True,
+            gridcolor="rgba(0, 245, 212, 0.08)",
+            secondary_y=False,
+        )
+        fig_speed.update_yaxes(
+            title_text="Motor RPM",
+            range=[0, 8500],
+            fixedrange=True,
+            showgrid=False,
+            secondary_y=True,
+        )
+        st.plotly_chart(
+            fig_speed,
+            key="chart_live_speed",
+            width="stretch",
+            config={"displayModeBar": False, "responsive": True},
+        )
+
+        # Lower Chart: Driver Demand (Throttle/Brake %) & Net Power Flow (kW)
+        fig_demand = make_subplots(specs=[[{"secondary_y": True}]])
+        fig_demand.add_trace(
+            go.Scatter(
+                x=time_seconds, y=throttles, name="Throttle %",
+                line=dict(color="#00F5A0", width=2),
+                fill="tozeroy", fillcolor="rgba(0, 245, 160, 0.15)",
+            ),
+            secondary_y=False,
+        )
+        fig_demand.add_trace(
+            go.Scatter(
+                x=time_seconds, y=brakes, name="Brake %",
+                line=dict(color="#FF4D6D", width=2),
+                fill="tozeroy", fillcolor="rgba(255, 77, 109, 0.25)",
+            ),
+            secondary_y=False,
+        )
+        fig_demand.add_trace(
+            go.Scatter(
+                x=time_seconds, y=powers, name="Power (kW)",
+                line=dict(color="#00E5FF", width=2),
+            ),
+            secondary_y=True,
+        )
+        fig_demand.update_layout(
+            title=dict(text="DRIVER DEMAND & NET POWER FLOW", font=dict(size=12, color="#00F5D4")),
+            height=260,
             template="plotly_dark",
             paper_bgcolor="#090E11",
             plot_bgcolor="#070B0D",
-            margin=dict(l=40, r=40, t=30, b=30),
+            margin=dict(l=50, r=50, t=35, b=25),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0),
+            hovermode="x unified",
+            uirevision="telemetry_stream",
+            transition=dict(duration=0),
         )
-        st.plotly_chart(fig, width="stretch")
+        fig_demand.update_xaxes(
+            range=[-59, 1],
+            fixedrange=True,
+            showgrid=True,
+            gridcolor="rgba(0, 245, 212, 0.08)",
+            ticksuffix="s",
+            nticks=7,
+        )
+        fig_demand.update_yaxes(
+            title_text="Demand (%)",
+            range=[-2, 102],
+            fixedrange=True,
+            showgrid=True,
+            gridcolor="rgba(0, 245, 212, 0.08)",
+            secondary_y=False,
+        )
+        fig_demand.update_yaxes(
+            title_text="Power (kW)",
+            range=[-30, 150],
+            fixedrange=True,
+            showgrid=False,
+            secondary_y=True,
+        )
+        st.plotly_chart(
+            fig_demand,
+            key="chart_live_demand",
+            width="stretch",
+            config={"displayModeBar": False, "responsive": True},
+        )
+    else:
+        # Fallback Temperature Trace (Rock-Solid Fixed Range)
+        times, temps, _ = get_live_temperature_history(seconds=60)
+        num_pts = len(times)
+        rel_times = [- (num_pts - 1 - i) for i in range(num_pts)]
+
+        fig_fallback = go.Figure()
+        fig_fallback.add_trace(go.Scatter(
+            x=rel_times, y=temps, mode="lines+markers", name="Motor Temp (°F)",
+            line=dict(color="#00F5D4", width=3), marker=dict(size=4),
+        ))
+        fig_fallback.add_hline(
+            y=warn_temp, line_dash="dash", line_color="#FF4D6D",
+            annotation_text=f"Warning Limit ({warn_temp}°F)", annotation_position="top right",
+        )
+        fig_fallback.update_layout(
+            title=dict(text="MOTOR CORE TEMPERATURE TREND", font=dict(size=12, color="#00F5D4")),
+            height=300,
+            template="plotly_dark",
+            paper_bgcolor="#090E11",
+            plot_bgcolor="#070B0D",
+            margin=dict(l=50, r=50, t=35, b=25),
+            uirevision="telemetry_stream",
+            transition=dict(duration=0),
+        )
+        fig_fallback.update_xaxes(
+            range=[-59, 1],
+            fixedrange=True,
+            showgrid=True,
+            gridcolor="rgba(0, 245, 212, 0.08)",
+            ticksuffix="s",
+            nticks=7,
+        )
+        fig_fallback.update_yaxes(
+            range=[60, max(210, warn_temp + 20)],
+            fixedrange=True,
+            showgrid=True,
+            gridcolor="rgba(0, 245, 212, 0.08)",
+            title_text="Motor Temp (°F)",
+        )
+        st.plotly_chart(
+            fig_fallback,
+            key="chart_live_fallback",
+            width="stretch",
+            config={"displayModeBar": False, "responsive": True},
+        )
 
     st.divider()
 
@@ -343,13 +406,13 @@ def render_pitwall_content():
 @st.fragment(run_every="1s")
 def render_live_telemetry_streaming():
     """Fragment re-executing automatically every 1 second without page flicker."""
-    render_pitwall_content()
+    render_live_telemetry_content()
 
 
 @st.fragment
 def render_live_telemetry_paused():
     """Fragment when stream is manually paused."""
-    render_pitwall_content()
+    render_live_telemetry_content()
 
 
 def show_live():
@@ -359,10 +422,10 @@ def show_live():
         st.markdown(
             """
             <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 1.8rem;">🏎️</span>
+                <span style="font-size: 1.8rem;">⚡</span>
                 <div>
                     <h2 style="margin: 0; padding: 0; font-weight: 800; letter-spacing: 0.05em; color: #FFFFFF;">
-                        F1 TELEMETRY COMMAND
+                        LIVE TELEMETRY COMMAND
                     </h2>
                     <p style="margin: 0; padding: 0; font-size: 0.82rem; color: #94A3B8;">
                         Direct PostgreSQL 16 Persistence Engine Telemetry Feed (Imperial °F / MPH / mi)

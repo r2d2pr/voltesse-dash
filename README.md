@@ -8,23 +8,24 @@
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 5.0.0 delivers the **Mercedes-AMG Formula 1 Pit-Wall Telemetry Command Center** for the technician portal (`technician-gui/`), featuring **Automated 1-Second Real-Time Telemetry Streaming** (`@st.fragment(run_every='1s')`), **Packet Freshness & Standby Detection**, **Complete Deprecation of Simulation Sliders** in favor of live PostgreSQL telemetry, **Stacked Synchronized F1 Telemetry Traces** (Speed/RPM, Driver Demand throttle/brake overlays, Net Power & Thermal curves), and **Strict Imperial Standardization** across the entire digital ecosystem. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
+A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 5.0.0 delivers the **Voltesse Pit-Wall Telemetry Command Center** for the technician portal (`technician-gui/`), featuring **Automated 1-Second Real-Time Telemetry Streaming** (`@st.fragment(run_every='1s')`), **Packet Freshness & Standby Detection**, **Complete Deprecation of Simulation Sliders** in favor of live PostgreSQL telemetry, **Rock-Solid Stutter-Free Synchronized Telemetry Traces** (Speed/RPM, Driver Demand throttle/brake overlays, Net Power & Thermal curves), and **Strict Imperial Standardization** across the entire digital ecosystem. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
 
 ---
 
 ## What's New in Version 5.0.0 🚀
 
-- 🏎️ **Mercedes-AMG Formula 1 Pit-Wall Telemetry Redesign**:
-  - Overhauled the Streamlit technician interface into a sleek F1 race-engineering pit-wall command center.
-  - Deep obsidian cockpit void (`#080C0E`), iconic Mercedes Petronas Emerald Cyan (`#00F5D4` / `#00A19B`), and metallic silver telemetry badges (`#E2E8F0`).
+- 🏎️ **Voltesse Pit-Wall Telemetry Command Center**:
+  - Overhauled the Streamlit technician interface into a sleek automotive race-engineering pit-wall command center.
+  - Deep obsidian cockpit void (`#080C0E`), Voltesse Emerald Cyan (`#00F5D4` / `#00A19B`), and metallic silver telemetry badges (`#E2E8F0`).
 - ⏱️ **Real-Time 1-Second Fragment Streaming & Packet Freshness**:
   - Resolved historical live vehicle status stagnation: Streamlit views now leverage non-blocking `@st.fragment(run_every="1s")` with a live pause/stream toggle.
   - Automatic packet age analysis classifies incoming CAN frames as `🟢 ACTIVE` (age ≤ 4.0s), `🟠 STANDBY` with elapsed packet duration for idle/parked vehicles, or `🔴 DISCONNECTED` with database reconnection guidance.
 - 🚫 **Complete Deprecation of Interactive Simulation Sliders**:
   - Streamlit interface now strictly reflects live and historical data persisted to PostgreSQL 16.
   - Pure single source of truth for race engineers and bench technicians with zero manual simulation manipulation.
-- 📊 **Stacked F1 Telemetry Traces & 6-Card Primary Strip**:
-  - Synchronized multi-channel time-series traces: Velocity & Motor RPM dual-axis, Driver Demand (throttle % and brake % overlays), and Net Power (kW) vs. Motor Core Temperature (°F).
+- 📊 **Rock-Solid Stutter-Free Telemetry Traces & 6-Card Primary Strip**:
+  - Eliminated live chart jitter and stuttering via fixed axis bounds, relative rolling seconds window (`-60s` to `0s`), `uirevision="telemetry_stream"`, and zero-duration redraw transitions.
+  - Synchronized multi-channel time-series traces: Velocity & Motor RPM dual-axis, Driver Demand (throttle % and brake % overlays), and Net Power (kW) flow.
   - Sculpted 6-card primary telemetry strip: Speed (`MPH`), Motor Velocity (`RPM`), Battery SoC (`%`), Net Power Flow (`kW`), Driver Demand (`THR% / BRK%`), and Motor Core (`°F`).
 - 🇺🇸 **Strict Imperial System Standardization**:
   - Exclusively imperial readouts across the technician portal: `MPH`, `°F`, `mi`, and `psi`, fully harmonized with the digital cockpit.
@@ -105,7 +106,7 @@ voltesse-dash/
 │   ├── telemetry_source.py    # Autonomous EV driving cycle telemetry stream (Test Mode, D1-D6 auto)
 │   ├── dashboard_gui.py       # PyQt6 digital cluster interface & 800x480 auto-scaling engine
 │   └── database.py            # PostgreSQL persistence: batched writer, sessions, retention, write controls, exports
-├── technician-gui/            # Mercedes-AMG F1 Pit-Wall Streamlit web interface
+├── technician-gui/            # Voltesse Pit-Wall Streamlit web interface
 │   ├── app.py                 # Streamlit entrypoint and navigation controller
 │   ├── data/
 │   │   ├── db.py              # PostgreSQL database queries, authentication & real-time telemetry feed
@@ -127,7 +128,7 @@ voltesse-dash/
 
 | Key | Function | Mode Availability |
 | :--- | :--- | :--- |
-| `1` / `F1` / `Num 1` | Switch to **Race Mode (CAN Bus)** | Global |
+| `1` / `Fn 1` / `Num 1` | Switch to **Race Mode (CAN Bus)** | Global |
 | `2` / `F2` / `Num 2` | Switch to **Simulation Mode (Keyboard Game)** | Global |
 | `3` / `F3` / `Num 3` | Switch to **Test Mode (Autonomous Mock)** | Global |
 | `Tab` | Cycle through Operating Modes (Race ➔ Sim ➔ Test) | Global |
@@ -153,7 +154,7 @@ voltesse-dash/
 
 ---
 
-## Technician Web Portal (Mercedes-AMG F1 Pit-Wall)
+## Technician Web Portal (Voltesse Pit-Wall)
 
 The technician portal provides pit-wall telemetry monitoring, session playback, and calibration diagnostics. Run with:
 
@@ -161,7 +162,7 @@ The technician portal provides pit-wall telemetry monitoring, session playback, 
 streamlit run technician-gui/app.py
 ```
 
-- **Live Telemetry Channel**: Real-time 1-second auto-streaming (`@st.fragment`) telemetry from PostgreSQL with link status (`ACTIVE`, `STANDBY`, `DISCONNECTED`), packet latency indicators, 6-card primary strip, stacked F1 traces, and full thermal matrix (`°F`).
+- **Live Telemetry Channel**: Real-time 1-second auto-streaming (`@st.fragment`) telemetry from PostgreSQL with link status (`ACTIVE`, `STANDBY`, `DISCONNECTED`), packet latency indicators, 6-card primary strip, stutter-free synchronized traces, and full thermal matrix (`°F`).
 - **Diagnostics Channel**: High-resolution performance curves (Energy Efficiency vs. Speed, Power Draw vs. Motor Temp, Battery SoC vs. Distance, Power Draw vs. RPM, Motor Temp rise vs. Time).
 - **Sessions Channel**: Historical timing-board log with session duration, peak thermals (`°F`), max speed (`MPH`), and total distance (`mi`).
 - **Settings Channel**: Calibration of motor thermal warning limit (`110°F`–`230°F`, default `160°F`), low battery alert threshold (`5%`–`40%`, default `20%`), and database link diagnostics.

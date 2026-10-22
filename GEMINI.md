@@ -12,7 +12,7 @@ Voltesse Dash is a production-grade, distraction-free automotive digital instrum
 - **Cluster GUI**: Python 3.10+, **PyQt6** (custom automotive vector rendering with `QPainter`, hardware-composited geometry animations, zero QML/web-view overhead for guaranteed 60 FPS performance).
 - **Vehicle Bus Interface**: **python-can** with `SocketCAN` support on Linux/RPi, virtual CAN bus, and synchronized frame decoders.
 - **Persistence Engine**: **PostgreSQL 16** with asynchronous, micro-batched worker threads preventing flash wear on SD cards.
-- **Technician Portal**: **Streamlit** multi-page admin dashboard for bench calibration, session export, and diagnostics styled as a **Mercedes-AMG Formula 1 Pit-Wall Command Center**.
+- **Technician Portal**: **Streamlit** multi-page admin dashboard for bench calibration, session export, and diagnostics styled as a **Voltesse Pit-Wall Command Center**.
 - **Operating Modes**:
   1. 🏎️ **Race Mode (Default)**: Direct CAN bus frame decoding for live vehicle telemetry.
   2. 🎮 **Simulation Mode**: Real-time video game physics engine mapped to keyboard inputs (`W/A/S/D`, arrow keys, shifting).
@@ -32,7 +32,7 @@ Voltesse Dash is a production-grade, distraction-free automotive digital instrum
   - **Energy Consumption**: `kWh/100mi` or `Wh/mi`.
 - **Constraint**: Never reintroduce metric units, metric toggle badges, or unit switching toggles back to the cluster GUI or technician portal.
 
-### 🏎️ Mercedes-AMG F1 Pit-Wall Technician Portal Architecture (v5.0.0+)
+### 🏎️ Voltesse Pit-Wall Technician Portal Architecture (v5.0.0+)
 - **No Simulation Sliders**:
   - The technician portal strictly displays persisted live and historical telemetry from PostgreSQL 16. Interactive simulation sliders are prohibited in the technician GUI.
 - **1-Second Fragment Streaming (`@st.fragment`)**:
@@ -42,13 +42,13 @@ Voltesse Dash is a production-grade, distraction-free automotive digital instrum
     - `🟢 ACTIVE`: `packet_age_sec <= 4.0` (indicates live CAN frame stream).
     - `🟠 STANDBY`: `packet_age_sec > 4.0` (indicates vehicle parked, bench idle, or ignition off; displays elapsed duration since last packet).
     - `🔴 DISCONNECTED`: PostgreSQL unreachable (displays diagnostic link status with instructions to launch PostgreSQL container).
-- **Synchronized Stacked F1 Telemetry Traces**:
-  - High-resolution multi-channel telemetry graphs styled after F1 pit-walls:
+- **Synchronized Stacked Telemetry Traces**:
+  - High-resolution multi-channel telemetry graphs styled as a digital race command center:
     - Channel 1: Speed (`MPH`) & Motor Velocity (`RPM`) dual-axis.
     - Channel 2: Driver Demand (Throttle % & Brake % overlays with area fill).
     - Channel 3: Net Power (`kW`) & Motor Core Temperature (`°F`) with warning limit line.
-- **F1 Pit-Wall Visual Aesthetic**:
-  - Deep obsidian void (`#080C0E`), Mercedes Petronas Emerald Cyan (`#00F5D4` / `#00A19B`), and metallic silver badges (`#E2E8F0`).
+- **Voltesse Command Visual Aesthetic**:
+  - Deep obsidian void (`#080C0E`), Voltesse Emerald Cyan (`#00F5D4` / `#00A19B`), and metallic silver badges (`#E2E8F0`).
 
 ### 🔴 Continuous Always-Active Logging
 - The telemetry engine logs continuously to PostgreSQL throughout operation.
