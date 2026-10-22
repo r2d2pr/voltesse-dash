@@ -1,14 +1,19 @@
 [theme]
-base = "light"
-primaryColor = "#2471E8"
-backgroundColor = "#F4F6F9"
-secondaryBackgroundColor = "#FFFFFF"
-textColor = "#1F2D3D"
-borderColor = "#D7DFE7"
+base = "dark"
+primaryColor = "#00F5D4"
+backgroundColor = "#080C0E"
+secondaryBackgroundColor = "#10161D"
+textColor = "#E2E8F0"
+borderColor = "#1E293B"
 font = "sans-serif"
 
 [theme.sidebar]
-backgroundColor = "#1F2D3D"
-secondaryBackgroundColor = "#293B50"
-textColor = "#FFFFFF"
-primaryColor = "#2471E8"
+backgroundColor = "#0A0F14"
+secondaryBackgroundColor = "#121A22"
+textColor = "#E2E8F0"
+primaryColor = "#00F5D4"
+
+[server]
+headless = true
+enableCORS = false
+enableXsrfProtection = false

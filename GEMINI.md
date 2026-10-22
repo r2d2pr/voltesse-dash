@@ -12,7 +12,7 @@ Voltesse Dash is a production-grade, distraction-free automotive digital instrum
 - **Cluster GUI**: Python 3.10+, **PyQt6** (custom automotive vector rendering with `QPainter`, hardware-composited geometry animations, zero QML/web-view overhead for guaranteed 60 FPS performance).
 - **Vehicle Bus Interface**: **python-can** with `SocketCAN` support on Linux/RPi, virtual CAN bus, and synchronized frame decoders.
 - **Persistence Engine**: **PostgreSQL 16** with asynchronous, micro-batched worker threads preventing flash wear on SD cards.
-- **Technician Portal**: **Streamlit** multi-page admin dashboard for bench calibration, session export, and diagnostics.
+- **Technician Portal**: **Streamlit** multi-page admin dashboard for bench calibration, session export, and diagnostics styled as a **Mercedes-AMG Formula 1 Pit-Wall Command Center**.
 - **Operating Modes**:
   1. 🏎️ **Race Mode (Default)**: Direct CAN bus frame decoding for live vehicle telemetry.
   2. 🎮 **Simulation Mode**: Real-time video game physics engine mapped to keyboard inputs (`W/A/S/D`, arrow keys, shifting).
@@ -23,14 +23,32 @@ Voltesse Dash is a production-grade, distraction-free automotive digital instrum
 ## 2. Hard Architectural Rules & Non-Negotiable Constraints
 
 ### 🇺🇸 Imperial Units Exclusively (Metric Deprecated)
-- All driver-facing telemetry, gauges, readouts, and database persistence are strictly locked to the **Imperial System**:
+- All driver-facing telemetry, gauges, readouts, database persistence, and technician web portal metrics are strictly locked to the **Imperial System**:
   - **Speed**: `MPH` (0–120 dial and digital numerals).
   - **Distance**: Miles (`mi`) for trip odometer and battery range.
   - **Thermals**: Degrees Fahrenheit (`°F`) for motor, inverter, battery pack, and tire thermals.
   - **Tire Pressure (TPMS)**: Pounds per square inch (`psi`).
   - **Dual-Motor Torque Vectoring**: Foot-pounds (`lb-ft`).
-  - **Energy Consumption**: `kWh/100mi`.
-- **Constraint**: Never reintroduce metric units, metric toggle badges, or unit switching toggles back to the cluster GUI.
+  - **Energy Consumption**: `kWh/100mi` or `Wh/mi`.
+- **Constraint**: Never reintroduce metric units, metric toggle badges, or unit switching toggles back to the cluster GUI or technician portal.
+
+### 🏎️ Mercedes-AMG F1 Pit-Wall Technician Portal Architecture (v5.0.0+)
+- **No Simulation Sliders**:
+  - The technician portal strictly displays persisted live and historical telemetry from PostgreSQL 16. Interactive simulation sliders are prohibited in the technician GUI.
+- **1-Second Fragment Streaming (`@st.fragment`)**:
+  - All real-time telemetry updates must be wrapped in `@st.fragment(run_every="1s")` with a pause/resume toggle. This eliminates full-page reloads and provides smooth, flicker-free live streaming.
+- **Packet Freshness & Link Status Contract**:
+  - Telemetry freshness must be evaluated per incoming CAN packet timestamp against current UTC time:
+    - `🟢 ACTIVE`: `packet_age_sec <= 4.0` (indicates live CAN frame stream).
+    - `🟠 STANDBY`: `packet_age_sec > 4.0` (indicates vehicle parked, bench idle, or ignition off; displays elapsed duration since last packet).
+    - `🔴 DISCONNECTED`: PostgreSQL unreachable (displays diagnostic link status with instructions to launch PostgreSQL container).
+- **Synchronized Stacked F1 Telemetry Traces**:
+  - High-resolution multi-channel telemetry graphs styled after F1 pit-walls:
+    - Channel 1: Speed (`MPH`) & Motor Velocity (`RPM`) dual-axis.
+    - Channel 2: Driver Demand (Throttle % & Brake % overlays with area fill).
+    - Channel 3: Net Power (`kW`) & Motor Core Temperature (`°F`) with warning limit line.
+- **F1 Pit-Wall Visual Aesthetic**:
+  - Deep obsidian void (`#080C0E`), Mercedes Petronas Emerald Cyan (`#00F5D4` / `#00A19B`), and metallic silver badges (`#E2E8F0`).
 
 ### 🔴 Continuous Always-Active Logging
 - The telemetry engine logs continuously to PostgreSQL throughout operation.
@@ -116,10 +134,14 @@ Voltesse Dash is a production-grade, distraction-free automotive digital instrum
 - **Local Python Environment**: `.\.venv\Scripts\python.exe`
 - **Unit Test Discovery**:
   ```powershell
+  # Cockpit GUI and telemetry tests (29 tests)
   .\.venv\Scripts\python.exe -m unittest discover -s tests -v
+
+  # Technician web portal tests (12 tests)
+  .\.venv\Scripts\python.exe -m unittest discover -s technician-gui/tests -v
   ```
 - **Requirements for PRs / Changes**:
-  - **100% Green**: All tests in `tests/test_voltesse.py` must pass with zero failures or errors.
+  - **100% Green**: All tests across both test suites must pass with zero failures or errors (41 total tests).
   - **Preserve Existing Attributes**: Do NOT break legacy or test-inspected attributes on `VoltesseDashboard` (`page_stack`, `center_stack`, `speed_gauge`, `battery_hero`, `powertrain_hero`, `tpms_widget`, `compact_speed_widget`, `compact_speed_pods`, `trip_pod`, `thermal_widget`, `bottom_bar`).
   - **QTimer & Thread Safety**: Always supply a context QObject when scheduling single-shot timers to prevent dangling callbacks on destructed widgets.
 
@@ -134,8 +156,8 @@ Voltesse Dash is a production-grade, distraction-free automotive digital instrum
 2. **Clean Working Tree**:
    - Delete temporary render scripts, scratch test files, and artifacts before staging.
 3. **Git Tagging Standard (STRICT)**:
-   - **Single Tag with `v` Prefix ONLY**: Always create annotated tags formatted as `vX.Y.Z` (e.g. `v4.3.0`).
-   - **NEVER Push Duplicate Un-Prefixed Tags**: Do NOT create or push tags like `4.3.0` alongside `v4.3.0`.
+   - **Single Tag with `v` Prefix ONLY**: Always create annotated tags formatted as `vX.Y.Z` (e.g. `v5.0.0`).
+   - **NEVER Push Duplicate Un-Prefixed Tags**: Do NOT create or push tags like `5.0.0` alongside `v5.0.0`.
    - Push command:
      ```powershell
      & "C:\Program Files\Git\cmd\git.exe" push origin main --tags

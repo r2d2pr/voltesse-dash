@@ -1,28 +1,33 @@
-# Voltesse Dash ⚡ v4.4.0
+# Voltesse Dash ⚡ v5.0.0
 
-[![Version](https://img.shields.io/badge/version-4.4.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
+[![Version](https://img.shields.io/badge/version-5.0.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/PyQt-6-green.svg)](https://riverbankcomputing.com/software/pyqt/)
-[![Web](https://img.shields.io/badge/Streamlit-1.65-red.svg)](https://streamlit.io/)
+[![Web](https://img.shields.io/badge/Streamlit-1.66-red.svg)](https://streamlit.io/)
 [![Database](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 4.4.0 delivers **Native Anti-Aliased Vector Trip & Battery Icons** (eliminating missing-glyph blank boxes across platforms) and a **Clean Top HUD Ribbon** (removing redundant top-bar speed boxes in favor of the permanent side `CompactSpeedPod` across all hero pages), building on Version 4.3's **Slide & Depth-Crossfade Animated View Transitions**, **Always-Visible Speed View**, **Modern Obsidian Cyber-Dock Deck**, **Exclusively Imperial Telemetry** (`MPH`, `mi`, `°F`, `psi`, `lb-ft`), and **Continuous Always-Active Logging**. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
+A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 5.0.0 delivers the **Mercedes-AMG Formula 1 Pit-Wall Telemetry Command Center** for the technician portal (`technician-gui/`), featuring **Automated 1-Second Real-Time Telemetry Streaming** (`@st.fragment(run_every='1s')`), **Packet Freshness & Standby Detection**, **Complete Deprecation of Simulation Sliders** in favor of live PostgreSQL telemetry, **Stacked Synchronized F1 Telemetry Traces** (Speed/RPM, Driver Demand throttle/brake overlays, Net Power & Thermal curves), and **Strict Imperial Standardization** across the entire digital ecosystem. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
 
 ---
 
-## What's New in Version 4.4.0 🚀
+## What's New in Version 5.0.0 🚀
 
-- 📍 **Native Vector Trip & Battery Icons (Blank Box Fix)**:
-  - Replaced legacy Plane-1 Unicode emoji characters (`📍`, `🔋`) that rendered as missing-glyph blank boxes (`□`) on systems lacking dedicated color emoji font fallback.
-  - **Vector Trip Navigation Marker**: Custom `TripHeaderLabel` rendering an anti-aliased, cyber-mint (`#00F5A0`) navigation marker pin with a hollow core directly using `QPainterPath`, guaranteeing crisp scaling and zero rendering glitches on embedded Linux, Raspberry Pi, and Windows.
-  - **Vector Battery Diagnostic Icon**: Custom horizontal battery cell in the bottom cyber-dock thermal monitor featuring a rounded outer casing, positive terminal nipple, and real-time state-aware charge fill glowing mint (`OK`), amber (`WARM`), or neon red (`HOT`).
-- 🪟 **Streamlined Top HUD Ribbon (Speed Box Removed)**:
-  - Removed the top-bar digital speed fallback pill (`speed_hud_badge`).
-  - With the permanent, integrated side **Compact Speed Pod** (`CompactSpeedPod`) seamlessly visible across all diagnostic pages (Battery, Powertrain, TPMS), the top ribbon is free of visual clutter.
-- 📖 **Clean Latest-Only Patch Notes**:
-  - Documentation structure streamlined: `README.md` now highlights only the latest release patch notes per revision for immediate clarity and readability.
+- 🏎️ **Mercedes-AMG Formula 1 Pit-Wall Telemetry Redesign**:
+  - Overhauled the Streamlit technician interface into a sleek F1 race-engineering pit-wall command center.
+  - Deep obsidian cockpit void (`#080C0E`), iconic Mercedes Petronas Emerald Cyan (`#00F5D4` / `#00A19B`), and metallic silver telemetry badges (`#E2E8F0`).
+- ⏱️ **Real-Time 1-Second Fragment Streaming & Packet Freshness**:
+  - Resolved historical live vehicle status stagnation: Streamlit views now leverage non-blocking `@st.fragment(run_every="1s")` with a live pause/stream toggle.
+  - Automatic packet age analysis classifies incoming CAN frames as `🟢 ACTIVE` (age ≤ 4.0s), `🟠 STANDBY` with elapsed packet duration for idle/parked vehicles, or `🔴 DISCONNECTED` with database reconnection guidance.
+- 🚫 **Complete Deprecation of Interactive Simulation Sliders**:
+  - Streamlit interface now strictly reflects live and historical data persisted to PostgreSQL 16.
+  - Pure single source of truth for race engineers and bench technicians with zero manual simulation manipulation.
+- 📊 **Stacked F1 Telemetry Traces & 6-Card Primary Strip**:
+  - Synchronized multi-channel time-series traces: Velocity & Motor RPM dual-axis, Driver Demand (throttle % and brake % overlays), and Net Power (kW) vs. Motor Core Temperature (°F).
+  - Sculpted 6-card primary telemetry strip: Speed (`MPH`), Motor Velocity (`RPM`), Battery SoC (`%`), Net Power Flow (`kW`), Driver Demand (`THR% / BRK%`), and Motor Core (`°F`).
+- 🇺🇸 **Strict Imperial System Standardization**:
+  - Exclusively imperial readouts across the technician portal: `MPH`, `°F`, `mi`, and `psi`, fully harmonized with the digital cockpit.
 
 ---
 
@@ -94,16 +99,16 @@ voltesse-dash/
 ├── data/
 │   └── exports/               # Generated CSV & JSON session dumps (auto-created)
 ├── src/
-│   ├── __init__.py            # Package version (v4.4.0)
+│   ├── __init__.py            # Package version (v5.0.0)
 │   ├── can_bus_source.py      # CAN Bus interface, frame decoders, and synchronized mock transmitter
 │   ├── simulation_source.py   # Video-game interactive EV dynamics engine (W/A/S/D, 6-speed manual, D1-D6 auto)
 │   ├── telemetry_source.py    # Autonomous EV driving cycle telemetry stream (Test Mode, D1-D6 auto)
 │   ├── dashboard_gui.py       # PyQt6 digital cluster interface & 800x480 auto-scaling engine
 │   └── database.py            # PostgreSQL persistence: batched writer, sessions, retention, write controls, exports
-├── technician-gui/            # Streamlit technician & admin web interface
+├── technician-gui/            # Mercedes-AMG F1 Pit-Wall Streamlit web interface
 │   ├── app.py                 # Streamlit entrypoint and navigation controller
 │   ├── data/
-│   │   ├── db.py              # PostgreSQL database queries, authentication & telemetry feed
+│   │   ├── db.py              # PostgreSQL database queries, authentication & real-time telemetry feed
 │   │   └── simulator.py       # Deterministic fallback simulator for bench testing
 │   ├── ui/                    # Modular UI pages (Live, Diagnostics, Sessions, Settings, Login)
 │   ├── tests/                 # Unit tests for database integration and simulator
@@ -138,147 +143,40 @@ voltesse-dash/
 | `+` / `=` | **Zoom In UI** (increase cockpit scale by 5%) | Global |
 | `0` | **Reset UI Zoom** to default (100%) | Global |
 | `W` / `Up Arrow` | Accelerate (Throttle ramp-up) | Simulation Mode |
-| `S` / `Down Arrow` | Brake (Regen & Friction brake) | Simulation Mode |
-| `A` / `Left Arrow` | Steer Left | Simulation Mode |
-| `D` / `Right Arrow` | Steer Right | Simulation Mode |
-| `M` | Cycle Drive Mode (`ECO` ➔ `DRIVE` ➔ `SPORT`) | Global (Race, Sim, Test) |
-| `Space` | Pause / Resume telemetry stream | Global |
-| `F11` | Toggle Fullscreen / Windowed display | Global |
-| `Esc` / `Q` | Graceful application shutdown | Global |
+| `S` / `Down Arrow` | Brake / Regenerative Deceleration | Simulation Mode |
+| `A` / `Left Arrow` | Steer Left (Dynamic steering angle) | Simulation Mode |
+| `D` / `Right Arrow` | Steer Right (Dynamic steering angle) | Simulation Mode |
+| `M` | Cycle Drive Mode (ECO ➔ DRIVE ➔ SPORT) | Global |
+| `F11` | Toggle Fullscreen / Windowed Mode | Global |
+| `L` | Toggle Active Logging Stream | Global |
+| `Q` / `Esc` | Graceful Exit | Global |
 
 ---
 
-## Getting Started
+## Technician Web Portal (Mercedes-AMG F1 Pit-Wall)
 
-### 1. Prerequisites
-
-- Python 3.10+
-- PostgreSQL 16 (local installation or Docker)
-
-### 2. Installation
-
-```bash
-git clone https://github.com/r2d2pr/voltesse-dash.git
-cd voltesse-dash
-
-# Create and activate virtual environment
-python -m venv .venv
-source .venv/bin/activate        # Linux/macOS
-# or: .venv\Scripts\activate     # Windows
-
-# Install driver cockpit dependencies
-pip install -r requirements.txt
-
-# Or install ALL dependencies (Cockpit + Technician Web Portal)
-pip install -r requirements-all.txt
-
-# Start the local PostgreSQL database (see db/README.md for details)
-cd db && cp .env.example .env && docker compose up -d && cd ..
-export VOLTESSE_DB_URL=postgresql://voltesse:voltesse@localhost:5432/voltesse_dash
-# or (Windows PowerShell): $env:VOLTESSE_DB_URL="postgresql://voltesse:voltesse@localhost:5432/voltesse_dash"
-```
-
-### 3. Launching the Driver Cockpit
-
-```bash
-# Launch in default Fullscreen Race Mode (CAN Bus) - auto-scales to Raspberry Pi 800x480
-python main.py
-
-# Launch in windowed development mode with interactive simulation
-python main.py --windowed --mode SIMULATION
-
-# Launch directly on specific cockpit page (e.g. Battery & Energy Diagnostics)
-python main.py --view battery
-
-# Launch in strict read-only database mode (disables session and telemetry writes)
-python main.py --read-only
-
-# Launch in Race Mode with mock CAN frame transmitter
-python main.py --can-mock
-
-# Launch with custom CAN interface (e.g., Linux SocketCAN)
-python main.py --can-interface socketcan --can-channel can0
-```
-
-### 4. Launching the Technician / Admin Web App
-
-The Streamlit web portal communicates directly with the PostgreSQL database:
-
-```bash
-cd technician-gui
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-Or run from the project root:
+The technician portal provides pit-wall telemetry monitoring, session playback, and calibration diagnostics. Run with:
 
 ```bash
 streamlit run technician-gui/app.py
 ```
 
-Access the web interface at `http://localhost:8501` (or `http://<pi-ip>:8501` on your local network).
-- Default demo credentials: `tech_demo` or `demo@voltesse.test` with password `Demo123!`.
-- If PostgreSQL is offline, the interface automatically runs in fault-tolerant simulated mode.
-
----
-
-## Database Export & Inspection Tools
-
-Export session logs directly from the command line without launching the GUI:
-
-```bash
-# Export summary of all trip sessions to CSV
-python main.py --export-summary
-
-# Export specific trip session (e.g. Session 1) to CSV
-python main.py --export-csv 1
-
-# Export specific trip session to structured JSON
-python main.py --export-json 1
-
-# Export from a custom database location
-python main.py --db-url postgresql://voltesse:voltesse@localhost:5432/voltesse_dash --export-csv 1
-```
-
-Generated files are saved directly to `data/exports/`.
-
-### Command-Line Options
-
-| Flag | Default | Description |
-| :--- | :--- | :--- |
-| `--mode` | `RACE` | Initial telemetry mode (`RACE`, `SIMULATION`, `TEST`) |
-| `--windowed` | `False` | Run in windowed mode (default is fullscreen) |
-| `--geometry` | `auto` | Force explicit window resolution `WxH` (e.g. `800x480` on Raspberry Pi) |
-| `--screen` | `auto` | Target display name or index (e.g. `DSI-1`, `HDMI-A-1`, `0`, `1`; default: auto-prefer DSI) |
-| `--scale` / `--ui-scale` | `auto` | Custom cockpit UI scale factor (e.g. `0.85` for compact screens) |
-| `--show-cursor` | `False` | Keep mouse cursor visible (default: hidden for distraction-free cockpit) |
-| `--imperial` | `True` | Exclusively Imperial units (`MPH`, `mi`, `°F`, `psi`, `lb-ft`) |
-| `--view` | `speed` | Initial cockpit page (`speed`, `battery`, `powertrain`, `tpms`) |
-| `--swap-wings` | `False` | Swap left and right cockpit wings |
-| `--read-only` | `False` | Open the database in strict read-only mode (bypasses active logging) |
-| `--export-csv` | `None` | Export a specific vehicle session ID to CSV and exit |
-| `--export-json`| `None` | Export a specific vehicle session ID to JSON and exit |
-| `--export-summary`| `False` | Export summary of all vehicle sessions to CSV and exit |
-| `--can-interface` | `None` | CAN driver (`socketcan`, `virtual`, `pcan`, etc.) |
-| `--can-channel` | `None` | CAN channel name (e.g., `can0`, `vcan0`) |
-| `--can-mock` | `False` | Enable background mock CAN frame broadcaster for bench testing |
-| `--interval-ms` | `40` | Telemetry poll interval in milliseconds (40ms = 25 Hz) |
-| `--batch-size` | `25` | Number of records to batch before a PostgreSQL commit |
-| `--flush-interval`| `1.0` | Max seconds between database batch flushes |
-| `--db-url` | `$VOLTESSE_DB_URL` | PostgreSQL connection URL |
-| `--keep-sessions` | `20` | Keep only newest N sessions at startup (`0` disables pruning) |
+- **Live Telemetry Channel**: Real-time 1-second auto-streaming (`@st.fragment`) telemetry from PostgreSQL with link status (`ACTIVE`, `STANDBY`, `DISCONNECTED`), packet latency indicators, 6-card primary strip, stacked F1 traces, and full thermal matrix (`°F`).
+- **Diagnostics Channel**: High-resolution performance curves (Energy Efficiency vs. Speed, Power Draw vs. Motor Temp, Battery SoC vs. Distance, Power Draw vs. RPM, Motor Temp rise vs. Time).
+- **Sessions Channel**: Historical timing-board log with session duration, peak thermals (`°F`), max speed (`MPH`), and total distance (`mi`).
+- **Settings Channel**: Calibration of motor thermal warning limit (`110°F`–`230°F`, default `160°F`), low battery alert threshold (`5%`–`40%`, default `20%`), and database link diagnostics.
 
 ---
 
 ## Running Tests
 
-Execute the automated test suites with Python's built-in `unittest`:
+Execute the automated test suites with Python's built-in `unittest` (41 total tests):
 
 ```bash
-# Run cockpit unit and integration tests (includes 800x480 resolution scaling tests)
+# Run cockpit unit and integration tests (29 tests)
 python -m unittest discover tests
 
-# Run technician web app database and simulation tests
+# Run technician web app database and simulation tests (12 tests)
 python -m unittest discover technician-gui/tests
 ```
 

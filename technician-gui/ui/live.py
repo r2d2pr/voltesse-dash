@@ -1,83 +1,389 @@
-"""Live telemetry view connecting to PostgreSQL database with fallback to simulation slider."""
+"""
+Mercedes-AMG Formula 1 Pit-Wall Telemetry Interface (v5.0.0).
 
+Live vehicle telemetry streamed directly from PostgreSQL 16 persistence engine.
+Interactive simulation sliders are completely deprecated in v5.0.0.
+Telemetry is refreshed in real time via automated 1-second Streamlit fragments.
+"""
+
+from datetime import datetime, timezone
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import streamlit as st
 
-from data.db import get_live_metrics, get_live_temperature_history
-from data.simulator import live_metrics as mock_live_metrics, live_temperature_history as mock_live_temp_history
+from data.db import (
+    get_live_metrics,
+    get_live_telemetry_traces,
+    get_live_temperature_history,
+)
 
 
-def show_live():
-    st.title("Live Telemetry")
+def render_pitwall_content():
+    """Inner telemetry content rendered on every fragment pulse."""
+    values, is_db = get_live_metrics()
+    traces, traces_is_db = get_live_telemetry_traces(limit=60)
 
-    # Source selection
-    data_source = st.radio(
-        "Telemetry Feed Source",
-        ["Live PostgreSQL Database", "Interactive Simulation Slider"],
-        horizontal=True,
+    # 1. Telemetry Link Status Header
+    is_active = values.get("is_active", False)
+    packet_age = values.get("packet_age_sec", 999.0)
+    session_id = values.get("session_id", "N/A")
+    log_id = values.get("log_id", "0")
+    drive_mode = values.get("drive_mode", "DRIVE")
+    gear = values.get("gear", "D")
+    trans_mode = values.get("transmission_mode", "AUTO")
+
+    if is_db and is_active:
+        st.markdown(
+            f"""
+            <div style="background: rgba(0, 245, 212, 0.08); border: 1px solid rgba(0, 245, 212, 0.4); 
+                        border-radius: 6px; padding: 8px 14px; margin-bottom: 14px; display: flex; 
+                        justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <span class="f1-pill f1-pill-active">🟢 TELEMETRY LINK: ACTIVE (CAN-0)</span>
+                    <span style="margin-left: 10px; font-size: 0.82rem; font-weight: 600; color: #E2E8F0;">
+                        PACKET AGE: <strong style="color: #00F5D4;">{packet_age:.1f}s</strong> &nbsp;|&nbsp; 
+                        FRAME ID: <strong style="color: #FFFFFF;">#{log_id}</strong> &nbsp;|&nbsp; 
+                        SESSION: <strong style="color: #00F5D4;">#{session_id}</strong>
+                    </span>
+                </div>
+                <div>
+                    <span class="f1-pill f1-pill-active">MODE: {drive_mode}</span>
+                    <span class="f1-pill f1-pill-active" style="margin-left: 6px;">TRANS: {gear} [{trans_mode}]</span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    elif is_db and not is_active:
+        age_display = f"{int(packet_age)}s" if packet_age < 3600 else f"{int(packet_age // 60)}m"
+        st.markdown(
+            f"""
+            <div style="background: rgba(255, 184, 0, 0.08); border: 1px solid rgba(255, 184, 0, 0.4); 
+                        border-radius: 6px; padding: 8px 14px; margin-bottom: 14px; display: flex; 
+                        justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <span class="f1-pill f1-pill-standby">🟠 TELEMETRY LINK: STANDBY</span>
+                    <span style="margin-left: 10px; font-size: 0.82rem; font-weight: 600; color: #E2E8F0;">
+                        LAST PACKET: <strong style="color: #FFB800;">{age_display} AGO</strong> &nbsp;|&nbsp; 
+                        SESSION: <strong style="color: #FFFFFF;">#{session_id}</strong> &nbsp;|&nbsp; 
+                        STATUS: VEHICLE PARKED / BENCH IDLE
+                    </span>
+                </div>
+                <div>
+                    <span class="f1-pill f1-pill-standby">AWAITING CAN FRAME</span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            """
+            <div style="background: rgba(255, 77, 109, 0.08); border: 1px solid rgba(255, 77, 109, 0.4); 
+                        border-radius: 6px; padding: 8px 14px; margin-bottom: 14px; display: flex; 
+                        justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <span class="f1-pill f1-pill-alert">🔴 TELEMETRY LINK: DISCONNECTED</span>
+                    <span style="margin-left: 10px; font-size: 0.82rem; font-weight: 600; color: #E2E8F0;">
+                        POSTGRESQL RECONNECTING... (SHOWING BENCH BASELINE)
+                    </span>
+                </div>
+                <div>
+                    <span class="f1-pill f1-pill-alert">DB OFFLINE</span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # 2. Critical Warning Strip
+    mot_temp = values["motor_temp_f"]
+    warn_temp = st.session_state.get("warning_temp", 160)
+    battery_soc = values["battery"]
+    warn_battery = st.session_state.get("warning_battery", 20)
+
+    is_hot = mot_temp >= warn_temp
+    is_low_soc = battery_soc <= warn_battery
+
+    if is_hot:
+        st.error(f"🚨 CRITICAL THERMAL LIMIT: Motor Core Temperature {mot_temp:.1f} °F exceeds race threshold ({warn_temp} °F)!")
+    if is_low_soc:
+        st.warning(f"⚠️ LOW ENERGY ALERT: Battery State-of-Charge at {battery_soc:.1f}% (Limit: {warn_battery}%)!")
+
+    # 3. Primary F1 6-Card Telemetry Strip
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+
+    # Card 1: Speed
+    c1.metric(
+        label="Vehicle Speed",
+        value=f"{values['speed']} MPH",
+        delta=f"{trans_mode} [{gear}]",
+        delta_color="off",
     )
 
-    if data_source == "Live PostgreSQL Database":
-        values, is_db = get_live_metrics()
-        if is_db:
-            st.caption(f"Voltesse Dash | 🟢 Connected to PostgreSQL — Source: {values.get('signal_status', 'ACTIVE')}")
-            times, temperatures, _ = get_live_temperature_history(seconds=60)
-            time_label = "Telemetry Readings Sequence"
-        else:
-            st.caption("Voltesse Dash | 🟡 PostgreSQL has no active telemetry records. Using baseline feed.")
-            values = mock_live_metrics(30)
-            times, temperatures = mock_live_temp_history(30)
-            time_label = "Simulation Time (seconds)"
-    else:
-        st.caption("Voltesse Dash | 🎮 Interactive Simulation Mode")
-        simulation_time = st.slider(
-            "Simulation Time (seconds)", min_value=0, max_value=120, value=30, step=5,
+    # Card 2: Motor RPM
+    c2.metric(
+        label="Motor Velocity",
+        value=f"{values['rpm']:,} RPM",
+        delta=f"Mode: {drive_mode}",
+        delta_color="off",
+    )
+
+    # Card 3: Battery SoC
+    c3.metric(
+        label="Battery Pack SoC",
+        value=f"{values['battery']}%",
+        delta=f"Range: {values['est_range_mi']} mi",
+        delta_color="off" if not is_low_soc else "inverse",
+    )
+
+    # Card 4: Net Power Flow
+    power_kw = values["power_kw"]
+    c4.metric(
+        label="Net Power Flow",
+        value=f"{power_kw:+.1f} kW",
+        delta=f"{values['voltage']:.0f}V • {values['current']:+.1f}A",
+        delta_color="off",
+    )
+
+    # Card 5: Driver Input
+    c5.metric(
+        label="Driver Demand",
+        value=f"THR {values['throttle_pct']:.0f}%",
+        delta=f"BRK {values['brake_pct']:.0f}%",
+        delta_color="off",
+    )
+
+    # Card 6: Motor Core Thermal
+    temp_tag = "HOT" if mot_temp >= 195 else ("WARM" if mot_temp >= 160 else "OK")
+    c6.metric(
+        label="Motor Core Temp",
+        value=f"{mot_temp:.1f} °F",
+        delta=f"Status: {temp_tag}",
+        delta_color="off" if not is_hot else "inverse",
+    )
+
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+
+    # 4. Stacked F1 Telemetry Traces
+    st.subheader("F1 Synchronized Telemetry Traces")
+
+    if traces_is_db and len(traces.get("indices", [])) >= 3:
+        indices = traces["indices"]
+        speeds = traces["speeds"]
+        rpms = traces["rpms"]
+        throttles = traces["throttles"]
+        brakes = traces["brakes"]
+        powers = traces["powers_kw"]
+        motor_temps = traces["motor_temps_f"]
+
+        # 3-Stack Synchronized Pit-Wall Subplots
+        fig = make_subplots(
+            rows=3, cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.06,
+            subplot_titles=(
+                "SPEED (MPH) & MOTOR RPM",
+                "DRIVER INPUT DEMAND (THROTTLE & BRAKE %)",
+                "NET POWER FLOW (kW) & MOTOR CORE TEMPERATURE (°F)",
+            ),
+            specs=[[{"secondary_y": True}], [{"secondary_y": False}], [{"secondary_y": True}]],
         )
-        values = mock_live_metrics(simulation_time)
-        times, temperatures = mock_live_temp_history(simulation_time)
-        time_label = "Simulation Time (seconds)"
 
-    st.subheader("Vehicle Status")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Speed", f"{values['speed']} MPH", border=True)
-    col2.metric("Motor RPM", f"{values['rpm']:,}", border=True)
-    col3.metric("Battery SoC", f"{values['battery']}%", border=True)
-    col4.metric("Motor Temperature", f"{values['temperature']} °C", border=True)
+        # Subplot 1: Speed & RPM
+        fig.add_trace(
+            go.Scatter(
+                x=indices, y=speeds, name="Speed (MPH)",
+                line=dict(color="#00F5D4", width=2.5),
+            ),
+            row=1, col=1, secondary_y=False,
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=indices, y=rpms, name="Motor RPM",
+                line=dict(color="#E2E8F0", width=1.5, dash="dot"),
+            ),
+            row=1, col=1, secondary_y=True,
+        )
 
-    # Extra electrical diagnostics if available
-    if "voltage" in values and "current" in values:
-        e1, e2, e3, e4 = st.columns(4)
-        e1.metric("Pack Voltage", f"{values['voltage']} V", border=True)
-        e2.metric("Current Draw", f"{values['current']} A", border=True)
-        e3.metric("Gear / Trans", f"{values.get('gear', 'D')} ({values.get('transmission_mode', 'AUTO')})", border=True)
-        e4.metric("Drive Mode", f"{values.get('drive_mode', 'DRIVE')}", border=True)
+        # Subplot 2: Throttle & Brake Overlaid
+        fig.add_trace(
+            go.Scatter(
+                x=indices, y=throttles, name="Throttle %",
+                line=dict(color="#00F5A0", width=2),
+                fill="tozeroy", fillcolor="rgba(0, 245, 160, 0.15)",
+            ),
+            row=2, col=1,
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=indices, y=brakes, name="Brake %",
+                line=dict(color="#FF4D6D", width=2),
+                fill="tozeroy", fillcolor="rgba(255, 77, 109, 0.25)",
+            ),
+            row=2, col=1,
+        )
+
+        # Subplot 3: Net Power & Thermal
+        fig.add_trace(
+            go.Scatter(
+                x=indices, y=powers, name="Power (kW)",
+                line=dict(color="#00E5FF", width=2),
+            ),
+            row=3, col=1, secondary_y=False,
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=indices, y=motor_temps, name="Motor Temp (°F)",
+                line=dict(color="#FFB800", width=2),
+            ),
+            row=3, col=1, secondary_y=True,
+        )
+        # Warning limit line
+        fig.add_hline(
+            y=warn_temp, line_dash="dash", line_color="#FF4D6D",
+            row=3, col=1, secondary_y=True,
+            annotation_text=f"Limit ({warn_temp}°F)", annotation_position="top right",
+        )
+
+        # Layout styling
+        fig.update_layout(
+            height=580,
+            template="plotly_dark",
+            paper_bgcolor="#090E11",
+            plot_bgcolor="#070B0D",
+            margin=dict(l=50, r=50, t=35, b=25),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0),
+            hovermode="x unified",
+        )
+        fig.update_xaxes(showgrid=True, gridcolor="rgba(0, 245, 212, 0.08)", zeroline=False)
+        fig.update_yaxes(showgrid=True, gridcolor="rgba(0, 245, 212, 0.08)", zeroline=False)
+
+        fig.update_yaxes(title_text="Speed (MPH)", row=1, col=1, secondary_y=False)
+        fig.update_yaxes(title_text="RPM", row=1, col=1, secondary_y=True)
+        fig.update_yaxes(title_text="Demand (%)", range=[0, 105], row=2, col=1)
+        fig.update_yaxes(title_text="Power (kW)", row=3, col=1, secondary_y=False)
+        fig.update_yaxes(title_text="Temp (°F)", row=3, col=1, secondary_y=True)
+
+        st.plotly_chart(fig, width="stretch")
+    else:
+        # Fallback Temperature Trace
+        times, temps, _ = get_live_temperature_history(seconds=60)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=times, y=temps, mode="lines+markers", name="Motor Temp (°F)",
+            line=dict(color="#00F5D4", width=3), marker=dict(size=4),
+        ))
+        fig.add_hline(
+            y=warn_temp, line_dash="dash", line_color="#FF4D6D",
+            annotation_text=f"Warning Limit ({warn_temp}°F)", annotation_position="top right",
+        )
+        fig.update_layout(
+            xaxis_title="Telemetry Packet Sequence",
+            yaxis_title="Motor Temperature (°F)",
+            height=320,
+            template="plotly_dark",
+            paper_bgcolor="#090E11",
+            plot_bgcolor="#070B0D",
+            margin=dict(l=40, r=40, t=30, b=30),
+        )
+        st.plotly_chart(fig, width="stretch")
 
     st.divider()
 
-    # One shared setting drives both the visible warning and red graph limit.
-    high_temp = values["temperature"] >= st.session_state.warning_temp
-    low_battery = values["battery"] <= st.session_state.warning_battery
-    if high_temp:
-        st.error(f"⚠️ WARNING: High Motor Temperature ({values['temperature']} °C >= limit {st.session_state.warning_temp} °C)!")
-    if low_battery:
-        st.warning(f"⚠️ WARNING: Low Battery Level ({values['battery']}% <= limit {st.session_state.warning_battery}%)!")
-    if not high_temp and not low_battery:
-        st.success("Vehicle Status: Normal (All Telemetry Within Operational Limits)")
+    # 5. Powertrain & High-Voltage Detailed Matrix
+    m1, m2, m3 = st.columns(3)
 
-    st.subheader("Motor Temperature Trend (Recent Window)")
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=times, y=temperatures, mode="lines+markers", name="Motor Temperature",
-        line=dict(color="#00F5A0", width=3), marker=dict(size=4),
-    ))
-    fig.add_hline(
-        y=st.session_state.warning_temp, line_dash="dash", line_color="red",
-        annotation_text="Warning Limit", annotation_position="top right",
-    )
-    fig.update_layout(
-        xaxis_title=time_label,
-        yaxis_title="Temperature (°C)", height=380,
-        margin=dict(l=30, r=30, t=40, b=30),
-        template="plotly_dark",
-    )
-    st.plotly_chart(fig, width="stretch")
+    with m1:
+        st.markdown(
+            """
+            <div style="font-size: 0.85rem; font-weight: 700; color: #00F5D4; letter-spacing: 0.08em; margin-bottom: 8px;">
+                ⚡ THERMAL TELEMETRY MATRIX (°F)
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        t_col1, t_col2 = st.columns(2)
+        t_col1.metric("Motor Core", f"{values['motor_temp_f']} °F", border=True)
+        t_col2.metric("Power Inverter", f"{values['inverter_temp_f']} °F", border=True)
+        t_col1.metric("Battery Pack", f"{values['battery_temp_f']} °F", border=True)
+        t_col2.metric("Warning Threshold", f"{warn_temp} °F", border=True)
+
+    with m2:
+        st.markdown(
+            """
+            <div style="font-size: 0.85rem; font-weight: 700; color: #00F5D4; letter-spacing: 0.08em; margin-bottom: 8px;">
+                ⚡ HIGH-VOLTAGE PACK BUS
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        h_col1, h_col2 = st.columns(2)
+        h_col1.metric("Pack Voltage", f"{values['voltage']} V", border=True)
+        h_col2.metric("Current Draw", f"{values['current']:+.1f} A", border=True)
+        h_col1.metric("Gross Power", f"{values['power_w']:,} W", border=True)
+        h_col2.metric("SoC Status", f"{values['battery']}%", border=True)
+
+    with m3:
+        st.markdown(
+            """
+            <div style="font-size: 0.85rem; font-weight: 700; color: #00F5D4; letter-spacing: 0.08em; margin-bottom: 8px;">
+                🏎️ CHASSIS & VEHICLE DYNAMICS
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        d_col1, d_col2 = st.columns(2)
+        d_col1.metric("Steering Angle", f"{values['steering_angle']}°", border=True)
+        d_col2.metric("Trip Odometer", f"{values['trip_mi']} mi", border=True)
+        d_col1.metric("Drive Mode", f"{drive_mode}", border=True)
+        d_col2.metric("Gear / Ratio", f"{gear} ({trans_mode})", border=True)
+
+
+@st.fragment(run_every="1s")
+def render_live_telemetry_streaming():
+    """Fragment re-executing automatically every 1 second without page flicker."""
+    render_pitwall_content()
+
+
+@st.fragment
+def render_live_telemetry_paused():
+    """Fragment when stream is manually paused."""
+    render_pitwall_content()
+
+
+def show_live():
+    """Main live telemetry command center."""
+    h_col1, h_col2 = st.columns([3, 1])
+    with h_col1:
+        st.markdown(
+            """
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.8rem;">🏎️</span>
+                <div>
+                    <h2 style="margin: 0; padding: 0; font-weight: 800; letter-spacing: 0.05em; color: #FFFFFF;">
+                        F1 TELEMETRY COMMAND
+                    </h2>
+                    <p style="margin: 0; padding: 0; font-size: 0.82rem; color: #94A3B8;">
+                        Direct PostgreSQL 16 Persistence Engine Telemetry Feed (Imperial °F / MPH / mi)
+                    </p>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with h_col2:
+        is_streaming = st.toggle(
+            "⚡ Live Stream (1s)",
+            value=st.session_state.get("live_stream_active", True),
+            help="Toggle automatic 1-second telemetry refresh from PostgreSQL.",
+        )
+        st.session_state["live_stream_active"] = is_streaming
+
+    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+
+    if is_streaming:
+        render_live_telemetry_streaming()
+    else:
+        st.info("⏸️ Telemetry stream is paused. Click 'Live Stream' toggle to resume 1s auto-refresh.")
+        render_live_telemetry_paused()
