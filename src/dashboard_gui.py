@@ -1125,7 +1125,7 @@ class ThermalMonitorWidget(QWidget):
         items = [
             ("⚡ MOTOR", self.motor_temp, 75.0, 90.0, 105.0),
             ("⚡ INV", self.inverter_temp, 65.0, 80.0, 95.0),
-            ("🔋 BATT", self.batt_temp, 42.0, 50.0, 60.0),
+            ("BATT", self.batt_temp, 42.0, 50.0, 60.0),
         ]
 
         col_w = w / len(items)
@@ -1151,7 +1151,37 @@ class ThermalMonitorWidget(QWidget):
             # Sensor Label (Left)
             painter.setPen(COLOR_TEXT_SECONDARY)
             painter.setFont(QFont("Segoe UI", lbl_font_sz, QFont.Weight.Bold))
-            painter.drawText(QRectF(box_x + 8, 3, box_w * 0.60, h * 0.35), Qt.AlignmentFlag.AlignLeft, label)
+            if "BATT" in label:
+                # Dedicated vector battery icon: crisp, perfectly scaled, zero missing glyph boxes
+                icon_h = max(7.0, min(10.0, lbl_font_sz * 1.05))
+                icon_w = icon_h * 1.65
+                icon_x = box_x + 8.0
+                icon_y = 3.0 + (h * 0.35 - icon_h) / 2.0
+
+                # Outer battery casing
+                painter.setPen(QPen(COLOR_TEXT_SECONDARY, 1.1))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawRoundedRect(QRectF(icon_x, icon_y, icon_w - 2.5, icon_h), 1.5, 1.5)
+
+                # Positive terminal nipple
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QBrush(COLOR_TEXT_SECONDARY))
+                painter.drawRoundedRect(QRectF(icon_x + icon_w - 2.5, icon_y + icon_h * 0.26, 2.0, icon_h * 0.48), 0.6, 0.6)
+
+                # Active charge level fill (tinted with card thermal state color)
+                painter.setBrush(QBrush(color))
+                fill_w = max(2.0, (icon_w - 5.5) * 0.72)
+                painter.drawRoundedRect(QRectF(icon_x + 1.5, icon_y + 1.5, fill_w, icon_h - 3.0), 0.8, 0.8)
+
+                # Text label right next to vector icon
+                painter.setPen(COLOR_TEXT_SECONDARY)
+                painter.drawText(
+                    QRectF(icon_x + icon_w + 4.0, 3, box_w * 0.60 - (icon_w + 4.0), h * 0.35),
+                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                    "BATT",
+                )
+            else:
+                painter.drawText(QRectF(box_x + 8, 3, box_w * 0.60, h * 0.35), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, label)
 
             # Status Tag (Right): OK / WARM / HOT
             status_tag = "OK" if temp_c < warn_th else ("WARM" if temp_c < crit_th else "HOT")
@@ -1953,6 +1983,65 @@ class AnimatedStackedWidget(QStackedWidget):
         super().resizeEvent(event)
 
 
+class TripHeaderLabel(QLabel):
+    """
+    Trip odometer header label featuring a crisp, anti-aliased vector navigation
+    pin icon rendered with QPainter in neon cyber-mint (#00F5A0).
+    Guarantees reliable, high-resolution rendering with zero missing-glyph tofu boxes (□)
+    across all platforms, fonts, and embedded display environments.
+    """
+    def __init__(self, text: str = "TRIP", parent=None):
+        super().__init__(text, parent)
+        self._raw_title = text.replace("📍", "").strip()
+
+    def setText(self, text: str) -> None:
+        self._raw_title = text.replace("📍", "").strip()
+        super().setText(text)
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+
+        h = float(self.height())
+        font = self.font()
+        painter.setFont(font)
+
+        # Scale pin icon proportionally with font size
+        pt_sz = font.pointSizeF() if font.pointSizeF() > 0 else float(font.pointSize())
+        icon_h = max(8.0, min(14.0, pt_sz * 1.35))
+        pin_r = icon_h * 0.36
+        pin_x = pin_r + 1.0
+        pin_y = max(1.0, (h - icon_h) / 2.0)
+
+        # Draw smooth location pin path
+        path = QPainterPath()
+        path.moveTo(pin_x, pin_y + icon_h)
+        path.cubicTo(pin_x - pin_r * 1.15, pin_y + icon_h * 0.5, pin_x - pin_r, pin_y + pin_r * 1.2, pin_x - pin_r, pin_y + pin_r)
+        path.arcTo(pin_x - pin_r, pin_y, pin_r * 2.0, pin_r * 2.0, 180, -180)
+        path.cubicTo(pin_x + pin_r, pin_y + pin_r * 1.2, pin_x + pin_r * 1.15, pin_y + icon_h * 0.5, pin_x, pin_y + icon_h)
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(COLOR_MINT))
+        painter.fillPath(path, COLOR_MINT)
+
+        # Inner hole
+        painter.setBrush(QBrush(QColor(6, 18, 14)))
+        painter.drawEllipse(QPointF(pin_x, pin_y + pin_r), pin_r * 0.42, pin_r * 0.42)
+
+        # Text label
+        painter.setPen(COLOR_MINT)
+        text_x = pin_x + pin_r + 5.0
+        title = self._raw_title if self._raw_title else "TRIP"
+        painter.drawText(
+            QRectF(text_x, 0, max(0.0, float(self.width()) - text_x), h),
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            title,
+        )
+        painter.end()
+
+
 class VoltesseDashboard(QMainWindow):
     """
     Main Automotive Digital Cockpit Cluster Window.
@@ -2134,10 +2223,9 @@ class VoltesseDashboard(QMainWindow):
         self.right_blinker = QLabel("►")
         self.right_blinker.setStyleSheet("color: #123226;")
 
-        # Streamlined, distraction-free Top Layout
+        # Streamlined, distraction-free Top Layout (Speed box removed; side CompactSpeedPod active across all pages)
         self.top_layout.addWidget(self.left_blinker)
         self.top_layout.addWidget(self.brand_label)
-        self.top_layout.addWidget(self.speed_hud_badge)
         self.top_layout.addStretch(1)
         self.top_layout.addWidget(self.nav_frame)
         self.top_layout.addWidget(self.status_badge)
@@ -2284,7 +2372,7 @@ class VoltesseDashboard(QMainWindow):
         self.trip_layout.setContentsMargins(8, 2, 8, 2)
         self.trip_layout.setSpacing(0)
 
-        self.trip_hdr = QLabel("📍 TRIP")
+        self.trip_hdr = TripHeaderLabel("TRIP")
         self.trip_hdr.setStyleSheet("color: #00F5A0; font-weight: bold; border: none; background: transparent; letter-spacing: 0.5px;")
 
         self.trip_dist_val = QLabel("0.00 mi")
@@ -2389,11 +2477,11 @@ class VoltesseDashboard(QMainWindow):
         if w < 950:
             self.right_hdr.setText("⚡ POWERTRAIN")
             self.power_title.setText("NET PWR")
-            self.trip_hdr.setText("📍 TRIP")
+            self.trip_hdr.setText("TRIP")
         else:
             self.right_hdr.setText("⚡ POWERTRAIN DYNAMICS")
             self.power_title.setText("NET POWER")
-            self.trip_hdr.setText("📍 TRIP ODOMETER")
+            self.trip_hdr.setText("TRIP ODOMETER")
 
         # Dynamic badge styling with proportional padding and radii
         pad_y = max(1, int(2 * scale))
@@ -2560,21 +2648,21 @@ class VoltesseDashboard(QMainWindow):
         elif p_name == "BATTERY":
             self.nav_frame.setStyleSheet("background-color: rgba(6, 20, 26, 0.9); border: 1px solid rgba(0, 229, 255, 0.5); border-radius: 4px;")
             self.page_title_label.setStyleSheet("color: #00E5FF; font-weight: bold; font-size: 8pt;")
-            self.speed_hud_badge.setVisible(True)
+            self.speed_hud_badge.setVisible(False)
             self.ready_badge.setVisible(False)
             self.wing_1_top_stack.setCurrentIndex(1)
             self.wing_2_stack.setCurrentIndex(0)
         elif p_name == "POWERTRAIN":
             self.nav_frame.setStyleSheet("background-color: rgba(26, 20, 6, 0.9); border: 1px solid rgba(255, 184, 0, 0.5); border-radius: 4px;")
             self.page_title_label.setStyleSheet("color: #FFB800; font-weight: bold; font-size: 8pt;")
-            self.speed_hud_badge.setVisible(True)
+            self.speed_hud_badge.setVisible(False)
             self.ready_badge.setVisible(False)
             self.wing_1_top_stack.setCurrentIndex(1)
             self.wing_2_stack.setCurrentIndex(1)
         elif p_name == "TPMS":
             self.nav_frame.setStyleSheet("background-color: rgba(12, 26, 20, 0.9); border: 1px solid rgba(92, 255, 199, 0.4); border-radius: 4px;")
             self.page_title_label.setStyleSheet("color: #5CFFC7; font-weight: bold; font-size: 8pt;")
-            self.speed_hud_badge.setVisible(True)
+            self.speed_hud_badge.setVisible(False)
             self.ready_badge.setVisible(False)
             self.wing_1_top_stack.setCurrentIndex(1)
             self.wing_2_stack.setCurrentIndex(0)

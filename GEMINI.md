@@ -42,7 +42,7 @@ Voltesse Dash is a production-grade, distraction-free automotive digital instrum
 ### 🪟 Streamlined, Non-Invasive Top HUD Ribbon
 - Minimalist translucent cyber-ribbon (`rgba(4, 12, 8, 0.65)` with cyber-mint border).
 - Free from redundant clutter:
-  - **Left**: Left Turn Signal (`◄`), Brand (`⚡ VOLTESSE`), and compact Speed Fallback badge (`65 MPH [D4]`).
+  - **Left**: Left Turn Signal (`◄`) and Brand (`⚡ VOLTESSE`). (Redundant top-bar speed fallback badge removed in v4.4.0 in favor of the permanent side `CompactSpeedPod` across all pages).
   - **Center**: Interactive Page Navigator (`◄ SPEED [1/4] ►`) and dynamic active warning alerts.
   - **Right**: Drive Mode (`SPORT` / `DRIVE` / `ECO`), Ambient Temperature (`72°F`), 12-Hour AM/PM Clock with seconds, Right Turn Signal (`►`).
 
@@ -63,13 +63,13 @@ Voltesse Dash is a production-grade, distraction-free automotive digital instrum
 ### 💎 Translucent Obsidian Cyber-Dock (Bottom Telemetry Deck)
 - Pinned constant bottom bar (`rgba(4, 14, 10, 0.75)` with top cyber-mint accent line).
 - **Sculpted Thermal Cards**:
-  - Dedicated cards for **⚡ MOTOR**, **⚡ INV**, and **🔋 BATT**.
+  - Dedicated cards for **⚡ MOTOR**, **⚡ INV**, and **BATT** (featuring an anti-aliased vector battery icon with dynamic state-aware charge fill).
   - **State-Aware Glowing Borders & Status Tags**:
     - Nominal: Mint glow with `OK` tag (< 160°F / 140°F / 120°F).
     - Warm: Amber glow with `WARM` tag (≥ 160°F / 140°F / 120°F).
     - Hot: Neon red glow & alert styling with `HOT` tag (≥ 195°F / 175°F / 140°F).
   - **Micro-Thermometer Progress Fill Bars**: Sub-millimeter visual level indicators relative to thermal limits.
-- **Trip Odometer Pod**: Distinct card with glowing `📍 TRIP` icon and high-contrast Consolas mileage (`mi`).
+- **Trip Odometer Pod**: Distinct card with glowing cyber-mint vector navigation marker pin and high-contrast Consolas mileage (`mi`).
 
 ---
 

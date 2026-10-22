@@ -1,6 +1,6 @@
-# Voltesse Dash ⚡ v4.3.0
+# Voltesse Dash ⚡ v4.4.0
 
-[![Version](https://img.shields.io/badge/version-4.3.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
+[![Version](https://img.shields.io/badge/version-4.4.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/PyQt-6-green.svg)](https://riverbankcomputing.com/software/pyqt/)
 [![Web](https://img.shields.io/badge/Streamlit-1.65-red.svg)](https://streamlit.io/)
@@ -8,103 +8,21 @@
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 4.3.0 delivers **Modern Automotive Slide & Depth-Crossfade Animated View Transitions between Cockpit Pages**, building on Version 4.2's **Always-Visible Speed View across all cockpit pages** (real-time velocity, active gear, motor RPM, dynamic speed progress bar, throttle/brake and steering telemetry on Battery, Powertrain, and TPMS views), a **Modern High-End Cyber Flair Overhaul for the Bottom Telemetry Deck** (sculpted obsidian cards, glowing state-aware borders, status tags, and micro-thermometer level bars for Motor, Inverter, and Battery thermals, paired with a glowing Trip Odometer pod), an **Exclusively Imperial Telemetry System** (`MPH`, `mi`, `°F`, `psi`, `lb-ft`), **Continuous Always-Active Logging**, and **Streamlined Non-Invasive Top HUD Ribbon**. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
+A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 4.4.0 delivers **Native Anti-Aliased Vector Trip & Battery Icons** (eliminating missing-glyph blank boxes across platforms) and a **Clean Top HUD Ribbon** (removing redundant top-bar speed boxes in favor of the permanent side `CompactSpeedPod` across all hero pages), building on Version 4.3's **Slide & Depth-Crossfade Animated View Transitions**, **Always-Visible Speed View**, **Modern Obsidian Cyber-Dock Deck**, **Exclusively Imperial Telemetry** (`MPH`, `mi`, `°F`, `psi`, `lb-ft`), and **Continuous Always-Active Logging**. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
 
 ---
 
-## What's New in Version 4.3.0 🚀
+## What's New in Version 4.4.0 🚀
 
-- 🎬 **Modern Automotive Animated View Transitions**:
-  - Upgraded the central cockpit stage with `AnimatedStackedWidget`, bringing fluid, high-end hypercar cluster carousel animations between views.
-  - **Directional Horizontal Slide**:
-    - **Navigating Right (`►`, `Right Arrow`, `V` key)**: Active view smoothly glides off to the left while the incoming view slides in effortlessly from the right.
-    - **Navigating Left (`◄`, `Left Arrow`)**: Active view glides off to the right while the incoming view slides in from the left.
-    - **Circular Wraparound**: Flawless loop transitions between Page 4 (`TPMS`) and Page 1 (`SPEED`).
-  - **Depth Crossfade**:
-    - Outgoing card smoothly fades out (1.0 ➔ 0.15) to simulate depth and spatial separation.
-    - Incoming card glides in glowing with an opacity ramp (0.2 ➔ 1.0).
-  - **Snappy 260ms Cubic Easing (`QEasingCurve.Type.OutCubic`)**:
-    - Engineered for authentic automotive feel—instant response to driver input with smooth, gentle deceleration upon arrival.
-  - **Tactile Chevron Haptic Pulse**:
-    - Interactive touch chevrons (`◄` / `►`) in the Top HUD ribbon illuminate with a momentary white pulse upon click or key press for instant tactile feedback.
-  - **Zero-Overhead Settle & Immediate Interruption Handling**:
-    - Graphics effects are automatically purged upon animation completion, maintaining 100% native rendering speed with zero GPU/CPU drag.
-    - Rapid consecutive page switches immediately fast-forward and cleanly glide to the newly requested view without stutter or ghosting.
-  - **CLI & Runtime Controls**:
-    - `--no-animation`: Option to disable transitions for instant cuts on lower-powered hardware or headless bench testing.
-    - Programmatic toggle via `gui.set_animation_enabled(bool)`.
-
----
-
-## What's New in Version 4.2.0 🚀
-
-- ⚡ **Always-Visible Speed Pod on All Cockpit Pages**:
-  - Never lose speed awareness when inspecting high-voltage battery metrics, dual-motor torque allocation, or tire pressures.
-  - On **Page 1 (Battery)**, **Page 2 (Powertrain)**, and **Page 3 (TPMS)**, an integrated **Compact Speed Pod** is permanently visible alongside the hero diagnostics, displaying:
-    - High-visibility glowing digital speed numeral in **MPH**
-    - Dynamic velocity level progress bar (cyan-to-mint gradient fill)
-    - Motor RPM readout
-    - Transmission selector & dynamic gear pill (e.g. `AUTO [4]`, `MANUAL [5]`)
-    - Micro telemetry meters for throttle (`THR %`), brake (`BRK %`), and steering angle (`STR °`)
-  - **Layout Interchangeability**: The compact speed pod and hero view positions can be instantly swapped left ⮂ right with the `X` key or `--swap-wings` CLI flag.
-- 💎 **Modern Cyber Flair Overhaul for the Bottom Telemetry Deck**:
-  - Elevates the pinned bottom bar into a high-end translucent obsidian cyber-dock (`rgba(4, 14, 10, 0.75)` with a top cyber-mint accent line and border radius).
-  - **Sculpted Thermal Cards**:
-    - Dedicated gradient cards for **⚡ MOTOR**, **⚡ INV**, and **🔋 BATT** thermals.
-    - **Dynamic State-Aware Glowing Borders**: Emerald/mint glow under nominal temps (< 160°F / 140°F / 120°F), warm amber glow (>= 160°F / 140°F / 120°F), and neon red glow with alert styling (>= 195°F / 175°F / 140°F).
-    - **Automotive Status Badges**: Micro-pill badges displaying `OK`, `WARM`, or `HOT` for each powertrain sensor.
-    - **Micro-Thermometer Level Fill Bars**: Real-time progress bars showing temperature fill relative to safe operational limits.
-  - **Cyber-Mint Trip Odometer Pod**:
-    - Distinct sculpted card with `📍 TRIP` icon, glowing mint border, and high-contrast Consolas mileage readout in **mi**.
-  - **Responsive Vertical Proportions**:
-    - Scaled deck height (42–64px dynamic scaling) providing comfortable breathing room, balanced proportions, and zero text clipping across 800×480 displays up to 4K monitors.
-
----
-
-## What's New in Version 4.1.0 🚀
-
-- 🇺🇸 **Exclusively Imperial System Telemetry (Metric Removed)**:
-  - Metric mode has been completely removed across the entire dashboard. All telemetry readouts, dials, and widgets are locked exclusively to the **Imperial system**:
-    - **Speedometer Dial & HUD**: 0–120 **MPH** scale with 20 MPH primary increments and precision tick marks.
-    - **Distance & Odometers**: Miles (**mi**) for total trip and estimated battery range.
-    - **Thermal Management**: Degrees Fahrenheit (**°F**) for motor, inverter, battery pack, and tire temperatures.
-    - **Tire Pressure Monitoring (TPMS)**: Pounds per square inch (**psi**) for all 4 corners.
-    - **Dual-Motor Torque Vectoring**: Foot-pounds (**lb-ft**) for front/rear motor torque outputs.
-    - **Energy Consumption**: **kWh/100mi** on the battery diagnostics page.
-- 🔴 **Continuous Always-Active Telemetry Logging**:
-  - The telemetry engine now logs continuously to the PostgreSQL database throughout vehicle operation.
-  - Logging cannot be accidentally toggled off during driving, ensuring 100% data integrity for race runs, dyno tests, and fleet diagnostics.
-- 🪟 **Streamlined Non-Invasive Top HUD Ribbon**:
-  - Eliminated visual clutter and redundant badges (`[METRIC]`/`[IMPERIAL]` badge, `REC`/`LOG OFF` badge, `[KEYS: ...]` legend, redundant `READY` indicator, `AUTO [D1]`, `RACE [CAN]`).
-  - Restyled into a sleek, low-profile translucent cyber ribbon (`rgba(4, 12, 8, 0.65)` with cyber-mint border) freeing over 350px of horizontal breathing room.
-  - **Intelligent Warning Alert**: Status badge is hidden during nominal driving and only displays when active vehicle warnings require driver attention (`⚠️ HIGH MOTOR TEMP`, etc.).
-  - **Clean 3-Section Layout**:
-    - **Left**: Left Turn Signal (`◄`), Brand (`⚡ VOLTESSE`), and compact Speed Fallback badge (`65 MPH [D4]`) when away from the speedometer page.
-    - **Center**: Interactive Touch Page Navigator (`◄ SPEED [1/4] ►`) and active warning alerts.
-    - **Right**: Drive Mode (`SPORT` / `DRIVE` / `ECO`), Ambient Temperature (`72°F`), 12-Hour AM/PM Clock, and Right Turn Signal (`►`).
-
----
-
-## What's New in Version 4.0 🚀
-
-- 📄 **Full-Width Dedicated Widget Pages (Individual Cockpit Views)**:
-  - Designed specifically for compact embedded screens (e.g., 800×480 Raspberry Pi touchscreens) where crowded multi-column layouts cause visual clutter. Each primary widget now commands the full central stage with clean breathing room, zero clipping, and authentic automotive typography:
-    - **Page 1 (SPEED)**: Full-stage radial speedometer dial with digital speed numerals, PRNDB capsule, active dynamic EV gear, motor RPM, steering angle, and throttle/brake meters.
-    - **Page 2 (BATTERY)**: High-voltage battery & energy diagnostics featuring a large glowing circular SoC gauge, range estimation HUD (`mi`), 4 pack diagnostic chips (Cell Avg, Health SOH, Charge Limit, Peak Temp), and a 4-quadrant electrical grid (Pack Voltage, Current Draw, Net Power, Energy Consumption).
-    - **Page 3 (POWERTRAIN)**: Dual-motor AWD torque vectoring dynamics, front/rear distribution bars with real-time torque in lb-ft, center-zero bidirectional Power/Regen bar, and live telemetry wave chart.
-    - **Page 4 (TPMS)**: Full-width tire pressure monitoring system with EV chassis blueprint, 4 corner diagnostic cards with dashed guide lines, individual tire pressures (`psi`), and temperatures (`°F`).
-- ↔️ **Intuitive Left ⇄ Right Page Switching**:
-  - **Arrow Keys `◄` / `►`**: Instant page flipping left or right.
-  - **Hotkey `V`**: Quick single-key page cycle (`SPEED` ➔ `BATTERY` ➔ `POWERTRAIN` ➔ `TPMS`).
-  - **Interactive Top HUD Navigator**: Touch-screen friendly `◄` and `►` buttons with live page indicator pill (`◄ SPEED [1/4] ►`, `◄ BATTERY [2/4] ►`, `◄ POWERTRAIN [3/4] ►`, `◄ TPMS [4/4] ►`).
-- 🛡️ **Top HUD Driver Safety Speed Fallback**:
-  - When viewing Pages 2, 3, or 4 (navigated away from the speedometer), the Top HUD displays a high-visibility compact digital speed pill (e.g. `65 MPH [M5]`), ensuring the driver is never without essential speed and active gear context.
-- ⚓ **Pinned Constant Telemetry Deck**:
-  - The bottom deck (Trip Odometer in `mi` + Powertrain Temperatures in `°F`: Motor, Inverter, Battery Pack) remains fixed, visible, and constant across all 4 pages.
-- ⚡ **Instant Frame-1 Display Initialization**:
-  - Eliminated startup black screen delay under Cage/Wayland kiosks by displaying the cockpit window immediately on frame 1 before executing database or network handshakes.
-- ⚙️ **CLI Flags for Custom Startup Views**:
-  - `--view {speed,battery,powertrain,tpms}`: Configure the initial startup page.
+- 📍 **Native Vector Trip & Battery Icons (Blank Box Fix)**:
+  - Replaced legacy Plane-1 Unicode emoji characters (`📍`, `🔋`) that rendered as missing-glyph blank boxes (`□`) on systems lacking dedicated color emoji font fallback.
+  - **Vector Trip Navigation Marker**: Custom `TripHeaderLabel` rendering an anti-aliased, cyber-mint (`#00F5A0`) navigation marker pin with a hollow core directly using `QPainterPath`, guaranteeing crisp scaling and zero rendering glitches on embedded Linux, Raspberry Pi, and Windows.
+  - **Vector Battery Diagnostic Icon**: Custom horizontal battery cell in the bottom cyber-dock thermal monitor featuring a rounded outer casing, positive terminal nipple, and real-time state-aware charge fill glowing mint (`OK`), amber (`WARM`), or neon red (`HOT`).
+- 🪟 **Streamlined Top HUD Ribbon (Speed Box Removed)**:
+  - Removed the top-bar digital speed fallback pill (`speed_hud_badge`).
+  - With the permanent, integrated side **Compact Speed Pod** (`CompactSpeedPod`) seamlessly visible across all diagnostic pages (Battery, Powertrain, TPMS), the top ribbon is free of visual clutter.
+- 📖 **Clean Latest-Only Patch Notes**:
+  - Documentation structure streamlined: `README.md` now highlights only the latest release patch notes per revision for immediate clarity and readability.
 
 ---
 
@@ -176,7 +94,7 @@ voltesse-dash/
 ├── data/
 │   └── exports/               # Generated CSV & JSON session dumps (auto-created)
 ├── src/
-│   ├── __init__.py            # Package version (v4.3.0)
+│   ├── __init__.py            # Package version (v4.4.0)
 │   ├── can_bus_source.py      # CAN Bus interface, frame decoders, and synchronized mock transmitter
 │   ├── simulation_source.py   # Video-game interactive EV dynamics engine (W/A/S/D, 6-speed manual, D1-D6 auto)
 │   ├── telemetry_source.py    # Autonomous EV driving cycle telemetry stream (Test Mode, D1-D6 auto)

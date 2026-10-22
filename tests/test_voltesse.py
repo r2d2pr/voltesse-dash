@@ -873,8 +873,9 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertEqual(gui.page_stack.currentIndex(), 1)        # Battery Hero
         self.assertIn("BATTERY", gui.page_title_label.text())
         self.assertIn("2/4", gui.page_title_label.text())
-        # Away from Speed page: Speed HUD badge is now visible
-        self.assertFalse(gui.speed_hud_badge.isHidden())
+        # Away from Speed page: Speed HUD badge is removed from top bar (side CompactSpeedPod is visible)
+        self.assertTrue(gui.speed_hud_badge.isHidden())
+        self.assertFalse(gui.battery_speed_pod.isHidden())
         self.assertTrue(gui.ready_badge.isHidden())
 
         # 3. Switch Right via Key_Right -> POWERTRAIN page (3/4)
@@ -883,7 +884,8 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertEqual(gui.page_stack.currentIndex(), 2)        # Powertrain Hero
         self.assertIn("POWERTRAIN", gui.page_title_label.text())
         self.assertIn("3/4", gui.page_title_label.text())
-        self.assertFalse(gui.speed_hud_badge.isHidden())
+        self.assertTrue(gui.speed_hud_badge.isHidden())
+        self.assertFalse(gui.powertrain_speed_pod.isHidden())
 
         # 4. Switch Right via Key_Right -> TPMS page (4/4)
         gui.keyPressEvent(event_right)
@@ -891,7 +893,8 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertEqual(gui.page_stack.currentIndex(), 3)        # TPMS Widget
         self.assertIn("TPMS", gui.page_title_label.text())
         self.assertIn("4/4", gui.page_title_label.text())
-        self.assertFalse(gui.speed_hud_badge.isHidden())
+        self.assertTrue(gui.speed_hud_badge.isHidden())
+        self.assertFalse(gui.tpms_speed_pod.isHidden())
 
         # 5. Switch Left via Key_Left -> wraps back to POWERTRAIN (3/4)
         event_left = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_Left, Qt.KeyboardModifier.NoModifier)
@@ -983,6 +986,14 @@ class TestDashboardGUI(unittest.TestCase):
             self.assertFalse(gui.trip_pod.isHidden())
             self.assertFalse(gui.thermal_widget.isHidden())
             self.assertEqual(gui.trip_dist_val.text(), f"{(28.4 * 0.621371):.2f} mi")
+
+        # 10. Vector Icons & Top HUD Speed Box Removal (v4.4.0 Verification)
+        from src.dashboard_gui import TripHeaderLabel
+        self.assertIsInstance(gui.trip_hdr, TripHeaderLabel)
+        self.assertIn("TRIP", gui.trip_hdr.text())
+        # Ensure speed box is completely removed from active top layout
+        self.assertEqual(gui.top_layout.indexOf(gui.speed_hud_badge), -1)
+        self.assertTrue(gui.speed_hud_badge.isHidden())
 
     def test_cli_view_and_swap_flags(self):
         from main import parse_args
