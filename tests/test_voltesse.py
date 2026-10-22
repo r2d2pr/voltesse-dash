@@ -1031,6 +1031,15 @@ class TestDashboardGUI(unittest.TestCase):
             sys.argv = ["main.py", "--theme", "classic"]
             args = parse_args()
             self.assertEqual(args.theme, "classic")
+
+            # Test --palette flag
+            sys.argv = ["main.py"]
+            args = parse_args()
+            self.assertEqual(args.palette, "mint")
+
+            sys.argv = ["main.py", "--palette", "amber"]
+            args = parse_args()
+            self.assertEqual(args.palette, "amber")
         finally:
             sys.argv = old_argv
 
@@ -1262,6 +1271,65 @@ class TestDashboardGUI(unittest.TestCase):
         gui.toggle_wing_swap()
         self.assertTrue(gui.swap_wings)
         self.assertTrue(gui.compact_speed_widget.is_right_wing)
+
+    def test_gui_ambient_palette_engine(self):
+        gui = VoltesseDashboard()
+        gui.resize(800, 480)
+
+        # 1. Default Palette Verification
+        self.assertEqual(gui.palette_key, "mint")
+        self.assertEqual(gui.palette.name, "CYBER-MINT")
+        self.assertEqual(gui.speed_gauge.palette.name, "CYBER-MINT")
+        self.assertEqual(gui.compact_speed_widget.palette.name, "CYBER-MINT")
+        self.assertEqual(gui.battery_hero.palette.name, "CYBER-MINT")
+        self.assertEqual(gui.powertrain_hero.palette.name, "CYBER-MINT")
+        self.assertEqual(gui.tpms_widget.palette.name, "CYBER-MINT")
+        self.assertEqual(gui.thermal_widget.palette.name, "CYBER-MINT")
+
+        # 2. Programmatic set_palette with key and object
+        pal_key = gui.set_palette("amber")
+        self.assertEqual(pal_key, "amber")
+        self.assertEqual(gui.palette_key, "amber")
+        self.assertEqual(gui.palette.name, "SOLAR-AMBER")
+        self.assertEqual(gui.speed_gauge.palette.name, "SOLAR-AMBER")
+        self.assertEqual(gui.compact_speed_widget.palette.name, "SOLAR-AMBER")
+        self.assertEqual(gui.battery_hero.palette.name, "SOLAR-AMBER")
+        self.assertEqual(gui.powertrain_hero.palette.name, "SOLAR-AMBER")
+        self.assertEqual(gui.tpms_widget.palette.name, "SOLAR-AMBER")
+        self.assertEqual(gui.thermal_widget.palette.name, "SOLAR-AMBER")
+
+        # 3. Palette Cycling Sequence
+        next_pal = gui.cycle_palette()
+        self.assertEqual(next_pal, "redline")
+        self.assertEqual(gui.palette.name, "TRACK-REDLINE")
+
+        next_pal = gui.cycle_palette()
+        self.assertEqual(next_pal, "synthwave")
+        self.assertEqual(gui.palette.name, "NEON-SYNTHWAVE")
+
+        next_pal = gui.cycle_palette()
+        self.assertEqual(next_pal, "mint")
+        self.assertEqual(gui.palette.name, "CYBER-MINT")
+
+        # 4. Hotkey 'P' Cycling
+        p_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_P, Qt.KeyboardModifier.NoModifier)
+        gui.keyPressEvent(p_event)
+        self.assertEqual(gui.palette_key, "stealth")
+        self.assertEqual(gui.palette.name, "STEALTH-MONOCHROME")
+
+        # 5. Pressing 'P' in Classic mode auto-switches to OLED mode
+        gui.set_cluster_theme("CLASSIC")
+        self.assertEqual(gui.cluster_theme, "CLASSIC")
+        gui.keyPressEvent(p_event)
+        self.assertEqual(gui.cluster_theme, "OLED")
+        self.assertEqual(gui.palette_key, "amber")
+
+        # 6. Speedometer Centerpiece Toast Overlay Trigger
+        gui.speed_gauge.show_palette_toast("SOLAR-AMBER")
+        self.assertTrue(gui.speed_gauge._toast_active)
+        self.assertEqual(gui.speed_gauge._toast_text, "SOLAR-AMBER")
+        self.assertGreater(gui.speed_gauge._toast_alpha, 0)
+
 
 
 

@@ -11,6 +11,7 @@ and 6-Speed Sequential Manual (R, N, 1-6) transmissions.
 from __future__ import annotations
 
 from collections import deque
+from dataclasses import dataclass
 import math
 import time
 from typing import Deque, List, Optional, Set, Tuple
@@ -100,6 +101,85 @@ COLOR_OLED_AMBER = QColor("#FFB800")              # Warning Amber
 COLOR_OLED_MUTED = QColor("#3E6558")              # Subtle Inactive Scale
 
 
+# =====================================================================
+# Voltesse Ambient Theme & Accent Palette Suite (v5.4.0)
+# =====================================================================
+@dataclass(frozen=True)
+class AmbientPalette:
+    key: str
+    name: str
+    primary: QColor
+    highlight: QColor
+    secondary: QColor
+    dim: QColor
+    border: QColor
+    text_accent: QColor
+
+
+PALETTES: dict[str, AmbientPalette] = {
+    "mint": AmbientPalette(
+        key="mint",
+        name="CYBER-MINT",
+        primary=QColor("#00F5A0"),
+        highlight=QColor("#5CFFC7"),
+        secondary=QColor("#00E5FF"),
+        dim=QColor(0, 245, 160, 45),
+        border=QColor(0, 245, 160, 80),
+        text_accent=QColor("#5CFFC7"),
+    ),
+    "stealth": AmbientPalette(
+        key="stealth",
+        name="STEALTH-MONOCHROME",
+        primary=QColor("#E2E8F0"),
+        highlight=QColor("#FFFFFF"),
+        secondary=QColor("#94A3B8"),
+        dim=QColor(226, 232, 240, 45),
+        border=QColor(226, 232, 240, 80),
+        text_accent=QColor("#FFFFFF"),
+    ),
+    "amber": AmbientPalette(
+        key="amber",
+        name="SOLAR-AMBER",
+        primary=QColor("#FFB800"),
+        highlight=QColor("#FFD166"),
+        secondary=QColor("#FF9F1C"),
+        dim=QColor(255, 184, 0, 45),
+        border=QColor(255, 184, 0, 80),
+        text_accent=QColor("#FFD166"),
+    ),
+    "redline": AmbientPalette(
+        key="redline",
+        name="TRACK-REDLINE",
+        primary=QColor("#FF3366"),
+        highlight=QColor("#FF6B8B"),
+        secondary=QColor("#FF9900"),
+        dim=QColor(255, 51, 102, 45),
+        border=QColor(255, 51, 102, 80),
+        text_accent=QColor("#FF6B8B"),
+    ),
+    "synthwave": AmbientPalette(
+        key="synthwave",
+        name="NEON-SYNTHWAVE",
+        primary=QColor("#D946EF"),
+        highlight=QColor("#F472B6"),
+        secondary=QColor("#06B6D4"),
+        dim=QColor(217, 70, 239, 45),
+        border=QColor(217, 70, 239, 80),
+        text_accent=QColor("#F472B6"),
+    ),
+}
+
+PALETTE_KEYS: list[str] = ["mint", "stealth", "amber", "redline", "synthwave"]
+
+
+def get_palette(key: str | AmbientPalette) -> AmbientPalette:
+    """Resolves an AmbientPalette instance from string key or returns palette unchanged."""
+    if isinstance(key, AmbientPalette):
+        return key
+    norm = str(key).strip().lower()
+    return PALETTES.get(norm, PALETTES["mint"])
+
+
 class SpeedometerDialWidget(QWidget):
     """
     Sleek automotive digital instrument cluster with Full Black Mint OLED Theme.
@@ -143,6 +223,11 @@ class SpeedometerDialWidget(QWidget):
         self.battery_voltage = 398.0
         self.battery_power_kw = 42.0
         self.cluster_theme = "OLED"  # "OLED" or "CLASSIC"
+        self.palette: AmbientPalette = PALETTES["mint"]
+        self._palette_toast_name: str = "CYBER-MINT"
+        self._palette_toast_alpha: float = 0.0
+        self._palette_toast_start_time: float = 0.0
+        self._palette_toast_timer: Optional[QTimer] = None
         self.is_sweeping = False
         self.sweep_progress = 0.0
         self._sweep_anim: Optional[QVariantAnimation] = None
@@ -252,6 +337,84 @@ class SpeedometerDialWidget(QWidget):
         self.cluster_theme = str(theme).upper()
         self.update()
 
+    def set_palette(self, palette: AmbientPalette | str) -> None:
+        """Sets the active ambient accent palette for the OLED cluster."""
+        self.palette = get_palette(palette)
+        self.update()
+
+    def show_palette_toast(self, palette_name: str) -> None:
+        """Triggers a 1.5-second centered glassmorphic notification overlay."""
+        self._palette_toast_name = palette_name
+        self._palette_toast_alpha = 1.0
+        self._palette_toast_start_time = time.time()
+        if not hasattr(self, "_palette_toast_timer") or self._palette_toast_timer is None:
+            self._palette_toast_timer = QTimer(self)
+            self._palette_toast_timer.setInterval(30)
+            self._palette_toast_timer.timeout.connect(self._step_palette_toast)
+        self._palette_toast_timer.start()
+        self.update()
+
+    def _step_palette_toast(self) -> None:
+        now = time.time()
+        elapsed = now - getattr(self, "_palette_toast_start_time", now)
+        if elapsed < 0.8:
+            self._palette_toast_alpha = 1.0
+        elif elapsed < 1.5:
+            # Smooth cubic fade out
+            t = (elapsed - 0.8) / 0.7
+            self._palette_toast_alpha = max(0.0, 1.0 - (t * t))
+        else:
+            self._palette_toast_alpha = 0.0
+            if hasattr(self, "_palette_toast_timer") and self._palette_toast_timer is not None:
+                self._palette_toast_timer.stop()
+        self.update()
+
+    @property
+    def _toast_active(self) -> bool:
+        return getattr(self, "_palette_toast_alpha", 0.0) > 0.0
+
+    @property
+    def _toast_text(self) -> str:
+        return getattr(self, "_palette_toast_name", "")
+
+    @property
+    def _toast_alpha(self) -> float:
+        return getattr(self, "_palette_toast_alpha", 0.0)
+
+    def _draw_palette_toast(self, painter: QPainter, cx: float, cy: float, r: float) -> None:
+        alpha = getattr(self, "_palette_toast_alpha", 0.0)
+        if alpha <= 0.01:
+            return
+
+        name = getattr(self, "_palette_toast_name", self.palette.name)
+        pill_w = max(190.0, r * 1.15)
+        pill_h = max(36.0, r * 0.24)
+        pill_x = cx - (pill_w / 2.0)
+        pill_y = cy - (pill_h / 2.0)
+        pill_rect = QRectF(pill_x, pill_y, pill_w, pill_h)
+
+        bg_col = QColor(4, 12, 10, int(230 * alpha))
+        border_col = QColor(self.palette.highlight.red(), self.palette.highlight.green(), self.palette.highlight.blue(), int(220 * alpha))
+
+        painter.save()
+        painter.setBrush(QBrush(bg_col))
+        painter.setPen(QPen(border_col, 1.5))
+        painter.drawRoundedRect(pill_rect, pill_h / 2.0, pill_h / 2.0)
+
+        # Subtle ambient halo glow
+        glow_pen_col = QColor(self.palette.primary.red(), self.palette.primary.green(), self.palette.primary.blue(), int(70 * alpha))
+        painter.setPen(QPen(glow_pen_col, 4.0))
+        painter.drawRoundedRect(pill_rect.adjusted(-2, -2, 2, 2), (pill_h + 4) / 2.0, (pill_h + 4) / 2.0)
+
+        # Centered text: 🎨 PALETTE: [NAME]
+        text_col = QColor(self.palette.highlight.red(), self.palette.highlight.green(), self.palette.highlight.blue(), int(255 * alpha))
+        painter.setPen(text_col)
+        font = QFont("Segoe UI", max(8, min(13, int(r * 0.082))), QFont.Weight.Bold)
+        font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
+        painter.setFont(font)
+        painter.drawText(pill_rect, Qt.AlignmentFlag.AlignCenter, f"🎨 {name}")
+        painter.restore()
+
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -276,6 +439,8 @@ class SpeedometerDialWidget(QWidget):
 
         if not is_wide:
             self._draw_center_pod(painter, w / 2.0, h / 2.0, min(w, h) * 0.44)
+            if getattr(self, "_palette_toast_alpha", 0.0) > 0.01:
+                self._draw_palette_toast(painter, w / 2.0, h / 2.0, min(w, h) * 0.44)
             return
 
         # 2. Geometry for 3-Pod Instrument Binnacle
@@ -299,6 +464,10 @@ class SpeedometerDialWidget(QWidget):
 
         # 5. Draw Top Flowing Cowl Luminous Brow across all 3 pods
         self._draw_flowing_cowl(painter, cx_left, cy_left, side_r, cx, cy_center, center_r, cx_right, cy_right, side_r)
+
+        # 6. Centered Glassmorphic Palette Overlay Notification (if active)
+        if getattr(self, "_palette_toast_alpha", 0.0) > 0.01:
+            self._draw_palette_toast(painter, cx, cy_center, center_r)
 
     def _draw_flowing_cowl(
         self, painter: QPainter, cx_l: float, cy_l: float, r_l: float,
@@ -338,13 +507,16 @@ class SpeedometerDialWidget(QWidget):
         path.cubicTo(cp_r1_x, cp_r1_y, cp_r2_x, cp_r2_y, p_end_x, p_end_y)
 
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.setPen(QPen(QColor(0, 229, 255, 35), 7.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        cowl_dim = QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 35)
+        painter.setPen(QPen(cowl_dim, 7.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
         painter.drawPath(path)
 
-        painter.setPen(QPen(QColor(0, 245, 212, 110), 3.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        cowl_pri = QColor(self.palette.primary.red(), self.palette.primary.green(), self.palette.primary.blue(), 110)
+        painter.setPen(QPen(cowl_pri, 3.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
         painter.drawPath(path)
 
-        painter.setPen(QPen(QColor(92, 255, 199, 245), 1.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        cowl_high = QColor(self.palette.highlight.red(), self.palette.highlight.green(), self.palette.highlight.blue(), 245)
+        painter.setPen(QPen(cowl_high, 1.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
         painter.drawPath(path)
 
     def _draw_left_pod(self, painter: QPainter, cx: float, cy: float, r: float) -> None:
@@ -354,7 +526,7 @@ class SpeedometerDialWidget(QWidget):
         grad.setColorAt(0.85, QColor(2, 6, 4, 240))
         grad.setColorAt(1.0, QColor(0, 0, 0, 255))
         painter.setBrush(QBrush(grad))
-        painter.setPen(QPen(QColor(0, 229, 255, 100), 1.2))
+        painter.setPen(QPen(QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 100), 1.2))
         painter.drawEllipse(QPointF(cx, cy), r, r)
 
         r_track = r * 0.88
@@ -411,13 +583,13 @@ class SpeedometerDialWidget(QWidget):
                 hy1 = cy + math.sin(half_rad) * r_outer
                 hx2 = cx + math.cos(half_rad) * (r_outer - tick_len * 0.55)
                 hy2 = cy + math.sin(half_rad) * (r_outer - tick_len * 0.55)
-                painter.setPen(QPen(COLOR_RED if i >= 6 else QColor(0, 229, 255, 120), 1.0))
+                painter.setPen(QPen(COLOR_RED if i >= 6 else QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 120), 1.0))
                 painter.drawLine(QPointF(hx1, hy1), QPointF(hx2, hy2))
 
         # RPM x1000 label
         lbl_rect = QRectF(cx - r * 0.26, cy - r * 0.50, r * 0.40, r * 0.24)
         painter.setFont(QFont("Segoe UI", max(6, min(10, int(r * 0.075))), QFont.Weight.Bold))
-        painter.setPen(COLOR_MINT)
+        painter.setPen(self.palette.primary)
         painter.drawText(lbl_rect, Qt.AlignmentFlag.AlignCenter, "RPM\nx1000")
 
         # Luminous Tachometer Needle
@@ -449,13 +621,13 @@ class SpeedometerDialWidget(QWidget):
 
         poly = QPolygonF([QPointF(b1_x, b1_y), QPointF(tip_x, tip_y), QPointF(b2_x, b2_y)])
         painter.setBrush(QBrush(COLOR_TEXT_PRIMARY))
-        painter.setPen(QPen(QColor(0, 229, 255, 180), 0.8))
+        painter.setPen(QPen(QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 180), 0.8))
         painter.drawPolygon(poly)
 
         # Center Hub Cap
         hub_r = r * 0.12
         painter.setBrush(QBrush(QColor(6, 16, 12, 245)))
-        painter.setPen(QPen(COLOR_CYAN, 1.5))
+        painter.setPen(QPen(self.palette.secondary, 1.5))
         painter.drawEllipse(QPointF(cx, cy), hub_r, hub_r)
 
         # Refined Vertical Temperature Sub-Gauge on Right Flank of Left Pod (Zero Overlap)
@@ -472,7 +644,7 @@ class SpeedometerDialWidget(QWidget):
 
         # Vector Thermometer Icon + °F Label
         motor_temp_f = self.motor_temp_c * 9.0 / 5.0 + 32.0
-        pip_col = COLOR_RED if motor_temp_f >= 220 else (COLOR_AMBER if motor_temp_f >= 180 else COLOR_MINT)
+        pip_col = COLOR_RED if motor_temp_f >= 220 else (COLOR_AMBER if motor_temp_f >= 180 else self.palette.primary)
 
         thermo_stem_x = sub_x - r * 0.14
         thermo_top_y = cy + r * 0.24
@@ -513,7 +685,7 @@ class SpeedometerDialWidget(QWidget):
         grad.setColorAt(0.85, QColor(2, 6, 4, 240))
         grad.setColorAt(1.0, QColor(0, 0, 0, 255))
         painter.setBrush(QBrush(grad))
-        painter.setPen(QPen(QColor(0, 229, 255, 100), 1.2))
+        painter.setPen(QPen(QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 100), 1.2))
         painter.drawEllipse(QPointF(cx, cy), r, r)
 
         r_track = r * 0.86
@@ -539,7 +711,7 @@ class SpeedometerDialWidget(QWidget):
             soc_ratio = live_soc_ratio
 
         if soc_ratio > 0.20:
-            soc_col = COLOR_MINT
+            soc_col = self.palette.primary
         elif soc_ratio > 0.10:
             soc_col = COLOR_AMBER
         else:
@@ -576,7 +748,7 @@ class SpeedometerDialWidget(QWidget):
         f_rad = -math.radians(start_angle_deg + total_span_deg)
         f_x = cx + math.cos(f_rad) * (r_track * 0.74)
         f_y = cy + math.sin(f_rad) * (r_track * 0.74)
-        painter.setPen(COLOR_MINT if soc_ratio >= 0.85 else COLOR_TEXT_MUTED)
+        painter.setPen(self.palette.primary if soc_ratio >= 0.85 else COLOR_TEXT_MUTED)
         painter.drawText(QRectF(f_x - 12, f_y - 10, 24, 20), Qt.AlignmentFlag.AlignCenter, "F")
 
         # Graduation ticks (25%, 50%, 75%)
@@ -628,8 +800,8 @@ class SpeedometerDialWidget(QWidget):
         badge_x = cx - (badge_w / 2.0)
         badge_y = cy + r * 0.18
         badge_rect = QRectF(badge_x, badge_y, badge_w, badge_h)
-        painter.setBrush(QBrush(QColor(0, 245, 160, 24)))
-        painter.setPen(QPen(QColor(0, 245, 160, 75), 1.0))
+        painter.setBrush(QBrush(self.palette.dim))
+        painter.setPen(QPen(self.palette.border, 1.0))
         painter.drawRoundedRect(badge_rect, badge_h / 2.0, badge_h / 2.0)
 
         # Vector navigation marker / lightning icon
@@ -640,13 +812,13 @@ class SpeedometerDialWidget(QWidget):
             QPointF(pin_x + 3.5, pin_y - 3.5),
             QPointF(pin_x, pin_y + 4.0),
         ])
-        painter.setBrush(QBrush(COLOR_CYAN))
+        painter.setBrush(QBrush(self.palette.secondary))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawPolygon(pin_poly)
 
         font_range = QFont("Segoe UI", max(8, min(13, int(r * 0.088))), QFont.Weight.Bold)
         painter.setFont(font_range)
-        painter.setPen(COLOR_MINT_BRIGHT)
+        painter.setPen(self.palette.highlight)
         range_text_rect = QRectF(pin_x + 4.0, badge_y, badge_w - (pin_x - badge_x) - 4.0, badge_h)
         painter.drawText(range_text_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"{range_mi} mi")
 
@@ -655,10 +827,10 @@ class SpeedometerDialWidget(QWidget):
         power_val = getattr(self, "battery_power_kw", 42.0)
         if power_val < -0.5:
             pwr_str = f"{power_val:.0f}kW"
-            pwr_col = COLOR_MINT
+            pwr_col = self.palette.primary
         elif power_val > 0.5:
             pwr_str = f"+{power_val:.0f}kW"
-            pwr_col = COLOR_CYAN
+            pwr_col = self.palette.secondary
         else:
             pwr_str = "0kW"
             pwr_col = COLOR_TEXT_MUTED
@@ -666,7 +838,7 @@ class SpeedometerDialWidget(QWidget):
         elec_str = f"{volt_val}V  •  {pwr_str}"
         font_elec = QFont("Consolas", max(7, min(11, int(r * 0.075))), QFont.Weight.Bold)
         painter.setFont(font_elec)
-        painter.setPen(COLOR_CYAN)
+        painter.setPen(self.palette.secondary)
         elec_rect = QRectF(cx - r * 0.50, cy + r * 0.52, r * 1.0, r * 0.16)
         painter.drawText(elec_rect, Qt.AlignmentFlag.AlignCenter, elec_str)
 
@@ -680,7 +852,7 @@ class SpeedometerDialWidget(QWidget):
             glow_alpha = int(50 + 110 * pulse)
         glow_grad = QRadialGradient(QPointF(cx, cy), r * 1.12)
         glow_grad.setColorAt(0.82, QColor(0, 0, 0, 0))
-        glow_grad.setColorAt(0.94, QColor(0, 229, 255, glow_alpha))
+        glow_grad.setColorAt(0.94, QColor(self.palette.primary.red(), self.palette.primary.green(), self.palette.primary.blue(), glow_alpha))
         glow_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
         painter.setBrush(QBrush(glow_grad))
         painter.setPen(Qt.PenStyle.NoPen)
@@ -692,7 +864,7 @@ class SpeedometerDialWidget(QWidget):
         face_grad.setColorAt(0.85, QColor(2, 6, 4, 245))
         face_grad.setColorAt(1.0, QColor(0, 0, 0, 255))
         painter.setBrush(QBrush(face_grad))
-        painter.setPen(QPen(QColor(0, 229, 255, 190), 2.2))
+        painter.setPen(QPen(QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 190), 2.2))
         painter.drawEllipse(QPointF(cx, cy), r, r)
 
         # Concentric Recessed Track Ring
@@ -710,9 +882,9 @@ class SpeedometerDialWidget(QWidget):
         painter.setClipPath(clip_path)
 
         glass_grad = QRadialGradient(QPointF(cx, cy - r * 0.65), r * 0.85)
-        glass_grad.setColorAt(0.0, QColor(0, 229, 255, 80))
-        glass_grad.setColorAt(0.40, QColor(92, 255, 199, 45))
-        glass_grad.setColorAt(0.75, QColor(0, 229, 255, 12))
+        glass_grad.setColorAt(0.0, QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 80))
+        glass_grad.setColorAt(0.40, QColor(self.palette.highlight.red(), self.palette.highlight.green(), self.palette.highlight.blue(), 45))
+        glass_grad.setColorAt(0.75, QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 12))
         glass_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
 
         painter.setBrush(QBrush(glass_grad))
@@ -759,7 +931,7 @@ class SpeedometerDialWidget(QWidget):
                 hy1 = cy + math.sin(half_rad) * r_outer
                 hx2 = cx + math.cos(half_rad) * (r_outer - tick_len * 0.55)
                 hy2 = cy + math.sin(half_rad) * (r_outer - tick_len * 0.55)
-                painter.setPen(QPen(QColor(0, 229, 255, 130), 1.0))
+                painter.setPen(QPen(QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 130), 1.0))
                 painter.drawLine(QPointF(hx1, hy1), QPointF(hx2, hy2))
 
         # 4. Luminous Speed Needle (Pointing to current speed)
@@ -792,7 +964,7 @@ class SpeedometerDialWidget(QWidget):
 
         poly = QPolygonF([QPointF(b1_x, b1_y), QPointF(tip_x, tip_y), QPointF(b2_x, b2_y)])
         painter.setBrush(QBrush(COLOR_TEXT_PRIMARY))
-        painter.setPen(QPen(QColor(0, 229, 255, 200), 0.8))
+        painter.setPen(QPen(QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 200), 0.8))
         painter.drawPolygon(poly)
 
         # 5. Central Digital Speed Numerals & Vector Chevrons
@@ -804,7 +976,7 @@ class SpeedometerDialWidget(QWidget):
             QPointF(cx - chv_w, chv_up_y + chv_h),
             QPointF(cx + chv_w, chv_up_y + chv_h),
         ])
-        painter.setBrush(QBrush(COLOR_MINT))
+        painter.setBrush(QBrush(self.palette.primary))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawPolygon(chv_up)
 
@@ -820,7 +992,7 @@ class SpeedometerDialWidget(QWidget):
 
         font_unit = QFont("Segoe UI", max(8, min(13, int(r * 0.070))), QFont.Weight.Bold)
         painter.setFont(font_unit)
-        painter.setPen(COLOR_MINT)
+        painter.setPen(self.palette.primary)
         unit_rect = QRectF(cx - r * 0.30, cy + r * 0.16, r * 0.60, r * 0.14)
         painter.drawText(unit_rect, Qt.AlignmentFlag.AlignCenter, self.unit)
 
@@ -830,12 +1002,12 @@ class SpeedometerDialWidget(QWidget):
             QPointF(cx - chv_w, chv_dn_y - chv_h),
             QPointF(cx + chv_w, chv_dn_y - chv_h),
         ])
-        painter.setBrush(QBrush(COLOR_MINT))
+        painter.setBrush(QBrush(self.palette.primary))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawPolygon(chv_dn)
 
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.setPen(QPen(QColor(0, 229, 255, 70), 1.0))
+        painter.setPen(QPen(QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 70), 1.0))
         painter.drawEllipse(QPointF(cx, cy), base_r, base_r)
 
         # 7. Curved Vertical Ribbon Meter on Right Flank (ACCEL / BRAKE)
@@ -855,7 +1027,7 @@ class SpeedometerDialWidget(QWidget):
         a_x = cx + math.cos(a_rad) * (ribbon_r * 1.02)
         a_y = cy + math.sin(a_rad) * (ribbon_r * 1.02)
         painter.setFont(QFont("Segoe UI", max(6, min(10, int(r * 0.065))), QFont.Weight.Bold))
-        painter.setPen(COLOR_MINT)
+        painter.setPen(self.palette.primary)
         painter.drawText(QRectF(a_x - 10, a_y - 12, 45, 14), Qt.AlignmentFlag.AlignLeft, "ACCEL")
 
         b_rad = -math.radians(-38.0)
@@ -867,7 +1039,7 @@ class SpeedometerDialWidget(QWidget):
 
         if self.throttle_pct > 0.5:
             thr_span = 30.0 * (self.throttle_pct / 100.0)
-            painter.setPen(QPen(COLOR_MINT, max(3.5, r * 0.026), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            painter.setPen(QPen(self.palette.primary, max(3.5, r * 0.026), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
             painter.drawArc(ribbon_rect, int(0 * 16), int(thr_span * 16))
 
             pip_rad = -math.radians(thr_span)
@@ -891,16 +1063,16 @@ class SpeedometerDialWidget(QWidget):
         # 8. Bottom Center Readouts (Gear, Drive Mode, Odometer)
         gear_y = cy + r * 0.82
         painter.setFont(QFont("Segoe UI", max(8, min(14, int(r * 0.090))), QFont.Weight.Bold))
-        painter.setPen(COLOR_CYAN)
+        painter.setPen(self.palette.secondary)
         painter.drawText(QRectF(cx - r * 0.40, gear_y, r * 0.35, 18), Qt.AlignmentFlag.AlignRight, self.active_gear)
 
         mode_char = self.drive_mode[0] if self.drive_mode else "D"
-        painter.setPen(COLOR_MINT)
+        painter.setPen(self.palette.primary)
         painter.drawText(QRectF(cx - r * 0.02, gear_y, r * 0.20, 18), Qt.AlignmentFlag.AlignLeft, mode_char)
 
         odo_str = f"{int(round(self.trip_dist_mi)):06d} mi"
         painter.setFont(QFont("Segoe UI", max(8, min(13, int(r * 0.076))), QFont.Weight.Bold))
-        painter.setPen(COLOR_MINT_BRIGHT)
+        painter.setPen(self.palette.highlight)
         painter.drawText(QRectF(cx + r * 0.38, gear_y, r * 0.60, 18), Qt.AlignmentFlag.AlignLeft, odo_str)
 
     def _paint_classic_theme(self, painter: QPainter, w: int, h: int) -> None:
@@ -1384,9 +1556,14 @@ class TPMSWidget(QWidget):
         self.rr_temp = 30.0
         self.unit_system = "IMPERIAL"
         self.cluster_theme = "OLED"
+        self.palette: AmbientPalette = PALETTES["mint"]
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(80)
         self.setMinimumWidth(0)
+
+    def set_palette(self, palette: AmbientPalette | str) -> None:
+        self.palette = get_palette(palette)
+        self.update()
 
     def set_cluster_theme(self, theme: str) -> None:
         self.cluster_theme = theme.upper().strip()
@@ -1422,7 +1599,7 @@ class TPMSWidget(QWidget):
             return COLOR_RED
         elif bar < 2.2 or bar > 2.65:
             return COLOR_AMBER
-        return COLOR_MINT
+        return getattr(self, "palette", PALETTES["mint"]).primary
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
@@ -1443,7 +1620,7 @@ class TPMSWidget(QWidget):
         painter.setFont(QFont("Segoe UI", hdr_font_sz, QFont.Weight.Bold))
         painter.drawText(QRectF(14, 8, w * 0.5, 18), Qt.AlignmentFlag.AlignLeft, "TIRE PRESSURE & TPMS")
 
-        painter.setPen(COLOR_MINT)
+        painter.setPen(self.palette.primary)
         painter.drawText(QRectF(w * 0.5, 8, w * 0.5 - 14, 18), Qt.AlignmentFlag.AlignRight, "● ALL NOMINAL")
 
         content_h = h - 30.0
@@ -1460,21 +1637,21 @@ class TPMSWidget(QWidget):
             chassis_rect = QRectF(cx - cw / 2.0, cy - ch / 2.0, cw, ch)
             if getattr(self, "cluster_theme", "OLED") == "OLED":
                 painter.setBrush(QBrush(QColor(0, 0, 0, 0)))
-                painter.setPen(QPen(QColor(0, 229, 255, 140), 1.5))
+                painter.setPen(QPen(QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 140), 1.5))
             else:
                 painter.setBrush(QBrush(QColor(10, 24, 18, 230)))
                 painter.setPen(QPen(COLOR_PANEL_BORDER, 1.4))
             painter.drawRoundedRect(chassis_rect, 10, 10)
 
             # Windshield & cockpit details
-            painter.setPen(QPen(QColor(0, 245, 160, 90), 1.2))
+            painter.setPen(QPen(QColor(self.palette.primary.red(), self.palette.primary.green(), self.palette.primary.blue(), 90), 1.2))
             painter.drawLine(int(cx - cw * 0.36), int(cy - ch * 0.18), int(cx + cw * 0.36), int(cy - ch * 0.18))
             painter.drawLine(int(cx - cw * 0.32), int(cy + ch * 0.22), int(cx + cw * 0.32), int(cy + ch * 0.22))
 
             # Battery Pack Glow in Floor
             batt_floor = QRectF(cx - cw * 0.32, cy - ch * 0.12, cw * 0.64, ch * 0.32)
-            painter.setBrush(QBrush(QColor(0, 245, 160, 25)))
-            painter.setPen(QPen(QColor(0, 245, 160, 60), 0.8))
+            painter.setBrush(QBrush(self.palette.dim))
+            painter.setPen(QPen(self.palette.border, 0.8))
             painter.drawRoundedRect(batt_floor, 3, 3)
 
             # Wheels
@@ -1533,7 +1710,7 @@ class TPMSWidget(QWidget):
                 painter.setPen(COLOR_TEXT_SECONDARY)
                 painter.drawText(QRectF(c_x + 8, c_y + card_h * 0.66, card_w - 16, card_h * 0.30), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"{temp_str} • NOMINAL")
 
-                dash_pen = QColor(0, 229, 255, 60) if getattr(self, "cluster_theme", "OLED") == "OLED" else QColor(18, 50, 38, 140)
+                dash_pen = QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 60) if getattr(self, "cluster_theme", "OLED") == "OLED" else QColor(18, 50, 38, 140)
                 painter.setPen(QPen(dash_pen, 1, Qt.PenStyle.DashLine))
                 start_lx = (c_x + card_w) if is_left else c_x
                 target_lx = (cx - wheel_dx - tw) if is_left else (cx + wheel_dx + tw)
@@ -1894,9 +2071,14 @@ class ThermalMonitorWidget(QWidget):
         self.inverter_temp = 0.0
         self.batt_temp = 0.0
         self.unit_system = "IMPERIAL"
+        self.palette: AmbientPalette = PALETTES["mint"]
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(32)
         self.setMinimumWidth(0)
+
+    def set_palette(self, palette: AmbientPalette | str) -> None:
+        self.palette = get_palette(palette)
+        self.update()
 
     def set_unit_system(self, unit_system: str) -> None:
         self.unit_system = unit_system
@@ -1913,7 +2095,7 @@ class ThermalMonitorWidget(QWidget):
             return COLOR_RED
         elif temp >= warn_th:
             return COLOR_AMBER
-        return COLOR_MINT
+        return getattr(self, "palette", PALETTES["mint"]).primary
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
@@ -1944,7 +2126,8 @@ class ThermalMonitorWidget(QWidget):
             painter.setBrush(QBrush(grad))
 
             # Dynamic state-aware border glow
-            border_col = QColor(color.red(), color.green(), color.blue(), 100 if color == COLOR_MINT else 180)
+            pri_col = getattr(self, "palette", PALETTES["mint"]).primary
+            border_col = QColor(color.red(), color.green(), color.blue(), 100 if color == pri_col else 180)
             painter.setPen(QPen(border_col, 1))
             painter.drawRoundedRect(QRectF(box_x, 0, box_w, h - 2), 6, 6)
 
@@ -2036,10 +2219,15 @@ class CompactSpeedPod(QWidget):
         self.steer_angle = 0.0
         self.cluster_theme = "OLED"
         self.is_right_wing = False
+        self.palette: AmbientPalette = PALETTES["mint"]
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(80)
         self.setMinimumWidth(170)
         self.setMaximumWidth(260)
+
+    def set_palette(self, palette: AmbientPalette | str) -> None:
+        self.palette = get_palette(palette)
+        self.update()
 
     def set_right_wing(self, is_right: bool) -> None:
         self.is_right_wing = bool(is_right)
@@ -2124,10 +2312,10 @@ class CompactSpeedPod(QWidget):
             is_right = getattr(self, "is_right_wing", False)
             seam_x = 0.0 if is_right else (w - 1.0)
             seam_grad = QLinearGradient(seam_x, 0, seam_x, h)
-            seam_grad.setColorAt(0.0, QColor(0, 229, 255, 0))
-            seam_grad.setColorAt(0.2, QColor(0, 229, 255, 180))
-            seam_grad.setColorAt(0.8, QColor(0, 245, 160, 180))
-            seam_grad.setColorAt(1.0, QColor(0, 229, 255, 0))
+            seam_grad.setColorAt(0.0, QColor(0, 0, 0, 0))
+            seam_grad.setColorAt(0.2, QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 180))
+            seam_grad.setColorAt(0.8, QColor(self.palette.primary.red(), self.palette.primary.green(), self.palette.primary.blue(), 180))
+            seam_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
             painter.setPen(QPen(QBrush(seam_grad), 1.5))
             painter.drawLine(int(seam_x), 10, int(seam_x), int(h - 10))
         else:
@@ -2142,11 +2330,11 @@ class CompactSpeedPod(QWidget):
         hdr_y = 8.0
         hdr_font_sz = max(7, min(10, int(w * 0.040)))
         painter.setFont(QFont("Segoe UI", hdr_font_sz, QFont.Weight.Bold))
-        painter.setPen(COLOR_MINT)
+        painter.setPen(self.palette.primary)
         painter.drawText(QRectF(10, hdr_y, w * 0.45, 16), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "⚡ SPEED")
 
         badge_str = f"{self.trans_mode} [{self.gear}]"
-        painter.setPen(COLOR_CYAN if self.trans_mode == "MANUAL" else COLOR_MINT_BRIGHT)
+        painter.setPen(self.palette.secondary if self.trans_mode == "MANUAL" else self.palette.highlight)
         painter.setFont(QFont("Consolas", max(7, min(9, int(w * 0.038))), QFont.Weight.Bold))
         painter.drawText(QRectF(w * 0.35, hdr_y, w * 0.65 - 10, 16), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, badge_str)
 
@@ -2155,8 +2343,8 @@ class CompactSpeedPod(QWidget):
         # Radial speed glow behind digits
         glow_center = QPointF(w * 0.35, hdr_y + 18.0 + content_h * 0.24)
         radial = QRadialGradient(glow_center, w * 0.45)
-        radial.setColorAt(0.0, QColor(0, 245, 160, 30))
-        radial.setColorAt(1.0, QColor(0, 245, 160, 0))
+        radial.setColorAt(0.0, self.palette.dim)
+        radial.setColorAt(1.0, QColor(0, 0, 0, 0))
         painter.setBrush(QBrush(radial))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(glow_center, w * 0.45, content_h * 0.35)
@@ -2174,7 +2362,7 @@ class CompactSpeedPod(QWidget):
         # Unit + RPM column on right
         font_unit_sz = max(8, min(12, int(content_h * 0.11)))
         painter.setFont(QFont("Segoe UI", font_unit_sz, QFont.Weight.Bold))
-        painter.setPen(COLOR_MINT)
+        painter.setPen(self.palette.primary)
         painter.drawText(QRectF(w * 0.52, spd_y + (spd_h * 0.10), w * 0.44, spd_h * 0.40), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, self.unit)
 
         font_rpm_sz = max(7, min(10, int(content_h * 0.09)))
@@ -2194,8 +2382,8 @@ class CompactSpeedPod(QWidget):
         spd_ratio = max(0.0, min(1.0, self.speed / max(1.0, self.max_speed)))
         if spd_ratio > 0.01:
             bar_grad = QLinearGradient(10, 0, 10 + bar_w * spd_ratio, 0)
-            bar_grad.setColorAt(0.0, COLOR_CYAN)
-            bar_grad.setColorAt(1.0, COLOR_MINT)
+            bar_grad.setColorAt(0.0, self.palette.secondary)
+            bar_grad.setColorAt(1.0, self.palette.primary)
             painter.setBrush(QBrush(bar_grad))
             painter.drawRoundedRect(QRectF(10, bar_y, bar_w * spd_ratio, bar_h), 2.5, 2.5)
 
@@ -2212,7 +2400,7 @@ class CompactSpeedPod(QWidget):
         painter.setFont(font_pedal)
 
         col_w = (w - 20.0) / 3.0
-        painter.setPen(COLOR_MINT)
+        painter.setPen(self.palette.primary)
         painter.drawText(QRectF(8, sub_y, col_w, sub_h), Qt.AlignmentFlag.AlignCenter, f"THR {int(self.throttle_pct)}%")
         painter.setPen(COLOR_SHIFT_RED if self.brake_pct > 0 else COLOR_TEXT_MUTED)
         painter.drawText(QRectF(8 + col_w, sub_y, col_w, sub_h), Qt.AlignmentFlag.AlignCenter, f"BRK {int(self.brake_pct)}%")
@@ -2236,8 +2424,13 @@ class BatteryHeroWidget(QWidget):
         self.est_range_km = 372.0
         self.unit_system = "IMPERIAL"
         self.cluster_theme = "OLED"
+        self.palette: AmbientPalette = PALETTES["mint"]
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(220)
+
+    def set_palette(self, palette: AmbientPalette | str) -> None:
+        self.palette = get_palette(palette)
+        self.update()
 
     def set_cluster_theme(self, theme: str) -> None:
         self.cluster_theme = theme.upper().strip()
@@ -2289,7 +2482,7 @@ class BatteryHeroWidget(QWidget):
         painter.drawText(QRectF(14, 8, w * 0.55, 18), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, title_str)
 
         status_str = "● DISCHARGING" if self.current > 5.0 else ("● REGEN" if self.current < -2.0 else "● STANDBY")
-        s_color = COLOR_AMBER if self.current > 70.0 else (COLOR_CYAN if self.current < -2.0 else COLOR_MINT)
+        s_color = COLOR_AMBER if self.current > 70.0 else (self.palette.secondary if self.current < -2.0 else self.palette.primary)
         painter.setPen(s_color)
         painter.drawText(QRectF(w * 0.50, 8, w * 0.50 - 14, 18), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, status_str)
 
@@ -2314,7 +2507,7 @@ class BatteryHeroWidget(QWidget):
         painter.drawArc(arc_rect, int(start_ang * 16), int(span_ang * 16))
 
         # Active Arc
-        bar_color = COLOR_MINT if self.soc > 30.0 else (COLOR_AMBER if self.soc > 15.0 else COLOR_RED)
+        bar_color = self.palette.primary if self.soc > 30.0 else (COLOR_AMBER if self.soc > 15.0 else COLOR_RED)
         active_span = span_ang * (self.soc / 100.0)
         if self.soc > 0.5:
             painter.setPen(QPen(bar_color, pen_w, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
@@ -2340,7 +2533,7 @@ class BatteryHeroWidget(QWidget):
         unit_str = "mi" if is_imp else "km"
 
         painter.setFont(QFont("Segoe UI", max(14, min(24, int(upper_h * 0.22))), QFont.Weight.Bold))
-        painter.setPen(COLOR_MINT)
+        painter.setPen(self.palette.highlight)
         painter.drawText(QRectF(rng_x, rng_y + 16, rng_w, 28), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"{range_val} {unit_str}")
 
         # Right Section: Pack Diagnostics Summary Grid (4 chips)
@@ -2350,9 +2543,9 @@ class BatteryHeroWidget(QWidget):
         chip_h = (upper_h - 14.0) / 2.0
 
         chips = [
-            ("CELL AVG", "4.15 V", COLOR_MINT),
-            ("HEALTH (SOH)", "100%", COLOR_MINT_BRIGHT),
-            ("CHARGE LIMIT", "90%", COLOR_CYAN),
+            ("CELL AVG", "4.15 V", self.palette.primary),
+            ("HEALTH (SOH)", "100%", self.palette.highlight),
+            ("CHARGE LIMIT", "90%", self.palette.secondary),
             ("PEAK TEMP", "32.0°C" if not is_imp else "89.6°F", COLOR_TEXT_PRIMARY),
         ]
         f_ch_lbl = QFont("Segoe UI", max(6, min(8, int(chip_h * 0.26))), QFont.Weight.Bold)
@@ -2389,7 +2582,7 @@ class BatteryHeroWidget(QWidget):
         quads = [
             ("PACK VOLTAGE", f"{self.voltage:.1f} V", COLOR_TEXT_PRIMARY, 0, 0),
             ("CURRENT DRAW", f"{self.current:+.1f} A", s_color, 1, 0),
-            ("NET POWER", f"{self.power_kw:+.1f} kW", COLOR_CYAN if self.power_kw < 0 else COLOR_MINT_BRIGHT, 0, 1),
+            ("NET POWER", f"{self.power_kw:+.1f} kW", self.palette.secondary if self.power_kw < 0 else self.palette.highlight, 0, 1),
             ("CONSUMPTION", "15.2 kWh/100km" if not is_imp else "24.5 kWh/100mi", COLOR_TEXT_PRIMARY, 1, 1),
         ]
 
@@ -2435,9 +2628,14 @@ class PowertrainHeroWidget(QWidget):
         self.speed = 104.0
         self.unit_system = "IMPERIAL"
         self.cluster_theme = "OLED"
+        self.palette: AmbientPalette = PALETTES["mint"]
         self.wave_points: List[Tuple[float, float]] = []
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(220)
+
+    def set_palette(self, palette: AmbientPalette | str) -> None:
+        self.palette = get_palette(palette)
+        self.update()
 
     def set_cluster_theme(self, theme: str) -> None:
         self.cluster_theme = theme.upper().strip()
@@ -2499,7 +2697,7 @@ class PowertrainHeroWidget(QWidget):
         painter.drawText(QRectF(14, 8, w * 0.58, 18), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, title_str)
 
         bias_str = f"● {self.bias_mode.replace('AWD ', '')}"
-        painter.setPen(COLOR_MINT_BRIGHT)
+        painter.setPen(self.palette.highlight)
         painter.drawText(QRectF(w * 0.52, 8, w * 0.48 - 14, 18), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, bias_str)
 
         content_h = h - 30.0
@@ -2531,7 +2729,7 @@ class PowertrainHeroWidget(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(QRectF(bar_l, y_f - 4, bar_w, bar_h), 2.5, 2.5)
 
-        painter.setBrush(QBrush(COLOR_MINT))
+        painter.setBrush(QBrush(self.palette.primary))
         painter.drawRoundedRect(QRectF(bar_l, y_f - 4, bar_w * (self.front_pct / 100.0), bar_h), 2.5, 2.5)
 
         painter.setFont(val_font)
@@ -2548,7 +2746,7 @@ class PowertrainHeroWidget(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(QRectF(bar_l, y_r - 4, bar_w, bar_h), 2.5, 2.5)
 
-        painter.setBrush(QBrush(COLOR_MINT_BRIGHT if self.rear_pct < 65.0 else COLOR_AMBER))
+        painter.setBrush(QBrush(self.palette.highlight if self.rear_pct < 65.0 else COLOR_AMBER))
         painter.drawRoundedRect(QRectF(bar_l, y_r - 4, bar_w * (self.rear_pct / 100.0), bar_h), 2.5, 2.5)
 
         painter.setFont(val_font)
@@ -2564,7 +2762,7 @@ class PowertrainHeroWidget(QWidget):
         pwr_bar_y = sec2_y + 14.0
 
         painter.setFont(QFont("Segoe UI", max(6, min(8, int(sec2_h * 0.20))), QFont.Weight.Bold))
-        painter.setPen(COLOR_CYAN)
+        painter.setPen(self.palette.secondary)
         painter.drawText(QRectF(14, sec2_y, 80, 12), Qt.AlignmentFlag.AlignLeft, "REGEN -60kW")
         painter.setPen(COLOR_AMBER)
         painter.drawText(QRectF(w - 94, sec2_y, 80, 12), Qt.AlignmentFlag.AlignRight, "+120kW PWR")
@@ -2584,16 +2782,16 @@ class PowertrainHeroWidget(QWidget):
         if self.power_kw < -0.2:
             fill_w = (abs(self.power_kw) / self.max_regen_kw) * (zero_x - 14.0)
             fill_x = zero_x - fill_w
-            painter.setBrush(QBrush(COLOR_CYAN))
+            painter.setBrush(QBrush(self.palette.secondary))
             painter.drawRoundedRect(QRectF(fill_x, pwr_bar_y, fill_w, pwr_bar_h), 2, 2)
         elif self.power_kw > 0.2:
             fill_w = (self.power_kw / self.max_kw) * (14.0 + pwr_bar_w - zero_x)
-            painter.setBrush(QBrush(COLOR_MINT if self.power_kw < 70.0 else COLOR_AMBER))
+            painter.setBrush(QBrush(self.palette.primary if self.power_kw < 70.0 else COLOR_AMBER))
             painter.drawRoundedRect(QRectF(zero_x, pwr_bar_y, fill_w, pwr_bar_h), 2, 2)
 
         # Readout below bar
         painter.setFont(QFont("Consolas", max(7, min(10, int(sec2_h * 0.26))), QFont.Weight.Bold))
-        painter.setPen(COLOR_MINT_BRIGHT)
+        painter.setPen(self.palette.highlight)
         painter.drawText(QRectF(w * 0.30, pwr_bar_y + pwr_bar_h + 2, w * 0.40, 14), Qt.AlignmentFlag.AlignCenter, f"{self.power_kw:+.1f} kW")
 
         # 3. Live Rolling Telemetry Waveform (Bottom 44%)
@@ -2610,14 +2808,14 @@ class PowertrainHeroWidget(QWidget):
         painter.setPen(COLOR_TEXT_MUTED)
         painter.drawText(QRectF(20, sec3_y + 4, 120, 14), Qt.AlignmentFlag.AlignLeft, "LIVE TELEMETRY WAVE")
 
-        painter.setPen(COLOR_MINT)
+        painter.setPen(self.palette.primary)
         painter.drawText(QRectF(w - 96, sec3_y + 4, 34, 14), Qt.AlignmentFlag.AlignRight, "SPD")
         painter.setPen(COLOR_AMBER)
         painter.drawText(QRectF(w - 56, sec3_y + 4, 34, 14), Qt.AlignmentFlag.AlignRight, "PWR")
 
         # Draw Grid Line
         mid_y = sec3_y + (sec3_h * 0.55)
-        dash_pen = QColor(0, 229, 255, 60) if getattr(self, "cluster_theme", "OLED") == "OLED" else QColor(18, 50, 38, 120)
+        dash_pen = QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 60) if getattr(self, "cluster_theme", "OLED") == "OLED" else QColor(18, 50, 38, 120)
         painter.setPen(QPen(dash_pen, 1, Qt.PenStyle.DashLine))
         painter.drawLine(int(18), int(mid_y), int(w - 18), int(mid_y))
 
@@ -2635,7 +2833,7 @@ class PowertrainHeroWidget(QWidget):
                 py_pwr = (sec3_y + sec3_h - 6.0) - ((pwr_val + 60.0) / 180.0) * (sec3_h - 24.0)
                 pwr_poly.append(QPointF(px, max(sec3_y + 18.0, min(sec3_y + sec3_h - 4.0, py_pwr))))
 
-            painter.setPen(QPen(COLOR_MINT, 1.8))
+            painter.setPen(QPen(self.palette.primary, 1.8))
             painter.drawPolyline(spd_poly)
 
             painter.setPen(QPen(COLOR_AMBER, 1.8))
@@ -2941,6 +3139,8 @@ class VoltesseDashboard(QMainWindow):
         self.active_hero_view = "SPEED"
         self.swap_wings = False
         self.cluster_theme = "OLED"
+        self.palette: AmbientPalette = PALETTES["mint"]
+        self.palette_key: str = "mint"
         self._last_record: Optional[TelemetryRecord] = None
 
         # Track currently held keys for video game simulation
@@ -3601,6 +3801,68 @@ class VoltesseDashboard(QMainWindow):
         self.set_page(self.current_page_idx)
         self.wing_swap_changed.emit(self.swap_wings)
 
+    def set_palette(self, palette: AmbientPalette | str) -> str:
+        """Sets active ambient colorway palette and propagates to all child widgets."""
+        pal = get_palette(palette)
+        self.palette = pal
+        for k, v in PALETTES.items():
+            if v.name == pal.name:
+                self.palette_key = k
+                break
+        else:
+            self.palette_key = "mint"
+
+        if hasattr(self, "speed_gauge") and hasattr(self.speed_gauge, "set_palette"):
+            self.speed_gauge.set_palette(pal)
+        if hasattr(self, "battery_hero") and hasattr(self.battery_hero, "set_palette"):
+            self.battery_hero.set_palette(pal)
+        if hasattr(self, "powertrain_hero") and hasattr(self.powertrain_hero, "set_palette"):
+            self.powertrain_hero.set_palette(pal)
+        if hasattr(self, "tpms_widget") and hasattr(self.tpms_widget, "set_palette"):
+            self.tpms_widget.set_palette(pal)
+        if hasattr(self, "thermal_widget") and hasattr(self.thermal_widget, "set_palette"):
+            self.thermal_widget.set_palette(pal)
+        if hasattr(self, "compact_speed_widget") and hasattr(self.compact_speed_widget, "set_palette"):
+            self.compact_speed_widget.set_palette(pal)
+        for pod in getattr(self, "compact_speed_pods", []):
+            if hasattr(pod, "set_palette"):
+                pod.set_palette(pal)
+        self._apply_cluster_theme_styles()
+        return self.palette_key
+
+    def cycle_palette(self) -> str:
+        """Cycles through the 5 signature OLED ambient palettes in sequence."""
+        if getattr(self, "cluster_theme", "OLED") != "OLED":
+            self.set_cluster_theme("OLED")
+
+        try:
+            curr_idx = PALETTE_KEYS.index(self.palette_key)
+            next_key = PALETTE_KEYS[(curr_idx + 1) % len(PALETTE_KEYS)]
+        except (ValueError, IndexError):
+            next_key = PALETTE_KEYS[0]
+
+        self.set_palette(next_key)
+
+        # Trigger centered floating speedometer glassmorphic overlay
+        if hasattr(self, "speed_gauge") and hasattr(self.speed_gauge, "show_palette_toast"):
+            self.speed_gauge.show_palette_toast(self.palette.name)
+
+        # Trigger top HUD ribbon status badge
+        if hasattr(self, "status_badge"):
+            p_col = self.palette.primary.name()
+            self.status_badge.setText(f"🎨 PALETTE: {self.palette.name}")
+            self.status_badge.setStyleSheet(
+                f"color: {p_col}; background-color: rgba(0, 0, 0, 0.85); "
+                f"border: 1px solid {p_col}; padding: 2px 8px; border-radius: 4px; "
+                f"font-weight: bold; font-family: 'Segoe UI'; font-size: 8.5pt;"
+            )
+            self.status_badge.setVisible(True)
+            QTimer.singleShot(
+                1800,
+                lambda: self.status_badge.setVisible(False) if not (hasattr(self, "_last_record") and self._last_record and self._last_record.warnings) else None,
+            )
+        return self.palette_key
+
     def set_cluster_theme(self, theme: str) -> None:
         """Sets the visual theme for the cluster ('OLED' or 'CLASSIC')."""
         self.cluster_theme = theme.upper().strip()
@@ -3630,6 +3892,12 @@ class VoltesseDashboard(QMainWindow):
     def _apply_cluster_theme_styles(self) -> None:
         """Applies global styling tokens matching the active cluster theme."""
         if getattr(self, "cluster_theme", "OLED") == "OLED":
+            pal = getattr(self, "palette", PALETTES["mint"])
+            p_sec = pal.secondary
+            top_border = f"rgba({p_sec.red()}, {p_sec.green()}, {p_sec.blue()}, 0.35)"
+            bot_border = f"rgba({p_sec.red()}, {p_sec.green()}, {p_sec.blue()}, 0.25)"
+            trip_border = f"rgba({p_sec.red()}, {p_sec.green()}, {p_sec.blue()}, 0.45)"
+
             self.setStyleSheet(
                 """
                 QMainWindow {
@@ -3641,14 +3909,14 @@ class VoltesseDashboard(QMainWindow):
                 """
             )
             if hasattr(self, "top_bar"):
-                self.top_bar.setStyleSheet("background-color: #000000; border-bottom: 1px solid rgba(0, 229, 255, 0.25); border-radius: 4px;")
+                self.top_bar.setStyleSheet(f"background-color: #000000; border-bottom: 1px solid {top_border}; border-radius: 4px;")
             if hasattr(self, "bottom_bar"):
                 self.bottom_bar.setStyleSheet(
-                    "background-color: #000000; border-top: 1px solid rgba(0, 229, 255, 0.20); border-radius: 6px; padding: 2px;"
+                    f"background-color: #000000; border-top: 1px solid {bot_border}; border-radius: 6px; padding: 2px;"
                 )
             if hasattr(self, "trip_pod"):
                 self.trip_pod.setStyleSheet(
-                    "background-color: #000000; border: 1px solid rgba(0, 229, 255, 0.35); border-radius: 6px;"
+                    f"background-color: #000000; border: 1px solid {trip_border}; border-radius: 6px;"
                 )
         else:
             self.setStyleSheet(
@@ -4014,6 +4282,9 @@ class VoltesseDashboard(QMainWindow):
             return
         elif key == Qt.Key.Key_B:
             self.toggle_cluster_theme()
+            return
+        elif key == Qt.Key.Key_P:
+            self.cycle_palette()
             return
         elif key == Qt.Key.Key_Space:
             self.pause_requested.emit()

@@ -1,6 +1,6 @@
-# Voltesse Dash ⚡ v5.3.1
+# Voltesse Dash ⚡ v5.4.0
 
-[![Version](https://img.shields.io/badge/version-5.3.1-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
+[![Version](https://img.shields.io/badge/version-5.4.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/PyQt-6-green.svg)](https://riverbankcomputing.com/software/pyqt/)
 [![Web](https://img.shields.io/badge/Streamlit-1.66-red.svg)](https://streamlit.io/)
@@ -8,22 +8,27 @@
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 5.3.1 introduces the dedicated **Summarized Battery Information Widget** in the cluster's right pod, refines the **Vertical Temperature Sub-Gauge** on the left pod with zero center-pod overlap and a vector thermometer icon (🌡️), and tunes the tachometer arc for reference-grade cluster harmony. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
+A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 5.4.0 introduces the **Dynamic Ambient Theme & Accent Palette Engine** with 5 signature OLED colorways, hotkey `P` cycling, centered glassmorphic speedometer toast overlay, technician portal calibration swatches, and `--palette` CLI support. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
 
 ---
 
-## What's New in Version 5.3.1 🚀
+## What's New in Version 5.4.0 🚀
 
-- 🔋 **Summarized Battery Information Widget (Right Pod)**:
-  - Re-engineered the cluster's right pod into a dedicated, high-tech Summarized Battery Information Widget.
-  - Features an illuminated 240° circular State of Charge (SoC) % arc dial with glowing beacon pip, bold digital SoC numerals (`85%`), dynamic vector EV battery icon, high-contrast remaining range pill badge (`222 mi`), and live electrical pack telemetry (`398V • +42kW` or regen `-kW`).
-  - Seamlessly integrates with the 1.2-second automotive startup sweep sequence (sweeping 0% to 100% on ignition before settling to live battery telemetry).
-- 🌡️ **Refined Vertical Temperature Sub-Gauge (Left Pod)**:
-  - Repositioned on the right flank of the left pod (`sub_x = cx + r * 0.50`) with full 38px clearance from the center speedometer bezel, eliminating all overlap or clipping.
-  - Optimized tachometer arc span to -170° (225° to 55°) with 7–8k RPM redline at the upper-right dome, giving the temperature gauge complete breathing room.
-  - Features crisp graduation marks (`100`, `200`, `320°F`), dynamic fluid level bar with floating pip, and an anti-aliased vector thermometer icon (🌡️) with state-aware color transitions (OK < 180°F mint, WARM ≥ 180°F amber, HOT ≥ 220°F red).
+- 🎨 **Dynamic Ambient Theme & Accent Palette Engine**:
+  - Engineered 5 signature automotive-grade OLED colorways tailored for pure black void (`#000000`):
+    - **`CYBER_MINT`** (`mint`, default): Voltesse signature cybernetic electric neon (`#00F5A0` primary, `#5CFFC7` highlight, `#00E5FF` secondary).
+    - **`STEALTH_MONOCHROME`** (`stealth`): Pure hypercar titanium silver & white (`#E2E8F0` primary, `#FFFFFF` highlight, `#94A3B8` secondary).
+    - **`SOLAR_AMBER`** (`amber`): Endurance motorsport amber tachometer (`#FFB800` primary, `#FFD166` highlight, `#FF9F1C` secondary).
+    - **`TRACK_REDLINE`** (`redline`): Aggressive track attack crimson (`#FF3366` primary, `#FF6B8B` highlight, `#FF9900` secondary).
+    - **`NEON_SYNTHWAVE`** (`synthwave`): Cyberpunk night drive magenta & cyan (`#D946EF` primary, `#F472B6` highlight, `#06B6D4` secondary).
+  - **Hotkey `P` & Auto-Switch UX**: Pressing `P` cycles between palettes in sequence (`mint` ➔ `stealth` ➔ `amber` ➔ `redline` ➔ `synthwave` ➔ loop). If pressed in Classic mode, the cluster automatically switches to OLED mode and activates the next palette.
+  - **Centered Glassmorphic Speedometer Toast**: Switching palettes triggers an animated floating glassmorphic pill directly across the center dial (`🎨 PALETTE: [NAME]`) with a smooth 1.5-second cubic fade out and top HUD ribbon status badge.
+  - **Coordinated Cockpit Styling Across All Pages**: The illuminated binnacle cowl, dial halos, battery SoC arc, powertrain torque split bars, TPMS chassis wireframe, and compact speed pod accent seam all dynamically adapt to the active palette.
+  - **Strict ISO/SAE Safety Invariant Lock**: Tachometer redline (7–8k RPM), brake pedal indicators, and critical thermal/pressure warnings remain invariant in standardized Coral Red (`#FF4D6D`) and Amber (`#FFB800`).
+  - **Technician Pit-Wall Calibration Preview**: Settings channel in the Streamlit portal features interactive swatch cards, live hex/RGB breakdown, contrast metrics, and an SVG/CSS cluster speedometer simulation preview.
+  - **CLI Argument Support**: Launch directly into any colorway via `--palette [mint|stealth|amber|redline|synthwave]`.
 - 🧪 **Automated Test Suite Verification**:
-  - 46 unit tests passing with 100% green status (32 cockpit GUI tests + 14 technician portal tests).
+  - 47 unit tests passing with 100% green status (33 cockpit GUI tests + 14 technician portal tests).
 
 ---
 
@@ -95,7 +100,7 @@ voltesse-dash/
 ├── data/
 │   └── exports/               # Generated CSV & JSON session dumps (auto-created)
 ├── src/
-│   ├── __init__.py            # Package version (v5.1.0)
+│   ├── __init__.py            # Package version (v5.4.0)
 │   ├── can_bus_source.py      # CAN Bus interface, frame decoders, and synchronized mock transmitter
 │   ├── simulation_source.py   # Video-game interactive EV dynamics engine (W/A/S/D, 6-speed manual, D1-D6 auto)
 │   ├── telemetry_source.py    # Autonomous EV driving cycle telemetry stream (Test Mode, D1-D6 auto)
@@ -110,7 +115,7 @@ voltesse-dash/
 │   ├── tests/                 # Unit tests for database integration and simulator
 │   └── requirements.txt       # Streamlit dependencies (streamlit, pandas, plotly, psycopg)
 ├── tests/
-│   └── test_voltesse.py       # Comprehensive unit and integration test suite (30 tests)
+│   └── test_voltesse.py       # Comprehensive unit and integration test suite (33 tests)
 ├── main.py                    # Application lifecycle, transmission, and mode controller
 ├── requirements.txt           # Driver cockpit dependencies (PyQt6, python-can, psycopg)
 ├── AGENTS.md                  # Embedded developer rules, architecture contracts & specifications

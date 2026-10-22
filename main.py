@@ -71,6 +71,8 @@ class VoltesseApp:
             self.gui.set_animation_enabled(False)
         if getattr(args, "theme", None):
             self.gui.set_cluster_theme(args.theme)
+        if getattr(args, "palette", None):
+            self.gui.set_palette(args.palette)
 
         # Screen enumeration & hardware detection
         screens = self.app.screens()
@@ -588,6 +590,13 @@ def parse_args() -> argparse.Namespace:
         default="oled",
         choices=["oled", "classic"],
         help="Cockpit display visual theme (oled [beta full black mint] or classic; default: oled)",
+    )
+    parser.add_argument(
+        "--palette",
+        type=str,
+        default="mint",
+        choices=["mint", "stealth", "amber", "redline", "synthwave"],
+        help="Initial ambient accent palette in OLED mode (mint, stealth, amber, redline, synthwave; default: mint)",
     )
     return parser.parse_args()
 

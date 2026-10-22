@@ -106,6 +106,28 @@ Voltesse Dash is a production-grade, distraction-free automotive digital instrum
 ### 🛠️ Diagnostic DTC Fault Code Injection Console (v5.3.0+)
 - Standardized EV diagnostic trouble code triggers (`P0A38`, `P0A80`, `C1A20`, `P0A44`, `C1201`) with single-click testing and a `Clear All DTCs` reset routine integrated across Diagnostics and Settings channels.
 
+### 🎨 Dynamic Ambient Theme & Accent Palette Engine Specification (v5.4.0+)
+- **5 Signature OLED Colorways**:
+  - Engineered for pure pitch-black OLED automotive displays (`#000000` void):
+    - **`CYBER_MINT`** (`mint`, default): Voltesse signature cybernetic electric neon (`#00F5A0` primary, `#5CFFC7` highlight, `#00E5FF` secondary).
+    - **`STEALTH_MONOCHROME`** (`stealth`): Pure hypercar titanium silver & white (`#E2E8F0` primary, `#FFFFFF` highlight, `#94A3B8` secondary).
+    - **`SOLAR_AMBER`** (`amber`): Endurance motorsport amber tachometer (`#FFB800` primary, `#FFD166` highlight, `#FF9F1C` secondary).
+    - **`TRACK_REDLINE`** (`redline`): Aggressive track attack crimson (`#FF3366` primary, `#FF6B8B` highlight, `#FF9900` secondary).
+    - **`NEON_SYNTHWAVE`** (`synthwave`): Cyberpunk night drive magenta & cyan (`#D946EF` primary, `#F472B6` highlight, `#06B6D4` secondary).
+- **OLED Mode Exclusivity & Auto-Switch on 'P'**:
+  - Dynamic ambient palettes apply exclusively to OLED mode (`cluster_theme == 'OLED'`). Classic theme remains permanently locked to classic Cyber-Mint.
+  - Pressing `P` while in Classic mode automatically switches the cluster to OLED mode and activates the next palette.
+- **Centered Floating Glassmorphic Speedometer Toast**:
+  - Switching palettes triggers an animated floating glassmorphic notification overlay pill directly across the center dial (`🎨 PALETTE: [NAME]`) with a smooth 1.5-second cubic fade out and top HUD ribbon status badge.
+- **Coordinated Cockpit Styling Across All Pages**:
+  - Glowing binnacle cowl, dial halos, battery SoC arc, powertrain torque split bars, TPMS chassis wireframe, and compact speed pod accent seam all dynamically adapt to the active palette.
+- **Strict ISO/SAE Safety Invariant Lock**:
+  - Tachometer redline (7–8k RPM), brake pedal indicators, and critical thermal/pressure warnings remain invariant in standardized Coral Red (`#FF4D6D`) and Amber (`#FFB800`).
+- **Technician Pit-Wall Calibration Preview**:
+  - Settings channel in the Streamlit portal features interactive swatch cards, live hex/RGB breakdown, contrast metrics, and an SVG/CSS cluster speedometer simulation preview.
+- **CLI Argument Support**:
+  - Launch directly into any colorway via `--palette [mint|stealth|amber|redline|synthwave]`.
+
 ### ⚡ Always-Visible Speed Pod on Non-Speed Pages
 - When navigated away from Page 0 (`SPEED`) to Page 1 (`BATTERY`), Page 2 (`POWERTRAIN`), or Page 3 (`TPMS`), an integrated `CompactSpeedPod` MUST remain permanently visible.
 - Displays: Speed (`MPH`), dynamic cyan-to-mint speed bar, RPM, transmission mode & dynamic gear pill (e.g. `AUTO [4]`, `MANUAL [5]`), and micro-indicators for throttle (`THR %`), brake (`BRK %`), and steering (`STR °`).
@@ -167,14 +189,14 @@ Voltesse Dash is a production-grade, distraction-free automotive digital instrum
 - **Local Python Environment**: `.\.venv\Scripts\python.exe`
 - **Unit Test Discovery**:
   ```powershell
-  # Cockpit GUI and telemetry tests (32 tests)
+  # Cockpit GUI and telemetry tests (33 tests)
   .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 
   # Technician web portal tests (14 tests)
   .\.venv\Scripts\python.exe -m unittest discover -s technician-gui/tests -v
   ```
 - **Requirements for PRs / Changes**:
-  - **100% Green**: All tests across both test suites must pass with zero failures or errors (46 total tests).
+  - **100% Green**: All tests across both test suites must pass with zero failures or errors (47 total tests).
   - **Preserve Existing Attributes**: Do NOT break legacy or test-inspected attributes on `VoltesseDashboard` (`page_stack`, `center_stack`, `speed_gauge`, `battery_hero`, `powertrain_hero`, `tpms_widget`, `compact_speed_widget`, `compact_speed_pods`, `trip_pod`, `thermal_widget`, `bottom_bar`).
   - **QTimer & Thread Safety**: Always supply a context QObject when scheduling single-shot timers to prevent dangling callbacks on destructed widgets.
 
