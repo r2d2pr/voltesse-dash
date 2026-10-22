@@ -140,6 +140,8 @@ class SpeedometerDialWidget(QWidget):
         self.motor_temp_c = 72.0
         self.inverter_temp_c = 48.0
         self.trip_dist_mi = 9999.0
+        self.battery_voltage = 398.0
+        self.battery_power_kw = 42.0
         self.cluster_theme = "OLED"  # "OLED" or "CLASSIC"
         self.is_sweeping = False
         self.sweep_progress = 0.0
@@ -233,12 +235,16 @@ class SpeedometerDialWidget(QWidget):
         motor_temp_c: float = 72.0,
         inverter_temp_c: float = 48.0,
         trip_dist_mi: float = 9999.0,
+        battery_voltage: float = 398.0,
+        battery_power_kw: float = 42.0,
     ) -> None:
         """Sets auxiliary battery, thermal, and trip distance telemetry for OLED binnacle."""
         self.battery_soc = max(0.0, min(100.0, float(soc)))
         self.motor_temp_c = float(motor_temp_c)
         self.inverter_temp_c = float(inverter_temp_c)
         self.trip_dist_mi = max(0.0, float(trip_dist_mi))
+        self.battery_voltage = float(battery_voltage)
+        self.battery_power_kw = float(battery_power_kw)
         self.update()
 
     def set_cluster_theme(self, theme: str) -> None:
@@ -273,12 +279,12 @@ class SpeedometerDialWidget(QWidget):
             return
 
         # 2. Geometry for 3-Pod Instrument Binnacle
-        center_r = min(h * 0.45, (w - 36.0) / 4.45)
+        center_r = min(h * 0.45, (w - 30.0) / 4.45)
         side_r = center_r * 0.77
 
         cx = w / 2.0
         cy_center = h * 0.49
-        dist_x = center_r * 0.88 + side_r * 0.88
+        dist_x = center_r * 0.91 + side_r * 0.89
         cx_left = cx - dist_x
         cx_right = cx + dist_x
         cy_left = cy_center + (center_r - side_r) * 0.24
@@ -342,7 +348,7 @@ class SpeedometerDialWidget(QWidget):
         painter.drawPath(path)
 
     def _draw_left_pod(self, painter: QPainter, cx: float, cy: float, r: float) -> None:
-        """Left Pod: Motor Tachometer (0-8 x1000 RPM) + Vertical Temperature Sub-Gauge (°F)."""
+        """Left Pod: Motor Tachometer (0-8 x1000 RPM) + Refined Vertical Temperature Sub-Gauge (°F)."""
         grad = QRadialGradient(QPointF(cx, cy), r)
         grad.setColorAt(0.0, QColor(4, 12, 9, 220))
         grad.setColorAt(0.85, QColor(2, 6, 4, 240))
@@ -353,17 +359,19 @@ class SpeedometerDialWidget(QWidget):
 
         r_track = r * 0.88
         painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        start_angle_deg = 225.0
+        total_span_deg = -170.0
+
         painter.setPen(QPen(QColor(10, 28, 20, 220), max(2.0, r * 0.025)))
-        painter.drawArc(QRectF(cx - r_track, cy - r_track, r_track * 2, r_track * 2), int(225.0 * 16), int(-270.0 * 16))
+        painter.drawArc(QRectF(cx - r_track, cy - r_track, r_track * 2, r_track * 2), int(start_angle_deg * 16), int(total_span_deg * 16))
 
         # Redline Sector Arc (between 7 and 8)
-        redline_start_ang = 225.0 - (270.0 * (7.0 / 8.0))
-        redline_span = -270.0 * (1.0 / 8.0)
+        redline_start_ang = start_angle_deg + (total_span_deg * (7.0 / 8.0))
+        redline_span = total_span_deg * (1.0 / 8.0)
         painter.setPen(QPen(QColor(255, 77, 109, 140), max(2.5, r * 0.035)))
         painter.drawArc(QRectF(cx - r_track, cy - r_track, r_track * 2, r_track * 2), int(redline_start_ang * 16), int(redline_span * 16))
 
-        start_angle_deg = 225.0
-        total_span_deg = -270.0
         font_num = QFont("Segoe UI", max(7, min(14, int(r * 0.115))), QFont.Weight.Bold)
 
         for i in range(9):
@@ -406,8 +414,8 @@ class SpeedometerDialWidget(QWidget):
                 painter.setPen(QPen(COLOR_RED if i >= 6 else QColor(0, 229, 255, 120), 1.0))
                 painter.drawLine(QPointF(hx1, hy1), QPointF(hx2, hy2))
 
-        # RPM x1000 label at top
-        lbl_rect = QRectF(cx - r * 0.28, cy - r * 0.44, r * 0.56, r * 0.26)
+        # RPM x1000 label
+        lbl_rect = QRectF(cx - r * 0.26, cy - r * 0.50, r * 0.40, r * 0.24)
         painter.setFont(QFont("Segoe UI", max(6, min(10, int(r * 0.075))), QFont.Weight.Bold))
         painter.setPen(COLOR_MINT)
         painter.drawText(lbl_rect, Qt.AlignmentFlag.AlignCenter, "RPM\nx1000")
@@ -450,35 +458,56 @@ class SpeedometerDialWidget(QWidget):
         painter.setPen(QPen(COLOR_CYAN, 1.5))
         painter.drawEllipse(QPointF(cx, cy), hub_r, hub_r)
 
-        # Vertical Temperature Sub-Gauge on Right Flank of Left Pod
-        sub_x = cx + r * 0.62
-        bar_top_y = cy - r * 0.38
-        bar_bot_y = cy + r * 0.38
+        # Refined Vertical Temperature Sub-Gauge on Right Flank of Left Pod (Zero Overlap)
+        sub_x = cx + r * 0.50
+        bar_top_y = cy - r * 0.18
+        bar_bot_y = cy + r * 0.48
         bar_h = bar_bot_y - bar_top_y
 
         painter.setFont(QFont("Segoe UI", max(5, min(9, int(r * 0.068))), QFont.Weight.Bold))
         painter.setPen(COLOR_TEXT_MUTED)
-        painter.drawText(QRectF(sub_x - r * 0.16, bar_top_y - 12, r * 0.32, 12), Qt.AlignmentFlag.AlignRight, "320")
-        painter.drawText(QRectF(sub_x - r * 0.16, cy - 6, r * 0.32, 12), Qt.AlignmentFlag.AlignRight, "200")
-        painter.drawText(QRectF(sub_x - r * 0.16, bar_bot_y, r * 0.32, 12), Qt.AlignmentFlag.AlignRight, "100")
+        painter.drawText(QRectF(sub_x - r * 0.24, bar_top_y - 8, r * 0.22, 12), Qt.AlignmentFlag.AlignRight, "320")
+        painter.drawText(QRectF(sub_x - r * 0.24, cy + r * 0.12 - 6, r * 0.22, 12), Qt.AlignmentFlag.AlignRight, "200")
+        painter.drawText(QRectF(sub_x - r * 0.24, bar_bot_y - 8, r * 0.22, 12), Qt.AlignmentFlag.AlignRight, "100")
 
-        painter.setFont(QFont("Segoe UI", max(6, min(9, int(r * 0.075))), QFont.Weight.Bold))
-        painter.setPen(COLOR_MINT)
-        painter.drawText(QRectF(sub_x - r * 0.16, cy + r * 0.08, r * 0.32, 14), Qt.AlignmentFlag.AlignRight, "°F")
-
-        painter.setPen(QPen(QColor(10, 28, 20, 200), 2.0))
-        painter.drawLine(QPointF(sub_x + r * 0.04, bar_top_y), QPointF(sub_x + r * 0.04, bar_bot_y))
-
+        # Vector Thermometer Icon + °F Label
         motor_temp_f = self.motor_temp_c * 9.0 / 5.0 + 32.0
-        t_frac = min(1.0, max(0.0, (motor_temp_f - 100.0) / 220.0))
-        cur_temp_y = bar_bot_y - (bar_h * t_frac)
         pip_col = COLOR_RED if motor_temp_f >= 220 else (COLOR_AMBER if motor_temp_f >= 180 else COLOR_MINT)
+
+        thermo_stem_x = sub_x - r * 0.14
+        thermo_top_y = cy + r * 0.24
         painter.setBrush(QBrush(pip_col))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRect(QRectF(sub_x, cur_temp_y - 1.5, r * 0.08, 3.0))
+        painter.drawRoundedRect(QRectF(thermo_stem_x - 1.2, thermo_top_y, 2.4, 7.0), 1.0, 1.0)
+        painter.drawEllipse(QPointF(thermo_stem_x, thermo_top_y + 8.5), 2.5, 2.5)
+
+        painter.setFont(QFont("Segoe UI", max(6, min(9, int(r * 0.075))), QFont.Weight.Bold))
+        painter.setPen(pip_col)
+        painter.drawText(QRectF(sub_x - r * 0.10, cy + r * 0.23, r * 0.14, 12), Qt.AlignmentFlag.AlignLeft, "°F")
+
+        # Vertical Track & Tick Marks
+        painter.setPen(QPen(QColor(10, 28, 20, 220), 2.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawLine(QPointF(sub_x, bar_top_y), QPointF(sub_x, bar_bot_y))
+
+        # Horizontal Ticks
+        painter.setPen(QPen(QColor(18, 50, 38, 200), 1.0))
+        painter.drawLine(QPointF(sub_x, bar_top_y), QPointF(sub_x + 4, bar_top_y))
+        painter.drawLine(QPointF(sub_x, cy + r * 0.12), QPointF(sub_x + 3, cy + r * 0.12))
+        painter.drawLine(QPointF(sub_x, bar_bot_y), QPointF(sub_x + 4, bar_bot_y))
+
+        # Dynamic Fluid Level Line & Floating Pip
+        t_frac = min(1.0, max(0.0, (motor_temp_f - 100.0) / 220.0))
+        cur_temp_y = bar_bot_y - (bar_h * t_frac)
+        painter.setPen(QPen(pip_col, 2.8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawLine(QPointF(sub_x, bar_bot_y), QPointF(sub_x, cur_temp_y))
+
+        painter.setBrush(QBrush(QColor(255, 255, 255, 240)))
+        painter.setPen(QPen(pip_col, 1.0))
+        painter.drawRect(QRectF(sub_x - 1, cur_temp_y - 1.5, r * 0.06, 3.0))
+
 
     def _draw_right_pod(self, painter: QPainter, cx: float, cy: float, r: float) -> None:
-        """Right Pod: Dual-Meter (Powertrain Temp C-H + Battery SoC E-F)."""
+        """Right Pod: Summarized Battery Information Widget (SoC % Arc, Range, Pack Metrics)."""
         grad = QRadialGradient(QPointF(cx, cy), r)
         grad.setColorAt(0.0, QColor(4, 12, 9, 220))
         grad.setColorAt(0.85, QColor(2, 6, 4, 240))
@@ -487,73 +516,18 @@ class SpeedometerDialWidget(QWidget):
         painter.setPen(QPen(QColor(0, 229, 255, 100), 1.2))
         painter.drawEllipse(QPointF(cx, cy), r, r)
 
-        r_track = r * 0.88
+        r_track = r * 0.86
+        track_rect = QRectF(cx - r_track, cy - r_track, r_track * 2, r_track * 2)
+
+        start_angle_deg = 210.0
+        total_span_deg = -240.0
+
+        # 1. Background Gauge Track
         painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(QColor(10, 28, 20, 220), max(3.5, r * 0.038), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawArc(track_rect, int(start_angle_deg * 16), int(total_span_deg * 16))
 
-        # 1. Upper Arc: Thermal Scale (C to H)
-        painter.setPen(QPen(QColor(10, 28, 20, 220), max(2.0, r * 0.025)))
-        painter.drawArc(QRectF(cx - r_track, cy - r_track, r_track * 2, r_track * 2), int(150.0 * 16), int(-120.0 * 16))
-
-        font_lbl = QFont("Segoe UI", max(8, min(14, int(r * 0.115))), QFont.Weight.Bold)
-        painter.setFont(font_lbl)
-
-        # 'C' at ~155 deg
-        c_rad = -math.radians(155.0)
-        c_x = cx + math.cos(c_rad) * (r_track * 0.72)
-        c_y = cy + math.sin(c_rad) * (r_track * 0.72)
-        painter.setPen(COLOR_MINT_BRIGHT)
-        painter.drawText(QRectF(c_x - 12, c_y - 10, 24, 20), Qt.AlignmentFlag.AlignCenter, "C")
-
-        # 'H' at ~25 deg
-        h_rad = -math.radians(25.0)
-        h_x = cx + math.cos(h_rad) * (r_track * 0.72)
-        h_y = cy + math.sin(h_rad) * (r_track * 0.72)
-        painter.setPen(COLOR_RED)
-        painter.drawText(QRectF(h_x - 12, h_y - 10, 24, 20), Qt.AlignmentFlag.AlignCenter, "H")
-
-        inv_temp_f = self.inverter_temp_c * 9.0 / 5.0 + 32.0
-        live_temp_ratio = min(1.0, max(0.0, (inv_temp_f - 60.0) / (200.0 - 60.0)))
-        if getattr(self, "is_sweeping", False):
-            p = getattr(self, "sweep_progress", 0.0)
-            if p < 0.5:
-                temp_ratio = p * 2.0
-            else:
-                temp_ratio = 1.0 - (1.0 - live_temp_ratio) * ((p - 0.5) * 2.0)
-        else:
-            temp_ratio = live_temp_ratio
-        t_ang = 150.0 - 120.0 * temp_ratio
-        t_rad = -math.radians(t_ang)
-        t_tip_x = cx + math.cos(t_rad) * (r_track * 0.86)
-        t_tip_y = cy + math.sin(t_rad) * (r_track * 0.86)
-
-        painter.setPen(QPen(COLOR_TEXT_PRIMARY, max(1.8, r * 0.022), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawLine(QPointF(cx, cy), QPointF(t_tip_x, t_tip_y))
-
-        # 2. Lower Arc: Battery SoC Scale (E to F)
-        painter.setPen(QPen(QColor(10, 28, 20, 220), max(2.0, r * 0.025)))
-        painter.drawArc(QRectF(cx - r_track, cy - r_track, r_track * 2, r_track * 2), int(210.0 * 16), int(120.0 * 16))
-
-        e_rad = -math.radians(205.0)
-        e_x = cx + math.cos(e_rad) * (r_track * 0.72)
-        e_y = cy + math.sin(e_rad) * (r_track * 0.72)
-        painter.setPen(COLOR_RED)
-        painter.drawText(QRectF(e_x - 12, e_y - 10, 24, 20), Qt.AlignmentFlag.AlignCenter, "E")
-
-        f_rad = -math.radians(335.0)
-        f_x = cx + math.cos(f_rad) * (r_track * 0.72)
-        f_y = cy + math.sin(f_rad) * (r_track * 0.72)
-        painter.setPen(COLOR_MINT)
-        painter.drawText(QRectF(f_x - 12, f_y - 10, 24, 20), Qt.AlignmentFlag.AlignCenter, "F")
-
-        # Vector EV Battery Icon at bottom right
-        icon_x = cx + r * 0.42
-        icon_y = cy + r * 0.40
-        painter.setPen(QPen(COLOR_MINT, 1.2))
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRoundedRect(QRectF(icon_x, icon_y, 14, 8), 1.5, 1.5)
-        painter.fillRect(QRectF(icon_x + 14, icon_y + 2, 2, 4), COLOR_MINT)
-        painter.fillRect(QRectF(icon_x + 2, icon_y + 2, 9, 4), COLOR_MINT)
-
+        # 2. Compute Active SoC Ratio (with startup sweep support)
         live_soc_ratio = min(1.0, max(0.0, self.battery_soc / 100.0))
         if getattr(self, "is_sweeping", False):
             p = getattr(self, "sweep_progress", 0.0)
@@ -563,19 +537,138 @@ class SpeedometerDialWidget(QWidget):
                 soc_ratio = 1.0 - (1.0 - live_soc_ratio) * ((p - 0.5) * 2.0)
         else:
             soc_ratio = live_soc_ratio
-        b_ang = 210.0 + 120.0 * soc_ratio
-        b_rad = -math.radians(b_ang)
-        b_tip_x = cx + math.cos(b_rad) * (r_track * 0.86)
-        b_tip_y = cy + math.sin(b_rad) * (r_track * 0.86)
 
-        painter.setPen(QPen(COLOR_TEXT_PRIMARY, max(1.8, r * 0.022), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawLine(QPointF(cx, cy), QPointF(b_tip_x, b_tip_y))
+        if soc_ratio > 0.20:
+            soc_col = COLOR_MINT
+        elif soc_ratio > 0.10:
+            soc_col = COLOR_AMBER
+        else:
+            soc_col = COLOR_RED
 
-        # Center Hub Cap
-        hub_r = r * 0.12
-        painter.setBrush(QBrush(QColor(6, 16, 12, 245)))
-        painter.setPen(QPen(COLOR_CYAN, 1.5))
-        painter.drawEllipse(QPointF(cx, cy), hub_r, hub_r)
+        # 3. Active SoC Glowing Arc
+        active_span_deg = total_span_deg * soc_ratio
+        if soc_ratio > 0.005:
+            pen_active = QPen(soc_col, max(3.8, r * 0.040), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+            painter.setPen(pen_active)
+            painter.drawArc(track_rect, int(start_angle_deg * 16), int(active_span_deg * 16))
+
+            # Beacon pip at active tip
+            tip_ang = start_angle_deg + active_span_deg
+            tip_rad = -math.radians(tip_ang)
+            tip_x = cx + math.cos(tip_rad) * r_track
+            tip_y = cy + math.sin(tip_rad) * r_track
+            painter.setBrush(QBrush(COLOR_TEXT_PRIMARY))
+            painter.setPen(QPen(soc_col, 1.6))
+            painter.drawEllipse(QPointF(tip_x, tip_y), max(2.5, r * 0.024), max(2.5, r * 0.024))
+
+        # 4. Graduation Ticks & E / F Markers
+        font_ef = QFont("Segoe UI", max(7, min(12, int(r * 0.095))), QFont.Weight.Bold)
+        painter.setFont(font_ef)
+
+        # 'E' at 210 deg (Bottom-Left)
+        e_rad = -math.radians(start_angle_deg)
+        e_x = cx + math.cos(e_rad) * (r_track * 0.74)
+        e_y = cy + math.sin(e_rad) * (r_track * 0.74)
+        painter.setPen(COLOR_RED if soc_ratio <= 0.15 else COLOR_TEXT_MUTED)
+        painter.drawText(QRectF(e_x - 12, e_y - 10, 24, 20), Qt.AlignmentFlag.AlignCenter, "E")
+
+        # 'F' at -30 deg (Bottom-Right)
+        f_rad = -math.radians(start_angle_deg + total_span_deg)
+        f_x = cx + math.cos(f_rad) * (r_track * 0.74)
+        f_y = cy + math.sin(f_rad) * (r_track * 0.74)
+        painter.setPen(COLOR_MINT if soc_ratio >= 0.85 else COLOR_TEXT_MUTED)
+        painter.drawText(QRectF(f_x - 12, f_y - 10, 24, 20), Qt.AlignmentFlag.AlignCenter, "F")
+
+        # Graduation ticks (25%, 50%, 75%)
+        for frac in (0.25, 0.50, 0.75):
+            tick_ang = start_angle_deg + (total_span_deg * frac)
+            tick_rad = -math.radians(tick_ang)
+            tx1 = cx + math.cos(tick_rad) * (r_track - 2.0)
+            ty1 = cy + math.sin(tick_rad) * (r_track - 2.0)
+            tx2 = cx + math.cos(tick_rad) * (r_track - r * 0.07)
+            ty2 = cy + math.sin(tick_rad) * (r_track - r * 0.07)
+            is_passed = (frac <= soc_ratio)
+            painter.setPen(QPen(soc_col if is_passed else QColor(10, 32, 22, 220), 1.2))
+            painter.drawLine(QPointF(tx1, ty1), QPointF(tx2, ty2))
+
+        # 5. Top Center Vector EV Battery Icon
+        icon_w = max(18.0, r * 0.16)
+        icon_h = icon_w * 0.50
+        icon_x = cx - (icon_w / 2.0)
+        icon_y = cy - r * 0.56
+        painter.setPen(QPen(soc_col, 1.2))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(QRectF(icon_x, icon_y, icon_w, icon_h), 1.5, 1.5)
+        # Terminal nub
+        painter.fillRect(QRectF(icon_x + icon_w, icon_y + (icon_h * 0.25), 2.0, icon_h * 0.50), soc_col)
+        # Inner fill level
+        fill_w = max(0.0, (icon_w - 3.0) * soc_ratio)
+        if fill_w > 0:
+            painter.fillRect(QRectF(icon_x + 1.5, icon_y + 1.5, fill_w, icon_h - 3.0), soc_col)
+
+        # 6. Central Large Digital SoC Numerals & Tag
+        disp_soc = int(round(soc_ratio * 100.0))
+        font_soc = QFont("Segoe UI", max(22, min(50, int(r * 0.32))), QFont.Weight.Bold)
+        painter.setFont(font_soc)
+        painter.setPen(COLOR_TEXT_PRIMARY)
+        soc_rect = QRectF(cx - r * 0.50, cy - r * 0.28, r * 1.0, r * 0.34)
+        painter.drawText(soc_rect, Qt.AlignmentFlag.AlignCenter, f"{disp_soc}%")
+
+        font_sub = QFont("Segoe UI", max(6, min(10, int(r * 0.068))), QFont.Weight.Bold)
+        font_sub.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
+        painter.setFont(font_sub)
+        painter.setPen(soc_col)
+        sub_tag_rect = QRectF(cx - r * 0.40, cy + r * 0.04, r * 0.80, r * 0.12)
+        painter.drawText(sub_tag_rect, Qt.AlignmentFlag.AlignCenter, "BATTERY")
+
+        # 7. Prominent Estimated Range Pill Badge
+        range_mi = int(round(soc_ratio * 261.0))
+        badge_w = r * 0.72
+        badge_h = max(16.0, r * 0.18)
+        badge_x = cx - (badge_w / 2.0)
+        badge_y = cy + r * 0.18
+        badge_rect = QRectF(badge_x, badge_y, badge_w, badge_h)
+        painter.setBrush(QBrush(QColor(0, 245, 160, 24)))
+        painter.setPen(QPen(QColor(0, 245, 160, 75), 1.0))
+        painter.drawRoundedRect(badge_rect, badge_h / 2.0, badge_h / 2.0)
+
+        # Vector navigation marker / lightning icon
+        pin_x = badge_x + (badge_h * 0.52)
+        pin_y = badge_y + (badge_h * 0.50)
+        pin_poly = QPolygonF([
+            QPointF(pin_x - 3.5, pin_y - 3.5),
+            QPointF(pin_x + 3.5, pin_y - 3.5),
+            QPointF(pin_x, pin_y + 4.0),
+        ])
+        painter.setBrush(QBrush(COLOR_CYAN))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawPolygon(pin_poly)
+
+        font_range = QFont("Segoe UI", max(8, min(13, int(r * 0.088))), QFont.Weight.Bold)
+        painter.setFont(font_range)
+        painter.setPen(COLOR_MINT_BRIGHT)
+        range_text_rect = QRectF(pin_x + 4.0, badge_y, badge_w - (pin_x - badge_x) - 4.0, badge_h)
+        painter.drawText(range_text_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"{range_mi} mi")
+
+        # 8. Live Electrical Pack Telemetry (Voltage & Power)
+        volt_val = int(round(getattr(self, "battery_voltage", 398.0)))
+        power_val = getattr(self, "battery_power_kw", 42.0)
+        if power_val < -0.5:
+            pwr_str = f"{power_val:.0f}kW"
+            pwr_col = COLOR_MINT
+        elif power_val > 0.5:
+            pwr_str = f"+{power_val:.0f}kW"
+            pwr_col = COLOR_CYAN
+        else:
+            pwr_str = "0kW"
+            pwr_col = COLOR_TEXT_MUTED
+
+        elec_str = f"{volt_val}V  •  {pwr_str}"
+        font_elec = QFont("Consolas", max(7, min(11, int(r * 0.075))), QFont.Weight.Bold)
+        painter.setFont(font_elec)
+        painter.setPen(COLOR_CYAN)
+        elec_rect = QRectF(cx - r * 0.50, cy + r * 0.52, r * 1.0, r * 0.16)
+        painter.drawText(elec_rect, Qt.AlignmentFlag.AlignCenter, elec_str)
 
     def _draw_center_pod(self, painter: QPainter, cx: float, cy: float, r: float) -> None:
         """Center Pod: Speedometer with Glass Reflection, Speed Needle, Digital Readout, Ribbon Meter, Gear, Odo."""
@@ -3656,6 +3749,8 @@ class VoltesseDashboard(QMainWindow):
                 motor_temp_c=record.motor_temp_c,
                 inverter_temp_c=record.inverter_temp_c,
                 trip_dist_mi=disp_dist,
+                battery_voltage=getattr(record, "battery_voltage", 398.0),
+                battery_power_kw=getattr(record, "battery_power_kw", 42.0),
             )
 
         # Compact Speed Pods (for non-speed hero views)

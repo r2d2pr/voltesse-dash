@@ -1164,11 +1164,15 @@ class TestDashboardGUI(unittest.TestCase):
             motor_temp_c=68.0,
             inverter_temp_c=54.0,
             trip_dist_mi=15.42,
+            battery_voltage=395.0,
+            battery_power_kw=38.5,
         )
         self.assertEqual(gui.speed_gauge.battery_soc, 82.0)
         self.assertEqual(gui.speed_gauge.motor_temp_c, 68.0)
         self.assertEqual(gui.speed_gauge.inverter_temp_c, 54.0)
         self.assertEqual(gui.speed_gauge.trip_dist_mi, 15.42)
+        self.assertEqual(gui.speed_gauge.battery_voltage, 395.0)
+        self.assertEqual(gui.speed_gauge.battery_power_kw, 38.5)
 
         # 3. Telemetry Update pipeline updates gauge aux telemetry
         rec = TelemetryRecord(
@@ -1195,6 +1199,8 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertEqual(gui.speed_gauge.battery_soc, 77.5)
         self.assertEqual(gui.speed_gauge.motor_temp_c, 62.0)
         self.assertEqual(gui.speed_gauge.inverter_temp_c, 48.0)
+        self.assertEqual(gui.speed_gauge.battery_voltage, 390.0)
+        self.assertEqual(gui.speed_gauge.battery_power_kw, 18.0)
         self.assertAlmostEqual(gui.speed_gauge.trip_dist_mi, 25.0 * 0.621371, places=2)
 
         # 4. Programmatic Theme Toggling

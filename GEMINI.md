@@ -73,13 +73,13 @@ Voltesse Dash is a production-grade, distraction-free automotive digital instrum
   - **Immediate Interruption Settlement**: Rapid inputs must call `finish_animation()` to immediately settle the in-flight view and transition to the target page without stutter or ghosting.
   - **Tactile Chevrons**: Nav frame chevrons (`◄` / `►`) flash white briefly upon click/press. Single-shot timers MUST pass the button context object (`QTimer.singleShot(150, btn, callback)`) to prevent callbacks on deleted C++ pointers.
 
-### 🏁 Voltesse Black Mint OLED Beta Display Specification (v5.2.1+)
-- **Full Black Mint OLED Beta Theme**:
+### 🏁 Voltesse Black Mint OLED Binnacle Specification (v5.3.1+)
+- **Full Black Mint OLED Theme**:
   - Engineered for pure pitch-black OLED automotive displays (`#000000` void) with zero card or grey box overhead.
   - Three-pod illuminated binnacle contoured with an ethereal Voltesse cyan/mint cowl contour brow arching over the cluster.
-  - **Left Pod**: Tachometer (0–8 x1000 RPM) with luminous needle, 7–8 redline zone in vivid race coral red, and vertical coolant/motor temperature sub-gauge (`100–320°F`).
+  - **Left Pod**: Tachometer (0–8 x1000 RPM, -170° arc span with 7–8 redline zone in vivid race coral red) and a refined vertical coolant/motor temperature sub-gauge (`100–320°F`) featuring an anti-aliased vector thermometer icon (🌡️), dynamic fluid level line, floating level pip, and 38px clearance eliminating center-pod overlap.
   - **Center Pod**: Speedometer centerpiece with concentric cyan glowing bezel rings, curved glass reflection highlight crescent, speed graduation (0–180 MPH), glowing white needle, bold digital numerals (`70` / `MPH`), vector chevrons (`▲`/`▼`), gear `D3`, odometer `009999 mi`, and flanking curved vertical `ACCEL` / `BRAKE` dynamic ribbon meter.
-  - **Right Pod**: Dual-meter gauge with Powertrain Thermal scale (`C` to `H`), Battery SoC (`E` to `F`), vector EV battery icon, and twin needles.
+  - **Right Pod**: Dedicated Summarized Battery Information Widget featuring a 240° circular State of Charge (SoC) % arc dial with glowing beacon pip, bold digital SoC numerals (`85%`), dynamic vector EV battery icon, remaining range pill badge (`222 mi`), and live electrical pack telemetry (`398V • +42kW` or regen `-kW`).
 - **Permanent Removal of Shift LED Strips**:
   - Shift light arrays (the legacy 15-LED shift array on the speedometer and 10-LED mini strip on `CompactSpeedPod`) have been permanently removed from both OLED and Classic themes to provide an unobstructed, premium cockpit experience.
 - **Theme Selection & Hotkey (`B` key / `--theme [oled|classic]`)**:

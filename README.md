@@ -1,6 +1,6 @@
-# Voltesse Dash ⚡ v5.3.0
+# Voltesse Dash ⚡ v5.3.1
 
-[![Version](https://img.shields.io/badge/version-5.3.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
+[![Version](https://img.shields.io/badge/version-5.3.1-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/PyQt-6-green.svg)](https://riverbankcomputing.com/software/pyqt/)
 [![Web](https://img.shields.io/badge/Streamlit-1.66-red.svg)](https://streamlit.io/)
@@ -8,24 +8,21 @@
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 5.3.0 establishes the **Borderless Black Mint OLED Cockpit Experience** across all cluster pages (`Speed`, `Battery`, `Powertrain`, `TPMS`), introduces a 1.2-second startup needle sweep sequence, and expands the technician portal with session replay scrubbing, dual-run ghost telemetry overlays, and a standardized EV diagnostic trouble code (DTC) fault injection console. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
+A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 5.3.1 introduces the dedicated **Summarized Battery Information Widget** in the cluster's right pod, refines the **Vertical Temperature Sub-Gauge** on the left pod with zero center-pod overlap and a vector thermometer icon (🌡️), and tunes the tachometer arc for reference-grade cluster harmony. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
 
 ---
 
-## What's New in Version 5.3.0 🚀
+## What's New in Version 5.3.1 🚀
 
-- 🖤 **Borderless Black Mint OLED Experience Across All Cockpit Pages**:
-  - Completely stripped card background rectangles, dark boxes, and container outlines across all secondary hero views (`BatteryHeroWidget`, `PowertrainHeroWidget`, `TPMSWidget`). Telemetry metrics, neon chassis wireframe, and SoC arcs float freely over pure `#000000` pitch black OLED void.
-  - Side `CompactSpeedPod` rendered borderless with floating white numerals and a vertical glowing cyan accent seam line separating it from the hero diagnostic stage. Seamlessly adapts to wing swapping (`X` key).
-- ⚡ **1.2-Second Automotive Startup Needle Sweep**:
-  - On ignition/display initialization, needles for Tachometer (8k RPM), Speedometer (180 MPH), and Dual Thermal/SoC sweep to peak with expanding cyan bezel glow pulses before smoothly settling to live vehicle telemetry. Rapid driver inputs immediately settle the animation for instant telemetry visibility.
-- 🎬 **Pit-Wall Session Replay Scrubbing**:
-  - Interactive timeline scrubber inside the Sessions channel with Play/Pause, 1x/2x/5x speed selector, and synchronized race traces with vertical cursor tracking.
-- 👻 **Dual-Run Ghost Telemetry Overlays**:
-  - Dropdown overlaying selected benchmark ghost runs as translucent dotted silver traces directly over active session charts with live $\Delta$ readouts ($\Delta$ MPH, $\Delta$ kW, $\Delta$ °F).
-- 🛠️ **Diagnostic DTC Fault Code Injection Console**:
-  - Standardized EV fault triggers (`P0A38`, `P0A80`, `C1A20`, `P0A44`, `C1201`) with single-click testing and a `Clear All DTCs` reset routine across Diagnostics and Settings.
-- 🧪 **Expanded Automated Test Verification**:
+- 🔋 **Summarized Battery Information Widget (Right Pod)**:
+  - Re-engineered the cluster's right pod into a dedicated, high-tech Summarized Battery Information Widget.
+  - Features an illuminated 240° circular State of Charge (SoC) % arc dial with glowing beacon pip, bold digital SoC numerals (`85%`), dynamic vector EV battery icon, high-contrast remaining range pill badge (`222 mi`), and live electrical pack telemetry (`398V • +42kW` or regen `-kW`).
+  - Seamlessly integrates with the 1.2-second automotive startup sweep sequence (sweeping 0% to 100% on ignition before settling to live battery telemetry).
+- 🌡️ **Refined Vertical Temperature Sub-Gauge (Left Pod)**:
+  - Repositioned on the right flank of the left pod (`sub_x = cx + r * 0.50`) with full 38px clearance from the center speedometer bezel, eliminating all overlap or clipping.
+  - Optimized tachometer arc span to -170° (225° to 55°) with 7–8k RPM redline at the upper-right dome, giving the temperature gauge complete breathing room.
+  - Features crisp graduation marks (`100`, `200`, `320°F`), dynamic fluid level bar with floating pip, and an anti-aliased vector thermometer icon (🌡️) with state-aware color transitions (OK < 180°F mint, WARM ≥ 180°F amber, HOT ≥ 220°F red).
+- 🧪 **Automated Test Suite Verification**:
   - 46 unit tests passing with 100% green status (32 cockpit GUI tests + 14 technician portal tests).
 
 ---
