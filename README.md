@@ -1,6 +1,6 @@
-# Voltesse Dash ⚡ v5.1.0
+# Voltesse Dash ⚡ v5.2.1
 
-[![Version](https://img.shields.io/badge/version-5.1.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
+[![Version](https://img.shields.io/badge/version-5.2.1-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/PyQt-6-green.svg)](https://riverbankcomputing.com/software/pyqt/)
 [![Web](https://img.shields.io/badge/Streamlit-1.66-red.svg)](https://streamlit.io/)
@@ -8,30 +8,25 @@
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 5.1.0 introduces the **Voltesse Race Cockpit Display** to the central digital cluster GUI (`src/dashboard_gui.py`), engineered for maximum driver peripheral viewability under high-speed racing conditions: a **Top 15-LED Multi-Stage Rev Shift Light Array** (Green ➔ Red ➔ Purple with Redline Flash), an **Enlarged High-Contrast Center Race Gear Hub**, **Dual Concentric Speed & Motor Tachometer Arcs**, **Multi-Color Segmented Racing Telemetry Meters for Throttle % and Brake %**, and an **Integrated 10-LED Mini Shift Light Strip on the Permanent CompactSpeedPod** across all secondary cockpit views. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
+A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 5.2.1 introduces the **Full Black Mint OLED Beta Theme** for the digital cluster GUI (`src/dashboard_gui.py`), engineered for pure pitch-black OLED contrast with an ethereal 3-pod binnacle, curved cowl brow, glass reflection highlight crescent, speed needle with bold digital numerals, dynamic Accel/Brake ribbon meter, twin-needle thermal/battery gauge, and permanent removal of the LED shift light strips. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
 
 ---
 
-## What's New in Version 5.1.0 🚀
+## What's New in Version 5.2.1 🚀
 
-- 🚥 **Top 15-LED Multi-Stage Rev Shift Light Array**:
-  - High-visibility automotive LED shift light array positioned across the top of the central speedometer dial.
-  - 15 multi-stage illuminated indicators: Stage 1 (5 Green/Neon Mint LEDs, 45%–72% RPM), Stage 2 (5 Vivid Race Red LEDs, 76%–92% RPM), and Stage 3 (5 Rev-Limit Purple LEDs, 94%–99% RPM).
-  - **Peripheral Redline Flash**: When motor RPM reaches redline (≥ 98% / 7,850+ RPM), all 15 LEDs pulse in unison with intense specular white flash and purple halos for instant peripheral shift timing cues.
-- ⚙️ **Enlarged High-Contrast Center Race Gear Hub**:
-  - Center-stage race steering display capsule rendering active gear numerals (`1`–`6`, `N`, `R`, dynamic `D1`–`D6`, `P`, `B`) in bold high-contrast typography.
-  - Dynamic state-aware border illumination: Cyan for Manual, Neon Mint for Auto, Alert Coral Red for Reverse, and Amber for Neutral.
-  - Paired with the transmission selector capsule and top ribbon telemetry badge for instant driver orientation.
-- 🔄 **Concentric Speed & Motor Tachometer Arcs**:
-  - Dual concentric vector arcs: outer graduated speed arc (0–120 MPH) with glowing tip beacon, complemented by an inner motor tachometer ribbon (0–8,000 RPM) with progressive color zoning (Emerald Cyan ➔ Amber ➔ Race Red).
-- 📊 **Multi-Color Segmented Racing Telemetry Meters**:
-  - Upgraded Throttle % and Brake % pedal meters to motorsport-grade telemetry bars with segmented track divisions.
-  - Dedicated alert styling for Brake (`BRK %` in vivid coral red) and Throttle (`THR %` in neon mint with cyan-to-mint gradient fill).
-- ⚡ **Integrated 10-LED Mini Shift Strip on CompactSpeedPod**:
-  - Integrated 10-LED mini shift rev strip across the header of `CompactSpeedPod` (4 Green, 3 Red, 3 Purple with redline flash).
-  - Ensures shift timing cues remain continuously visible when navigating through Battery Hero, Powertrain Hero, or TPMS pages.
-- 🎨 **Voltesse Race Display Cockpit Aesthetic**:
-  - Deep obsidian carbon matrix background (`#030706` / `#091410`), Voltesse Emerald Cyan (`#00F5D4`), Shift Purple (`#A855F7`), and Metallic Silver (`#E2E8F0`).
+- 🖤 **Full Black Mint OLED Beta Theme**:
+  - Engineered for pure pitch-black OLED automotive displays (`#000000` true black) with zero grey/carbon card clutter.
+  - Three-pod illuminated binnacle contoured with an ethereal Voltesse cyan/mint hood cowl brow.
+  - **Left Pod**: Tachometer (0–8 x1000 RPM) with luminous needle, 7–8 redline zone in race coral, and vertical coolant/motor temperature sub-gauge (`100–320°F`).
+  - **Center Pod**: Speedometer centerpiece with concentric glowing cyan bezel rings, curved glass reflection highlight crescent, speed graduation (0–180 MPH), glowing white needle, bold digital numerals (`70` / `MPH`), vector chevrons (`▲`/`▼`), gear `D3`, odometer `009999 mi`, and flanking curved vertical `ACCEL` / `BRAKE` dynamic ribbon meter.
+  - **Right Pod**: Dual-meter gauge with Powertrain Thermal scale (`C` to `H`), Battery SoC (`E` to `F`), vector EV battery icon, and twin needles.
+- 🚫 **LED Shift Light Strip Removal**:
+  - Permanently removed the top 15-LED shift array from `SpeedometerDialWidget` and 10-LED mini strip from `CompactSpeedPod` for a clean, distraction-free cockpit aesthetic.
+- ⌨️ **Live Theme Toggling & CLI Flag**:
+  - Hotkey `B` instantly toggles between **OLED Beta** and **Classic** themes with animated on-screen HUD badge feedback.
+  - New CLI argument `--theme [oled|classic]` (default: `oled`).
+- 🧪 **Expanded Automated Verification**:
+  - Enhanced automated unit test suites to 43 tests (31 cockpit tests + 12 technician portal tests), 100% passing.
 
 ---
 
@@ -143,6 +138,7 @@ voltesse-dash/
 | `Right Arrow` | **Next Cockpit Page (Right ►)** | Global (Race, Sim, Test) |
 | `V` | **Cycle Cockpit Pages** (`Speed` ➔ `Battery` ➔ `Powertrain` ➔ `TPMS`) | Global (Race, Sim, Test) |
 | `X` | **Swap Wing Views (Alternate Layout)** | Global (Race, Sim, Test) |
+| `B` | **Toggle Cluster Theme** (OLED Beta ⮂ Classic) | Global (Race, Sim, Test) |
 | `-` / `_` | **Zoom Out UI** (reduce cockpit scale by 5%) | Global |
 | `+` / `=` | **Zoom In UI** (increase cockpit scale by 5%) | Global |
 | `0` | **Reset UI Zoom** to default (100%) | Global |
@@ -174,10 +170,10 @@ streamlit run technician-gui/app.py
 
 ## Running Tests
 
-Execute the automated test suites with Python's built-in `unittest` (42 total tests):
+Execute the automated test suites with Python's built-in `unittest` (43 total tests):
 
 ```bash
-# Run cockpit unit and integration tests (30 tests)
+# Run cockpit unit and integration tests (31 tests)
 python -m unittest discover tests
 
 # Run technician web app database and simulation tests (12 tests)

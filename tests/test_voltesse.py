@@ -1022,6 +1022,15 @@ class TestDashboardGUI(unittest.TestCase):
             sys.argv = ["main.py", "--no-animation"]
             args = parse_args()
             self.assertTrue(args.no_animation)
+
+            # Test --theme flag
+            sys.argv = ["main.py"]
+            args = parse_args()
+            self.assertEqual(args.theme, "oled")
+
+            sys.argv = ["main.py", "--theme", "classic"]
+            args = parse_args()
+            self.assertEqual(args.theme, "classic")
         finally:
             sys.argv = old_argv
 
@@ -1139,6 +1148,79 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertEqual(gui.compact_speed_widget.motor_rpm, 7950)
         self.assertEqual(gui.speed_gauge.active_gear, "6")
         self.assertEqual(gui.compact_speed_widget.gear, "6")
+
+    def test_gui_oled_theme_and_controls(self):
+        gui = VoltesseDashboard()
+        gui.resize(800, 480)
+
+        # 1. Default Theme Verification (OLED Black Mint Beta)
+        self.assertEqual(gui.cluster_theme, "OLED")
+        self.assertEqual(gui.speed_gauge.cluster_theme, "OLED")
+        self.assertEqual(gui.compact_speed_widget.cluster_theme, "OLED")
+
+        # 2. Aux Telemetry Forwarding
+        gui.speed_gauge.set_aux_telemetry(
+            soc=82.0,
+            motor_temp_c=68.0,
+            inverter_temp_c=54.0,
+            trip_dist_mi=15.42,
+        )
+        self.assertEqual(gui.speed_gauge.battery_soc, 82.0)
+        self.assertEqual(gui.speed_gauge.motor_temp_c, 68.0)
+        self.assertEqual(gui.speed_gauge.inverter_temp_c, 54.0)
+        self.assertEqual(gui.speed_gauge.trip_dist_mi, 15.42)
+
+        # 3. Telemetry Update pipeline updates gauge aux telemetry
+        rec = TelemetryRecord(
+            timestamp=time.time(),
+            speed_kmh=80.0,
+            motor_rpm=5500,
+            battery_soc=77.5,
+            battery_voltage=390.0,
+            battery_current=45.0,
+            battery_power_kw=18.0,
+            battery_temp_c=31.0,
+            motor_temp_c=62.0,
+            inverter_temp_c=48.0,
+            throttle_pct=50.0,
+            brake_pct=0.0,
+            drive_mode="SPORT",
+            trip_distance_km=25.0,
+            warnings=[],
+            steering_angle=0.0,
+            gear="D4",
+            transmission_mode="AUTO",
+        )
+        gui.update_telemetry(rec)
+        self.assertEqual(gui.speed_gauge.battery_soc, 77.5)
+        self.assertEqual(gui.speed_gauge.motor_temp_c, 62.0)
+        self.assertEqual(gui.speed_gauge.inverter_temp_c, 48.0)
+        self.assertAlmostEqual(gui.speed_gauge.trip_dist_mi, 25.0 * 0.621371, places=2)
+
+        # 4. Programmatic Theme Toggling
+        theme = gui.toggle_cluster_theme()
+        self.assertEqual(theme, "CLASSIC")
+        self.assertEqual(gui.cluster_theme, "CLASSIC")
+        self.assertEqual(gui.speed_gauge.cluster_theme, "CLASSIC")
+        self.assertEqual(gui.compact_speed_widget.cluster_theme, "CLASSIC")
+
+        theme = gui.toggle_cluster_theme()
+        self.assertEqual(theme, "OLED")
+        self.assertEqual(gui.cluster_theme, "OLED")
+
+        # 5. Hotkey 'B' Theme Toggle
+        b_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_B, Qt.KeyboardModifier.NoModifier)
+        gui.keyPressEvent(b_event)
+        self.assertEqual(gui.cluster_theme, "CLASSIC")
+
+        gui.keyPressEvent(b_event)
+        self.assertEqual(gui.cluster_theme, "OLED")
+
+        # 6. Set Theme Explicitly
+        gui.set_cluster_theme("classic")
+        self.assertEqual(gui.cluster_theme, "CLASSIC")
+        gui.set_cluster_theme("oled")
+        self.assertEqual(gui.cluster_theme, "OLED")
 
 
 

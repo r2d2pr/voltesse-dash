@@ -79,23 +79,35 @@ COLOR_GAUGE_ACCENT = QColor(20, 44, 34, 240)
 
 # Voltesse Race Display Cockpit Extensions
 COLOR_EMERALD_CYAN = QColor("#00F5D4")             # Voltesse Emerald Cyan
-COLOR_SHIFT_GREEN = QColor("#00F5A0")              # Shift Stage 1 (Neon Mint)
-COLOR_SHIFT_RED = QColor("#FF2A55")                # Shift Stage 2 (Vivid Race Red)
-COLOR_SHIFT_PURPLE = QColor("#A855F7")             # Shift Stage 3 (Rev Limit Purple)
+COLOR_SHIFT_GREEN = QColor("#00F5A0")              # Neon Mint
+COLOR_SHIFT_RED = QColor("#FF2A55")                # Vivid Race Red
+COLOR_SHIFT_PURPLE = QColor("#A855F7")             # Rev Limit Purple
 COLOR_SHIFT_PURPLE_BRIGHT = QColor("#D946EF")      # Shift Peak Purple
-COLOR_SHIFT_FLASH = QColor("#FFFFFF")              # Redline Flash White
-COLOR_SILVER_METALLIC = QColor("#E2E8F0")          # Race Display Silver
+COLOR_SHIFT_FLASH = QColor("#FFFFFF")              # Specular Flash White
+COLOR_SILVER_METALLIC = QColor("#E2E8F0")          # Display Silver
+
+# Voltesse Black Mint OLED Beta Theme Palette
+COLOR_OLED_BLACK = QColor("#000000")              # Pitch Black Void (OLED True Black)
+COLOR_OLED_GLOW = QColor("#00E5FF")               # Electric Luminous Cyan
+COLOR_OLED_MINT_GLOW = QColor("#00F5D4")          # Voltesse Emerald Mint
+COLOR_OLED_RING = QColor(0, 229, 255, 180)        # Bezel Ring Neon Cyan
+COLOR_OLED_GLASS = QColor(0, 229, 255, 60)        # Convex Glass Sheen Top
+COLOR_OLED_NEEDLE = QColor("#FFFFFF")             # Specular White Needle
+COLOR_OLED_NEEDLE_CYAN = QColor("#00F5D4")        # Glowing Needle Core
+COLOR_OLED_BRAKE = QColor("#FF4D6D")              # Vivid Coral Red Brake / Alert
+COLOR_OLED_AMBER = QColor("#FFB800")              # Warning Amber
+COLOR_OLED_MUTED = QColor("#3E6558")              # Subtle Inactive Scale
 
 
 class SpeedometerDialWidget(QWidget):
     """
-    Sleek automotive central speedometer engineered with Voltesse Race Cockpit aesthetics.
-    Features a top 15-LED multi-stage rev shift light array with redline flash,
-    dual outer speed and inner motor RPM tachometer arcs, an enlarged high-contrast center
-    race gear display hub, automotive transmission ratio selector capsule,
-    dual segmented racing telemetry meters for Throttle % and Brake %, and a real-time
-    steering wheel angle vector. Auto-scales cleanly to any fullscreen resolution while
-    preserving balanced proportions without text clipping.
+    Sleek automotive digital instrument cluster with Full Black Mint OLED Theme.
+    Features a 3-pod automotive binnacle layout with flowing luminous cowl brow,
+    outer bezel glowing neon rings, convex glass reflection highlight, precision
+    speedometer needle, large pure-white digital speed, dynamic ACCEL/BRAKE curved
+    ribbon meter, tachometer (0-8 x1000 RPM) with vertical coolant temp (°F), and
+    twin-needle battery SoC (E-F) and powertrain thermal (C-H) gauges.
+    Auto-scales cleanly to any screen size and aspect ratio.
     """
 
     def __init__(
@@ -122,6 +134,12 @@ class SpeedometerDialWidget(QWidget):
         self.active_gear = "D1"
         self.transmission_mode = "AUTO"  # "AUTO" or "MANUAL"
         self.drive_mode = "DRIVE"
+        # Aux telemetry for OLED binnacle display
+        self.battery_soc = 88.0
+        self.motor_temp_c = 72.0
+        self.inverter_temp_c = 48.0
+        self.trip_dist_mi = 9999.0
+        self.cluster_theme = "OLED"  # "OLED" or "CLASSIC"
 
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Expanding)
         self.setMinimumSize(160, 160)
@@ -169,25 +187,559 @@ class SpeedometerDialWidget(QWidget):
             self.sub_val = str(self.motor_rpm)
         self.update()
 
+    def set_aux_telemetry(
+        self,
+        soc: float = 88.0,
+        motor_temp_c: float = 72.0,
+        inverter_temp_c: float = 48.0,
+        trip_dist_mi: float = 9999.0,
+    ) -> None:
+        """Sets auxiliary battery, thermal, and trip distance telemetry for OLED binnacle."""
+        self.battery_soc = max(0.0, min(100.0, float(soc)))
+        self.motor_temp_c = float(motor_temp_c)
+        self.inverter_temp_c = float(inverter_temp_c)
+        self.trip_dist_mi = max(0.0, float(trip_dist_mi))
+        self.update()
+
+    def set_cluster_theme(self, theme: str) -> None:
+        """Switches cluster rendering theme ('OLED' or 'CLASSIC')."""
+        self.cluster_theme = str(theme).upper()
+        self.update()
+
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
 
-        w = self.width()
-        h = self.height()
+        try:
+            w = self.width()
+            h = self.height()
+            if getattr(self, "cluster_theme", "OLED") == "OLED":
+                self._paint_oled_theme(painter, w, h)
+            else:
+                self._paint_classic_theme(painter, w, h)
+        finally:
+            painter.end()
+
+    def _paint_oled_theme(self, painter: QPainter, w: int, h: int) -> None:
+        """Renders Full Black Mint OLED 3-Pod Instrument Binnacle matching reference photo."""
+        # 1. Pitch Black OLED Background (True Black #000000, zero grey cards)
+        painter.fillRect(0, 0, w, h, COLOR_OLED_BLACK)
+
+        is_wide = (w >= 540) and (w / max(1.0, float(h)) >= 1.20)
+
+        if not is_wide:
+            self._draw_center_pod(painter, w / 2.0, h / 2.0, min(w, h) * 0.44)
+            return
+
+        # 2. Geometry for 3-Pod Instrument Binnacle
+        center_r = min(h * 0.45, (w - 36.0) / 4.45)
+        side_r = center_r * 0.77
+
+        cx = w / 2.0
+        cy_center = h * 0.49
+        dist_x = center_r * 0.88 + side_r * 0.88
+        cx_left = cx - dist_x
+        cx_right = cx + dist_x
+        cy_left = cy_center + (center_r - side_r) * 0.24
+        cy_right = cy_left
+
+        # 3. Draw Side Pods First (So center pod naturally sits in front)
+        self._draw_left_pod(painter, cx_left, cy_left, side_r)
+        self._draw_right_pod(painter, cx_right, cy_right, side_r)
+
+        # 4. Draw Center Pod (Prominent centerpiece)
+        self._draw_center_pod(painter, cx, cy_center, center_r)
+
+        # 5. Draw Top Flowing Cowl Luminous Brow across all 3 pods
+        self._draw_flowing_cowl(painter, cx_left, cy_left, side_r, cx, cy_center, center_r, cx_right, cy_right, side_r)
+
+    def _draw_flowing_cowl(
+        self, painter: QPainter, cx_l: float, cy_l: float, r_l: float,
+        cx_c: float, cy_c: float, r_c: float, cx_r: float, cy_r: float, r_r: float,
+    ) -> None:
+        """Draws the ethereal glowing cybernetic brow line arching over the cluster."""
+        path = QPainterPath()
+        p_start_x = cx_l - r_l * 1.02
+        p_start_y = cy_l + r_l * 0.15
+        path.moveTo(p_start_x, p_start_y)
+
+        # Arch over left pod
+        cp1_x = cx_l - r_l * 0.70
+        cp1_y = cy_l - r_l * 1.05
+        cp2_x = cx_l + r_l * 0.20
+        cp2_y = cy_l - r_l * 1.08
+        mid_dip_left_x = (cx_l + cx_c) / 2.0 - (r_c * 0.15)
+        mid_dip_left_y = cy_c - r_c * 0.75
+        path.cubicTo(cp1_x, cp1_y, cp2_x, cp2_y, mid_dip_left_x, mid_dip_left_y)
+
+        # Rise over center dome
+        cp_c1_x = cx_c - r_c * 0.55
+        cp_c1_y = cy_c - r_c * 1.15
+        cp_c2_x = cx_c + r_c * 0.55
+        cp_c2_y = cy_c - r_c * 1.15
+        mid_dip_right_x = (cx_c + cx_r) / 2.0 + (r_c * 0.15)
+        mid_dip_right_y = cy_c - r_c * 0.75
+        path.cubicTo(cp_c1_x, cp_c1_y, cp_c2_x, cp_c2_y, mid_dip_right_x, mid_dip_right_y)
+
+        # Arch over right pod
+        cp_r1_x = cx_r - r_r * 0.20
+        cp_r1_y = cy_r - r_r * 1.08
+        cp_r2_x = cx_r + r_r * 0.70
+        cp_r2_y = cy_r - r_r * 1.05
+        p_end_x = cx_r + r_r * 1.02
+        p_end_y = cy_r + r_r * 0.15
+        path.cubicTo(cp_r1_x, cp_r1_y, cp_r2_x, cp_r2_y, p_end_x, p_end_y)
+
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(QColor(0, 229, 255, 35), 7.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        painter.drawPath(path)
+
+        painter.setPen(QPen(QColor(0, 245, 212, 110), 3.0, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        painter.drawPath(path)
+
+        painter.setPen(QPen(QColor(92, 255, 199, 245), 1.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        painter.drawPath(path)
+
+    def _draw_left_pod(self, painter: QPainter, cx: float, cy: float, r: float) -> None:
+        """Left Pod: Motor Tachometer (0-8 x1000 RPM) + Vertical Temperature Sub-Gauge (°F)."""
+        grad = QRadialGradient(QPointF(cx, cy), r)
+        grad.setColorAt(0.0, QColor(4, 12, 9, 220))
+        grad.setColorAt(0.85, QColor(2, 6, 4, 240))
+        grad.setColorAt(1.0, QColor(0, 0, 0, 255))
+        painter.setBrush(QBrush(grad))
+        painter.setPen(QPen(QColor(0, 229, 255, 100), 1.2))
+        painter.drawEllipse(QPointF(cx, cy), r, r)
+
+        r_track = r * 0.88
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(QColor(10, 28, 20, 220), max(2.0, r * 0.025)))
+        painter.drawArc(QRectF(cx - r_track, cy - r_track, r_track * 2, r_track * 2), int(225.0 * 16), int(-270.0 * 16))
+
+        # Redline Sector Arc (between 7 and 8)
+        redline_start_ang = 225.0 - (270.0 * (7.0 / 8.0))
+        redline_span = -270.0 * (1.0 / 8.0)
+        painter.setPen(QPen(QColor(255, 77, 109, 140), max(2.5, r * 0.035)))
+        painter.drawArc(QRectF(cx - r_track, cy - r_track, r_track * 2, r_track * 2), int(redline_start_ang * 16), int(redline_span * 16))
+
+        start_angle_deg = 225.0
+        total_span_deg = -270.0
+        font_num = QFont("Segoe UI", max(7, min(14, int(r * 0.115))), QFont.Weight.Bold)
+
+        for i in range(9):
+            fraction = i / 8.0
+            ang = start_angle_deg + (total_span_deg * fraction)
+            rad = -math.radians(ang)
+
+            is_redline = (i >= 7)
+            tick_col = COLOR_RED if is_redline else COLOR_TEXT_PRIMARY
+            tick_len = r * 0.09
+            r_outer = r_track - 1.0
+            r_inner = r_outer - tick_len
+
+            x1 = cx + math.cos(rad) * r_outer
+            y1 = cy + math.sin(rad) * r_outer
+            x2 = cx + math.cos(rad) * r_inner
+            y2 = cy + math.sin(rad) * r_inner
+
+            painter.setPen(QPen(tick_col, max(1.2, r * 0.016)))
+            painter.drawLine(QPointF(x1, y1), QPointF(x2, y2))
+
+            # Major Number
+            r_num = r_inner - (r * 0.11)
+            nx = cx + math.cos(rad) * r_num
+            ny = cy + math.sin(rad) * r_num
+            nw = r * 0.28
+            nh = r * 0.18
+            painter.setFont(font_num)
+            painter.setPen(tick_col)
+            painter.drawText(QRectF(nx - (nw / 2.0), ny - (nh / 2.0), nw, nh), Qt.AlignmentFlag.AlignCenter, str(i))
+
+            # Minor half-tick
+            if i < 8:
+                half_ang = start_angle_deg + (total_span_deg * (fraction + (0.5 / 8.0)))
+                half_rad = -math.radians(half_ang)
+                hx1 = cx + math.cos(half_rad) * r_outer
+                hy1 = cy + math.sin(half_rad) * r_outer
+                hx2 = cx + math.cos(half_rad) * (r_outer - tick_len * 0.55)
+                hy2 = cy + math.sin(half_rad) * (r_outer - tick_len * 0.55)
+                painter.setPen(QPen(COLOR_RED if i >= 6 else QColor(0, 229, 255, 120), 1.0))
+                painter.drawLine(QPointF(hx1, hy1), QPointF(hx2, hy2))
+
+        # RPM x1000 label at top
+        lbl_rect = QRectF(cx - r * 0.28, cy - r * 0.44, r * 0.56, r * 0.26)
+        painter.setFont(QFont("Segoe UI", max(6, min(10, int(r * 0.075))), QFont.Weight.Bold))
+        painter.setPen(COLOR_MINT)
+        painter.drawText(lbl_rect, Qt.AlignmentFlag.AlignCenter, "RPM\nx1000")
+
+        # Luminous Tachometer Needle
+        effective_rpm = self.motor_rpm
+        if effective_rpm <= 0 and self.current_val > 0.5:
+            effective_rpm = int(min(8000.0, (self.current_val / max(1.0, self.max_val)) * 7200.0))
+        rpm_ratio = min(1.0, max(0.0, effective_rpm / 8000.0))
+        needle_ang = start_angle_deg + (total_span_deg * rpm_ratio)
+        needle_rad = -math.radians(needle_ang)
+
+        tip_x = cx + math.cos(needle_rad) * (r_track * 0.88)
+        tip_y = cy + math.sin(needle_rad) * (r_track * 0.88)
+
+        p_rad_left = needle_rad + math.pi / 2.0
+        p_rad_right = needle_rad - math.pi / 2.0
+        base_w = r * 0.045
+        b1_x = cx + math.cos(p_rad_left) * base_w
+        b1_y = cy + math.sin(p_rad_left) * base_w
+        b2_x = cx + math.cos(p_rad_right) * base_w
+        b2_y = cy + math.sin(p_rad_right) * base_w
+
+        poly = QPolygonF([QPointF(b1_x, b1_y), QPointF(tip_x, tip_y), QPointF(b2_x, b2_y)])
+        painter.setBrush(QBrush(COLOR_TEXT_PRIMARY))
+        painter.setPen(QPen(QColor(0, 229, 255, 180), 0.8))
+        painter.drawPolygon(poly)
+
+        # Center Hub Cap
+        hub_r = r * 0.12
+        painter.setBrush(QBrush(QColor(6, 16, 12, 245)))
+        painter.setPen(QPen(COLOR_CYAN, 1.5))
+        painter.drawEllipse(QPointF(cx, cy), hub_r, hub_r)
+
+        # Vertical Temperature Sub-Gauge on Right Flank of Left Pod
+        sub_x = cx + r * 0.62
+        bar_top_y = cy - r * 0.38
+        bar_bot_y = cy + r * 0.38
+        bar_h = bar_bot_y - bar_top_y
+
+        painter.setFont(QFont("Segoe UI", max(5, min(9, int(r * 0.068))), QFont.Weight.Bold))
+        painter.setPen(COLOR_TEXT_MUTED)
+        painter.drawText(QRectF(sub_x - r * 0.16, bar_top_y - 12, r * 0.32, 12), Qt.AlignmentFlag.AlignRight, "320")
+        painter.drawText(QRectF(sub_x - r * 0.16, cy - 6, r * 0.32, 12), Qt.AlignmentFlag.AlignRight, "200")
+        painter.drawText(QRectF(sub_x - r * 0.16, bar_bot_y, r * 0.32, 12), Qt.AlignmentFlag.AlignRight, "100")
+
+        painter.setFont(QFont("Segoe UI", max(6, min(9, int(r * 0.075))), QFont.Weight.Bold))
+        painter.setPen(COLOR_MINT)
+        painter.drawText(QRectF(sub_x - r * 0.16, cy + r * 0.08, r * 0.32, 14), Qt.AlignmentFlag.AlignRight, "°F")
+
+        painter.setPen(QPen(QColor(10, 28, 20, 200), 2.0))
+        painter.drawLine(QPointF(sub_x + r * 0.04, bar_top_y), QPointF(sub_x + r * 0.04, bar_bot_y))
+
+        motor_temp_f = self.motor_temp_c * 9.0 / 5.0 + 32.0
+        t_frac = min(1.0, max(0.0, (motor_temp_f - 100.0) / 220.0))
+        cur_temp_y = bar_bot_y - (bar_h * t_frac)
+        pip_col = COLOR_RED if motor_temp_f >= 220 else (COLOR_AMBER if motor_temp_f >= 180 else COLOR_MINT)
+        painter.setBrush(QBrush(pip_col))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRect(QRectF(sub_x, cur_temp_y - 1.5, r * 0.08, 3.0))
+
+    def _draw_right_pod(self, painter: QPainter, cx: float, cy: float, r: float) -> None:
+        """Right Pod: Dual-Meter (Powertrain Temp C-H + Battery SoC E-F)."""
+        grad = QRadialGradient(QPointF(cx, cy), r)
+        grad.setColorAt(0.0, QColor(4, 12, 9, 220))
+        grad.setColorAt(0.85, QColor(2, 6, 4, 240))
+        grad.setColorAt(1.0, QColor(0, 0, 0, 255))
+        painter.setBrush(QBrush(grad))
+        painter.setPen(QPen(QColor(0, 229, 255, 100), 1.2))
+        painter.drawEllipse(QPointF(cx, cy), r, r)
+
+        r_track = r * 0.88
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        # 1. Upper Arc: Thermal Scale (C to H)
+        painter.setPen(QPen(QColor(10, 28, 20, 220), max(2.0, r * 0.025)))
+        painter.drawArc(QRectF(cx - r_track, cy - r_track, r_track * 2, r_track * 2), int(150.0 * 16), int(-120.0 * 16))
+
+        font_lbl = QFont("Segoe UI", max(8, min(14, int(r * 0.115))), QFont.Weight.Bold)
+        painter.setFont(font_lbl)
+
+        # 'C' at ~155 deg
+        c_rad = -math.radians(155.0)
+        c_x = cx + math.cos(c_rad) * (r_track * 0.72)
+        c_y = cy + math.sin(c_rad) * (r_track * 0.72)
+        painter.setPen(COLOR_MINT_BRIGHT)
+        painter.drawText(QRectF(c_x - 12, c_y - 10, 24, 20), Qt.AlignmentFlag.AlignCenter, "C")
+
+        # 'H' at ~25 deg
+        h_rad = -math.radians(25.0)
+        h_x = cx + math.cos(h_rad) * (r_track * 0.72)
+        h_y = cy + math.sin(h_rad) * (r_track * 0.72)
+        painter.setPen(COLOR_RED)
+        painter.drawText(QRectF(h_x - 12, h_y - 10, 24, 20), Qt.AlignmentFlag.AlignCenter, "H")
+
+        inv_temp_f = self.inverter_temp_c * 9.0 / 5.0 + 32.0
+        temp_ratio = min(1.0, max(0.0, (inv_temp_f - 60.0) / (200.0 - 60.0)))
+        t_ang = 150.0 - 120.0 * temp_ratio
+        t_rad = -math.radians(t_ang)
+        t_tip_x = cx + math.cos(t_rad) * (r_track * 0.86)
+        t_tip_y = cy + math.sin(t_rad) * (r_track * 0.86)
+
+        painter.setPen(QPen(COLOR_TEXT_PRIMARY, max(1.8, r * 0.022), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawLine(QPointF(cx, cy), QPointF(t_tip_x, t_tip_y))
+
+        # 2. Lower Arc: Battery SoC Scale (E to F)
+        painter.setPen(QPen(QColor(10, 28, 20, 220), max(2.0, r * 0.025)))
+        painter.drawArc(QRectF(cx - r_track, cy - r_track, r_track * 2, r_track * 2), int(210.0 * 16), int(120.0 * 16))
+
+        e_rad = -math.radians(205.0)
+        e_x = cx + math.cos(e_rad) * (r_track * 0.72)
+        e_y = cy + math.sin(e_rad) * (r_track * 0.72)
+        painter.setPen(COLOR_RED)
+        painter.drawText(QRectF(e_x - 12, e_y - 10, 24, 20), Qt.AlignmentFlag.AlignCenter, "E")
+
+        f_rad = -math.radians(335.0)
+        f_x = cx + math.cos(f_rad) * (r_track * 0.72)
+        f_y = cy + math.sin(f_rad) * (r_track * 0.72)
+        painter.setPen(COLOR_MINT)
+        painter.drawText(QRectF(f_x - 12, f_y - 10, 24, 20), Qt.AlignmentFlag.AlignCenter, "F")
+
+        # Vector EV Battery Icon at bottom right
+        icon_x = cx + r * 0.42
+        icon_y = cy + r * 0.40
+        painter.setPen(QPen(COLOR_MINT, 1.2))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(QRectF(icon_x, icon_y, 14, 8), 1.5, 1.5)
+        painter.fillRect(QRectF(icon_x + 14, icon_y + 2, 2, 4), COLOR_MINT)
+        painter.fillRect(QRectF(icon_x + 2, icon_y + 2, 9, 4), COLOR_MINT)
+
+        soc_ratio = min(1.0, max(0.0, self.battery_soc / 100.0))
+        b_ang = 210.0 + 120.0 * soc_ratio
+        b_rad = -math.radians(b_ang)
+        b_tip_x = cx + math.cos(b_rad) * (r_track * 0.86)
+        b_tip_y = cy + math.sin(b_rad) * (r_track * 0.86)
+
+        painter.setPen(QPen(COLOR_TEXT_PRIMARY, max(1.8, r * 0.022), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawLine(QPointF(cx, cy), QPointF(b_tip_x, b_tip_y))
+
+        # Center Hub Cap
+        hub_r = r * 0.12
+        painter.setBrush(QBrush(QColor(6, 16, 12, 245)))
+        painter.setPen(QPen(COLOR_CYAN, 1.5))
+        painter.drawEllipse(QPointF(cx, cy), hub_r, hub_r)
+
+    def _draw_center_pod(self, painter: QPainter, cx: float, cy: float, r: float) -> None:
+        """Center Pod: Speedometer with Glass Reflection, Speed Needle, Digital Readout, Ribbon Meter, Gear, Odo."""
+        # 1. Bezel Ring Halo Glow
+        glow_grad = QRadialGradient(QPointF(cx, cy), r * 1.12)
+        glow_grad.setColorAt(0.82, QColor(0, 0, 0, 0))
+        glow_grad.setColorAt(0.94, QColor(0, 229, 255, 50))
+        glow_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
+        painter.setBrush(QBrush(glow_grad))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(QPointF(cx, cy), r * 1.12, r * 1.12)
+
+        # Dark Dial Face
+        face_grad = QRadialGradient(QPointF(cx, cy), r)
+        face_grad.setColorAt(0.0, QColor(5, 14, 11, 235))
+        face_grad.setColorAt(0.85, QColor(2, 6, 4, 245))
+        face_grad.setColorAt(1.0, QColor(0, 0, 0, 255))
+        painter.setBrush(QBrush(face_grad))
+        painter.setPen(QPen(QColor(0, 229, 255, 190), 2.2))
+        painter.drawEllipse(QPointF(cx, cy), r, r)
+
+        # Concentric Recessed Track Ring
+        r_track = r * 0.93
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(QColor(12, 28, 22, 220), max(3.0, r * 0.024)))
+        start_angle_deg = 225.0
+        total_span_deg = -270.0
+        painter.drawArc(QRectF(cx - r_track, cy - r_track, r_track * 2, r_track * 2), int(start_angle_deg * 16), int(total_span_deg * 16))
+
+        # 2. UPPER CONVEX GLASS REFLECTION HIGHLIGHT
+        painter.save()
+        clip_path = QPainterPath()
+        clip_path.addEllipse(QPointF(cx, cy), r * 0.97, r * 0.97)
+        painter.setClipPath(clip_path)
+
+        glass_grad = QRadialGradient(QPointF(cx, cy - r * 0.65), r * 0.85)
+        glass_grad.setColorAt(0.0, QColor(0, 229, 255, 80))
+        glass_grad.setColorAt(0.40, QColor(92, 255, 199, 45))
+        glass_grad.setColorAt(0.75, QColor(0, 229, 255, 12))
+        glass_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
+
+        painter.setBrush(QBrush(glass_grad))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(QPointF(cx, cy - r * 0.45), r * 0.92, r * 0.55)
+        painter.restore()
+
+        # 3. Speed Graduation Ticks and Numbers
+        major_nums = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180]
+        dial_max = 180.0
+        num_ticks = len(major_nums)
+        font_tick = QFont("Segoe UI", max(7, min(14, int(r * 0.082))), QFont.Weight.Bold)
+
+        for idx, val in enumerate(major_nums):
+            fraction = val / dial_max
+            ang = start_angle_deg + (total_span_deg * fraction)
+            rad = -math.radians(ang)
+
+            tick_len = r * 0.085
+            r_outer = r_track - 1.0
+            r_inner = r_outer - tick_len
+
+            x1 = cx + math.cos(rad) * r_outer
+            y1 = cy + math.sin(rad) * r_outer
+            x2 = cx + math.cos(rad) * r_inner
+            y2 = cy + math.sin(rad) * r_inner
+
+            painter.setPen(QPen(COLOR_TEXT_PRIMARY, max(1.5, r * 0.016)))
+            painter.drawLine(QPointF(x1, y1), QPointF(x2, y2))
+
+            r_num = r_inner - (r * 0.10)
+            nx = cx + math.cos(rad) * r_num
+            ny = cy + math.sin(rad) * r_num
+            nw = r * 0.28
+            nh = r * 0.16
+            painter.setFont(font_tick)
+            painter.setPen(COLOR_TEXT_PRIMARY)
+            painter.drawText(QRectF(nx - (nw / 2.0), ny - (nh / 2.0), nw, nh), Qt.AlignmentFlag.AlignCenter, str(val))
+
+            if idx < num_ticks - 1:
+                half_ang = start_angle_deg + (total_span_deg * ((val + 10.0) / dial_max))
+                half_rad = -math.radians(half_ang)
+                hx1 = cx + math.cos(half_rad) * r_outer
+                hy1 = cy + math.sin(half_rad) * r_outer
+                hx2 = cx + math.cos(half_rad) * (r_outer - tick_len * 0.55)
+                hy2 = cy + math.sin(half_rad) * (r_outer - tick_len * 0.55)
+                painter.setPen(QPen(QColor(0, 229, 255, 130), 1.0))
+                painter.drawLine(QPointF(hx1, hy1), QPointF(hx2, hy2))
+
+        # 4. Luminous Speed Needle (Pointing to current speed)
+        spd_fraction = min(1.0, max(0.0, self.current_val / dial_max))
+        needle_ang = start_angle_deg + (total_span_deg * spd_fraction)
+        needle_rad = -math.radians(needle_ang)
+
+        tip_x = cx + math.cos(needle_rad) * (r_track * 0.88)
+        tip_y = cy + math.sin(needle_rad) * (r_track * 0.88)
+
+        base_r = r * 0.26
+        base_x = cx + math.cos(needle_rad) * base_r
+        base_y = cy + math.sin(needle_rad) * base_r
+
+        p_rad_left = needle_rad + math.pi / 2.0
+        p_rad_right = needle_rad - math.pi / 2.0
+        base_w = r * 0.032
+        b1_x = base_x + math.cos(p_rad_left) * base_w
+        b1_y = base_y + math.sin(p_rad_left) * base_w
+        b2_x = base_x + math.cos(p_rad_right) * base_w
+        b2_y = base_y + math.sin(p_rad_right) * base_w
+
+        poly = QPolygonF([QPointF(b1_x, b1_y), QPointF(tip_x, tip_y), QPointF(b2_x, b2_y)])
+        painter.setBrush(QBrush(COLOR_TEXT_PRIMARY))
+        painter.setPen(QPen(QColor(0, 229, 255, 200), 0.8))
+        painter.drawPolygon(poly)
+
+        # 5. Central Digital Speed Numerals & Vector Chevrons
+        chv_up_y = cy - r * 0.32
+        chv_w = max(5.0, r * 0.045)
+        chv_h = max(3.5, r * 0.032)
+        chv_up = QPolygonF([
+            QPointF(cx, chv_up_y - chv_h),
+            QPointF(cx - chv_w, chv_up_y + chv_h),
+            QPointF(cx + chv_w, chv_up_y + chv_h),
+        ])
+        painter.setBrush(QBrush(COLOR_MINT))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawPolygon(chv_up)
+
+        spd_val = int(round(self.current_val))
+        font_spd = QFont("Segoe UI", max(26, min(68, int(r * 0.34))), QFont.Weight.Bold)
+        painter.setFont(font_spd)
+        painter.setPen(COLOR_TEXT_PRIMARY)
+        spd_rect = QRectF(cx - r * 0.45, cy - r * 0.20, r * 0.90, r * 0.38)
+        painter.drawText(spd_rect, Qt.AlignmentFlag.AlignCenter, str(spd_val))
+
+        font_unit = QFont("Segoe UI", max(8, min(13, int(r * 0.070))), QFont.Weight.Bold)
+        painter.setFont(font_unit)
+        painter.setPen(COLOR_MINT)
+        unit_rect = QRectF(cx - r * 0.30, cy + r * 0.16, r * 0.60, r * 0.14)
+        painter.drawText(unit_rect, Qt.AlignmentFlag.AlignCenter, self.unit)
+
+        chv_dn_y = cy + r * 0.33
+        chv_dn = QPolygonF([
+            QPointF(cx, chv_dn_y + chv_h),
+            QPointF(cx - chv_w, chv_dn_y - chv_h),
+            QPointF(cx + chv_w, chv_dn_y - chv_h),
+        ])
+        painter.setBrush(QBrush(COLOR_MINT))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawPolygon(chv_dn)
+
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(QColor(0, 229, 255, 70), 1.0))
+        painter.drawEllipse(QPointF(cx, cy), base_r, base_r)
+
+        # 7. Curved Vertical Ribbon Meter on Right Flank (ACCEL / BRAKE)
+        ribbon_r = r * 1.07
+        ribbon_rect = QRectF(cx - ribbon_r, cy - ribbon_r, ribbon_r * 2, ribbon_r * 2)
+
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(QColor(10, 28, 20, 220), max(3.5, r * 0.026), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawArc(ribbon_rect, int(32.0 * 16), int(-64.0 * 16))
+
+        m_x1 = cx + ribbon_r - (r * 0.035)
+        m_x2 = cx + ribbon_r + (r * 0.035)
+        painter.setPen(QPen(COLOR_TEXT_PRIMARY, 1.5))
+        painter.drawLine(QPointF(m_x1, cy), QPointF(m_x2, cy))
+
+        a_rad = -math.radians(38.0)
+        a_x = cx + math.cos(a_rad) * (ribbon_r * 1.02)
+        a_y = cy + math.sin(a_rad) * (ribbon_r * 1.02)
+        painter.setFont(QFont("Segoe UI", max(6, min(10, int(r * 0.065))), QFont.Weight.Bold))
+        painter.setPen(COLOR_MINT)
+        painter.drawText(QRectF(a_x - 10, a_y - 12, 45, 14), Qt.AlignmentFlag.AlignLeft, "ACCEL")
+
+        b_rad = -math.radians(-38.0)
+        b_x = cx + math.cos(b_rad) * (ribbon_r * 1.02)
+        b_y = cy + math.sin(b_rad) * (ribbon_r * 1.02)
+        painter.setFont(QFont("Segoe UI", max(6, min(10, int(r * 0.065))), QFont.Weight.Bold))
+        painter.setPen(COLOR_RED)
+        painter.drawText(QRectF(b_x - 10, b_y - 2, 45, 14), Qt.AlignmentFlag.AlignLeft, "BRAKE")
+
+        if self.throttle_pct > 0.5:
+            thr_span = 30.0 * (self.throttle_pct / 100.0)
+            painter.setPen(QPen(COLOR_MINT, max(3.5, r * 0.026), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            painter.drawArc(ribbon_rect, int(0 * 16), int(thr_span * 16))
+
+            pip_rad = -math.radians(thr_span)
+            px = cx + math.cos(pip_rad) * ribbon_r
+            py = cy + math.sin(pip_rad) * ribbon_r
+            painter.setBrush(QBrush(COLOR_TEXT_PRIMARY))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawEllipse(QPointF(px, py), 2.5, 2.5)
+        elif self.brake_pct > 0.5:
+            brk_span = -30.0 * (self.brake_pct / 100.0)
+            painter.setPen(QPen(COLOR_RED, max(3.5, r * 0.026), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            painter.drawArc(ribbon_rect, int(0 * 16), int(brk_span * 16))
+
+            pip_rad = -math.radians(brk_span)
+            px = cx + math.cos(pip_rad) * ribbon_r
+            py = cy + math.sin(pip_rad) * ribbon_r
+            painter.setBrush(QBrush(COLOR_TEXT_PRIMARY))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawEllipse(QPointF(px, py), 2.5, 2.5)
+
+        # 8. Bottom Center Readouts (Gear, Drive Mode, Odometer)
+        gear_y = cy + r * 0.82
+        painter.setFont(QFont("Segoe UI", max(8, min(14, int(r * 0.090))), QFont.Weight.Bold))
+        painter.setPen(COLOR_CYAN)
+        painter.drawText(QRectF(cx - r * 0.40, gear_y, r * 0.35, 18), Qt.AlignmentFlag.AlignRight, self.active_gear)
+
+        mode_char = self.drive_mode[0] if self.drive_mode else "D"
+        painter.setPen(COLOR_MINT)
+        painter.drawText(QRectF(cx - r * 0.02, gear_y, r * 0.20, 18), Qt.AlignmentFlag.AlignLeft, mode_char)
+
+        odo_str = f"{int(round(self.trip_dist_mi)):06d} mi"
+        painter.setFont(QFont("Segoe UI", max(8, min(13, int(r * 0.076))), QFont.Weight.Bold))
+        painter.setPen(COLOR_MINT_BRIGHT)
+        painter.drawText(QRectF(cx + r * 0.38, gear_y, r * 0.60, 18), Qt.AlignmentFlag.AlignLeft, odo_str)
+
+    def _paint_classic_theme(self, painter: QPainter, w: int, h: int) -> None:
+        """Renders Classic Dial Theme (shift LED light strip removed)."""
         side = min(w, h)
         cx = w / 2.0
         cy = h / 2.0
 
-        # Calculate effective RPM for shift lights & tachometer
         effective_rpm = self.motor_rpm
         if effective_rpm <= 0 and self.current_val > 0.5:
-            # Fallback estimation if RPM not explicitly provided
             effective_rpm = int(min(8000.0, (self.current_val / max(1.0, self.max_val)) * 7200.0))
         rpm_ratio = min(1.0, max(0.0, effective_rpm / float(max(1000, self.max_rpm))))
-        is_redline = (rpm_ratio >= 0.98) or (effective_rpm >= 7850)
-        flash_state = (int(time.time() * 14) % 2 == 0)
 
         padding = max(14.0, side * 0.065)
         outer_r = (side / 2.0) - padding
@@ -215,75 +767,7 @@ class SpeedometerDialWidget(QWidget):
             p2 = QPointF(diag_x - card_rect.height(), card_rect.bottom())
             painter.drawLine(p1, p2)
 
-        # 2. Top Shift Light Rev LED Array (15 Multi-Stage Racing LEDs)
-        strip_y = max(10.0, cy - (side * 0.44))
-        strip_h = max(7.0, min(14.0, side * 0.027))
-        total_led_w = min(w - 32.0, side * 0.78)
-        num_leds = 15
-        gap = max(2.0, min(4.0, side * 0.007))
-        led_w = (total_led_w - ((num_leds - 1) * gap)) / num_leds
-
-        # Bezel tray for shift LEDs
-        bezel_rect = QRectF(cx - (total_led_w / 2.0) - 5, strip_y - 3, total_led_w + 10, strip_h + 6)
-        painter.setBrush(QBrush(QColor(4, 10, 7, 240)))
-        painter.setPen(QPen(QColor(0, 245, 160, 50) if not is_redline else (COLOR_SHIFT_PURPLE if flash_state else QColor(40, 10, 40)), 1))
-        painter.drawRoundedRect(bezel_rect, 5, 5)
-
-        # Shift LED Thresholds (5 Green, 5 Red, 5 Purple)
-        led_thresholds = [
-            # Stage 1: Green / Neon Mint (45% - 72%)
-            0.45, 0.52, 0.59, 0.65, 0.72,
-            # Stage 2: Vivid Race Red (76% - 92%)
-            0.76, 0.80, 0.84, 0.88, 0.92,
-            # Stage 3: Rev Limit Purple (94% - 99%)
-            0.94, 0.955, 0.97, 0.985, 0.995,
-        ]
-
-        start_led_x = cx - (total_led_w / 2.0)
-        for i in range(num_leds):
-            cur_led_x = start_led_x + i * (led_w + gap)
-            led_rect = QRectF(cur_led_x, strip_y, led_w, strip_h)
-
-            if i < 5:
-                base_col = COLOR_SHIFT_GREEN
-                dim_col = QColor(0, 45, 25, 200)
-            elif i < 10:
-                base_col = COLOR_SHIFT_RED
-                dim_col = QColor(55, 10, 18, 200)
-            else:
-                base_col = COLOR_SHIFT_PURPLE
-                dim_col = QColor(42, 10, 52, 200)
-
-            is_lit = (rpm_ratio >= led_thresholds[i])
-
-            if is_redline:
-                # Blinding Redline Flash across all 15 LEDs
-                if flash_state:
-                    painter.setBrush(QBrush(COLOR_SHIFT_FLASH))
-                    painter.setPen(QPen(COLOR_SHIFT_PURPLE_BRIGHT, 1))
-                    painter.drawRoundedRect(led_rect, 3, 3)
-                else:
-                    painter.setBrush(QBrush(COLOR_SHIFT_PURPLE))
-                    painter.setPen(QPen(COLOR_SHIFT_PURPLE_BRIGHT, 1))
-                    painter.drawRoundedRect(led_rect, 3, 3)
-            elif is_lit:
-                # Active Lit LED with glow
-                painter.setBrush(QBrush(base_col))
-                painter.setPen(QPen(QColor(255, 255, 255, 200), 0.8))
-                painter.drawRoundedRect(led_rect, 3, 3)
-
-                # Specular core dot
-                dot_r = max(1.0, led_w * 0.15)
-                painter.setBrush(QBrush(COLOR_TEXT_PRIMARY))
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.drawEllipse(QPointF(cur_led_x + led_w / 2.0, strip_y + strip_h / 2.0), dot_r, dot_r)
-            else:
-                # Unlit Dim Smoked LED
-                painter.setBrush(QBrush(dim_col))
-                painter.setPen(QPen(QColor(0, 0, 0, 160), 0.6))
-                painter.drawRoundedRect(led_rect, 3, 3)
-
-        # 3. Ambient Mint Glow Ring
+        # 2. Ambient Mint Glow Ring
         glow_rad = track_r + max(8.0, side * 0.035)
         glow_grad = QRadialGradient(QPointF(cx, cy), glow_rad)
         glow_grad.setColorAt(0.68, QColor(0, 0, 0, 0))
@@ -293,20 +777,19 @@ class SpeedometerDialWidget(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(QPointF(cx, cy), glow_rad, glow_rad)
 
-        # 4. Main Speedometer Gauge Track (Dark Smoked Track)
+        # 3. Main Speedometer Gauge Track
         gauge_rect = QRectF(cx - track_r, cy - track_r, track_r * 2, track_r * 2)
         pen_track = QPen(COLOR_GAUGE_TRACK, track_w, Qt.PenStyle.SolidLine, Qt.PenCapStyle.FlatCap)
         painter.setPen(pen_track)
         painter.drawArc(gauge_rect, int(start_angle_deg * 16), int(total_span_deg * 16))
 
-        # 5. Inner Concentric Tachometer Arc (Motor RPM 0 - 8000)
+        # 4. Inner Concentric Tachometer Arc
         tach_r = track_r - (side * 0.08)
         tach_w = max(2.5, min(6.0, side * 0.012))
         tach_rect = QRectF(cx - tach_r, cy - tach_r, tach_r * 2, tach_r * 2)
         painter.setPen(QPen(QColor(10, 28, 20, 200), tach_w, Qt.PenStyle.SolidLine, Qt.PenCapStyle.FlatCap))
         painter.drawArc(tach_rect, int(start_angle_deg * 16), int(total_span_deg * 16))
 
-        # Active Tachometer Arc Ribbon
         if rpm_ratio > 0.01:
             tach_span = total_span_deg * rpm_ratio
             if rpm_ratio < 0.70:
@@ -319,7 +802,7 @@ class SpeedometerDialWidget(QWidget):
             painter.setPen(pen_tach)
             painter.drawArc(tach_rect, int(start_angle_deg * 16), int(tach_span * 16))
 
-        # 6. Precision Graduation Ticks & Numbers
+        # 5. Precision Graduation Ticks & Numbers
         num_ticks = 19 if self.max_val >= 150.0 else 13
         for i in range(num_ticks):
             val = int(round(i * (self.max_val / (num_ticks - 1))))
@@ -347,7 +830,6 @@ class SpeedometerDialWidget(QWidget):
             painter.setPen(QPen(tick_color, tick_width))
             painter.drawLine(QPointF(x1, y1), QPointF(x2, y2))
 
-            # Major Tick Numbers
             if is_major and side > 160:
                 r_num = r_inner - (side * 0.038)
                 nx = cx + math.cos(rad) * r_num
@@ -361,7 +843,7 @@ class SpeedometerDialWidget(QWidget):
                 nh = max(16.0, side * 0.05)
                 painter.drawText(QRectF(nx - (nw / 2), ny - (nh / 2), nw, nh), Qt.AlignmentFlag.AlignCenter, str(val))
 
-        # 7. Active Speed Glowing Ribbon
+        # 6. Active Speed Glowing Ribbon
         fraction = (self.current_val - self.min_val) / (self.max_val - self.min_val)
         active_span_deg = total_span_deg * fraction
 
@@ -377,7 +859,6 @@ class SpeedometerDialWidget(QWidget):
             painter.setPen(pen_sweep)
             painter.drawArc(gauge_rect, int(start_angle_deg * 16), int(active_span_deg * 16))
 
-            # Glowing needle tip beacon
             tip_angle = start_angle_deg + active_span_deg
             tip_rad = math.radians(-tip_angle)
             tip_x = cx + math.cos(tip_rad) * track_r
@@ -388,7 +869,7 @@ class SpeedometerDialWidget(QWidget):
             painter.setPen(QPen(sweep_color, 2))
             painter.drawEllipse(QPointF(tip_x, tip_y), beacon_r, beacon_r)
 
-        # 8. Inner Concentric Ring
+        # 7. Inner Concentric Ring
         inner_r = track_r - (side * 0.16)
         pen_inner = QPen(QColor(18, 50, 38, 120), 1.0, Qt.PenStyle.DashLine)
         painter.setPen(pen_inner)
@@ -398,7 +879,7 @@ class SpeedometerDialWidget(QWidget):
             int(total_span_deg * 16),
         )
 
-        # 9. Central Large Digital Speedometer Readout
+        # 8. Central Large Digital Speedometer Readout
         speed_int = int(round(self.current_val))
         font_speed_size = max(20, min(58, int(side * 0.120)))
         font_speed = QFont("Segoe UI", font_speed_size, QFont.Weight.Bold)
@@ -410,7 +891,7 @@ class SpeedometerDialWidget(QWidget):
         speed_rect = QRectF(cx - (speed_box_w / 2.0), cy - side * 0.25, speed_box_w, speed_box_h)
         painter.drawText(speed_rect, Qt.AlignmentFlag.AlignCenter, f"{speed_int}")
 
-        # 10. Speed Unit Label & Motor RPM Tag
+        # 9. Speed Unit Label & Motor RPM Tag
         painter.setPen(COLOR_MINT)
         font_unit = QFont("Segoe UI", max(7, min(13, int(side * 0.024))), QFont.Weight.Bold)
         font_unit.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, max(1, int(side * 0.005)))
@@ -420,13 +901,12 @@ class SpeedometerDialWidget(QWidget):
         rpm_formatted = f"{effective_rpm:,}" if effective_rpm > 0 else f"{self.sub_val}"
         painter.drawText(unit_rect, Qt.AlignmentFlag.AlignCenter, f"{self.unit}   •   {rpm_formatted} RPM")
 
-        # 11. Center Stage Race Gear Hub (Enlarged High-Contrast Racing Display)
+        # 10. Center Stage Race Gear Hub
         gear_hub_y = cy - (side * 0.020)
         gear_block_w = max(46.0, min(76.0, side * 0.16))
         gear_block_h = max(26.0, min(42.0, side * 0.088))
         gear_rect = QRectF(cx - (gear_block_w / 2.0), gear_hub_y, gear_block_w, gear_block_h)
 
-        # Active gear highlight color
         if self.transmission_mode == "MANUAL":
             accent_col = COLOR_CYAN
         elif self.active_gear == "R":
@@ -438,27 +918,23 @@ class SpeedometerDialWidget(QWidget):
         else:
             accent_col = COLOR_MINT
 
-        # Sculpted Gear Box Background with intense glowing border
         painter.setBrush(QBrush(QColor(6, 16, 12, 240)))
         painter.setPen(QPen(accent_col, 1.8))
         painter.drawRoundedRect(gear_rect, 6, 6)
 
-        # Mode tag inside gear hub (top 30%)
         mode_tag_rect = QRectF(gear_rect.left(), gear_rect.top() + 2, gear_rect.width(), gear_rect.height() * 0.30)
         painter.setPen(accent_col)
         font_mode_tag = QFont("Segoe UI", max(5, min(8, int(side * 0.016))), QFont.Weight.Bold)
         painter.setFont(font_mode_tag)
         painter.drawText(mode_tag_rect, Qt.AlignmentFlag.AlignCenter, self.transmission_mode)
 
-        # Large Gear Numeral inside gear hub (bottom 70%)
         gear_num_rect = QRectF(gear_rect.left(), gear_rect.top() + gear_rect.height() * 0.26, gear_rect.width(), gear_rect.height() * 0.72)
-        center_gear_str = self.active_gear
         font_gear_hub = QFont("Segoe UI", max(13, min(24, int(side * 0.058))), QFont.Weight.Bold)
         painter.setFont(font_gear_hub)
         painter.setPen(COLOR_TEXT_PRIMARY)
-        painter.drawText(gear_num_rect, Qt.AlignmentFlag.AlignCenter, center_gear_str)
+        painter.drawText(gear_num_rect, Qt.AlignmentFlag.AlignCenter, self.active_gear)
 
-        # 12. Transmission Selector Strip (PRNDB or R/N/1-6)
+        # 11. Transmission Selector Strip
         capsule_y = gear_hub_y + gear_block_h + max(4.0, side * 0.010)
         if self.transmission_mode == "MANUAL":
             gears = ["R", "N", "1", "2", "3", "4", "5", "6"]
@@ -506,7 +982,7 @@ class SpeedometerDialWidget(QWidget):
 
             painter.drawText(slot_rect, Qt.AlignmentFlag.AlignCenter, label_text)
 
-        # 13. High-Visibility Racing Telemetry Meters for Throttle & Brake
+        # 12. Racing Telemetry Meters for Throttle & Brake
         pedal_y = capsule_y + box_h + max(14.0, side * 0.036)
         bar_w = max(40.0, min(68.0, side * 0.13))
         bar_h = max(6.0, min(10.0, side * 0.020))
@@ -515,16 +991,13 @@ class SpeedometerDialWidget(QWidget):
         font_pedal_lbl = QFont("Segoe UI", max(6, min(8, int(side * 0.017))), QFont.Weight.Bold)
         painter.setFont(font_pedal_lbl)
 
-        # Brake Meter on Left
         brk_bx = cx - gap - bar_w
         lbl_y = pedal_y - max(11.0, side * 0.026)
         lbl_h = max(10.0, side * 0.024)
 
-        # Brake Label
         painter.setPen(COLOR_SHIFT_RED if self.brake_pct > 0 else COLOR_TEXT_MUTED)
         painter.drawText(QRectF(brk_bx, lbl_y, bar_w, lbl_h), Qt.AlignmentFlag.AlignCenter, f"BRK {int(self.brake_pct)}%")
 
-        # Brake Bar
         painter.setBrush(QBrush(COLOR_GAUGE_TRACK))
         painter.setPen(QPen(QColor(255, 77, 109, 60), 0.8))
         painter.drawRoundedRect(QRectF(brk_bx, pedal_y, bar_w, bar_h), 2, 2)
@@ -535,14 +1008,10 @@ class SpeedometerDialWidget(QWidget):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRoundedRect(QRectF(brk_bx + bar_w - brk_fill, pedal_y, brk_fill, bar_h), 2, 2)
 
-        # Throttle Meter on Right
         thr_bx = cx + gap
-
-        # Throttle Label
         painter.setPen(COLOR_MINT if self.throttle_pct > 0 else COLOR_TEXT_MUTED)
         painter.drawText(QRectF(thr_bx, lbl_y, bar_w, lbl_h), Qt.AlignmentFlag.AlignCenter, f"THR {int(self.throttle_pct)}%")
 
-        # Throttle Bar
         painter.setBrush(QBrush(COLOR_GAUGE_TRACK))
         painter.setPen(QPen(QColor(0, 245, 160, 60), 0.8))
         painter.drawRoundedRect(QRectF(thr_bx, pedal_y, bar_w, bar_h), 2, 2)
@@ -556,7 +1025,7 @@ class SpeedometerDialWidget(QWidget):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRoundedRect(QRectF(thr_bx, pedal_y, thr_fill, bar_h), 2, 2)
 
-        # 14. Steering Wheel Angle Vector
+        # 13. Steering Wheel Angle Vector
         steer_y = pedal_y + bar_h + max(4.0, side * 0.010)
         angle = self.steering_angle
         steer_txt = f"STR ◄ {abs(int(angle))}°" if angle < -0.5 else (f"STR {int(angle)}° ►" if angle > 0.5 else "STR 0°")
@@ -565,8 +1034,6 @@ class SpeedometerDialWidget(QWidget):
         painter.setPen(s_color)
         painter.setFont(QFont("Segoe UI", max(5, min(9, int(side * 0.017))), QFont.Weight.Bold))
         painter.drawText(QRectF(cx - 50, steer_y, 100, 12), Qt.AlignmentFlag.AlignCenter, steer_txt)
-
-        painter.end()
 
 
 # Alias for backward compatibility
@@ -1382,10 +1849,15 @@ class CompactSpeedPod(QWidget):
         self.throttle_pct = 0.0
         self.brake_pct = 0.0
         self.steer_angle = 0.0
+        self.cluster_theme = "OLED"
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         self.setMinimumHeight(80)
         self.setMinimumWidth(170)
         self.setMaximumWidth(260)
+
+    def set_cluster_theme(self, theme: str) -> None:
+        self.cluster_theme = theme.upper().strip()
+        self.update()
 
     def set_unit_system(self, unit_system: str) -> None:
         self.unit = "MPH"
@@ -1452,66 +1924,25 @@ class CompactSpeedPod(QWidget):
         w = self.width()
         h = self.height()
 
-        # Calculate RPM ratio & redline state for mini shift lights
+        # Calculate effective RPM for numeric readout
         effective_rpm = self.motor_rpm
         if effective_rpm <= 0 and self.speed > 0.5:
             effective_rpm = int(min(8000.0, (self.speed / max(1.0, self.max_speed)) * 7200.0))
-        rpm_ratio = min(1.0, max(0.0, effective_rpm / 8000.0))
-        is_redline = (rpm_ratio >= 0.98) or (effective_rpm >= 7850)
-        flash_state = (int(time.time() * 14) % 2 == 0)
 
-        # Panel with subtle race obsidian carbon gradient and mint border
-        grad = QLinearGradient(0, 0, 0, h)
-        grad.setColorAt(0.0, QColor(8, 20, 15, 245))
-        grad.setColorAt(1.0, QColor(4, 10, 8, 250))
-        painter.setBrush(QBrush(grad))
-        painter.setPen(QPen(QColor(0, 245, 160, 75), 1))
+        # Panel styling based on cluster theme
+        if getattr(self, "cluster_theme", "OLED") == "OLED":
+            painter.setBrush(QBrush(QColor(0, 0, 0)))
+            painter.setPen(QPen(QColor(0, 229, 255, 60), 1))
+        else:
+            grad = QLinearGradient(0, 0, 0, h)
+            grad.setColorAt(0.0, QColor(8, 20, 15, 245))
+            grad.setColorAt(1.0, QColor(4, 10, 8, 250))
+            painter.setBrush(QBrush(grad))
+            painter.setPen(QPen(QColor(0, 245, 160, 75), 1))
         painter.drawRoundedRect(QRectF(0, 0, w - 1, h - 1), 8, 8)
 
-        # 1. Mini 10-LED Race Shift Rev Strip across top header
-        mini_num_leds = 10
-        mini_strip_w = w - 24.0
-        mini_gap = 2.0
-        mini_led_w = (mini_strip_w - ((mini_num_leds - 1) * mini_gap)) / mini_num_leds
-        mini_led_h = 4.5
-        mini_led_y = 6.0
-        mini_start_x = 12.0
-
-        # Tray background for shift lights
-        painter.setBrush(QBrush(QColor(3, 8, 6, 220)))
-        painter.setPen(QPen(QColor(0, 245, 160, 40) if not is_redline else COLOR_SHIFT_PURPLE, 0.6))
-        painter.drawRoundedRect(QRectF(mini_start_x - 3, mini_led_y - 2, mini_strip_w + 6, mini_led_h + 4), 3, 3)
-
-        mini_thresholds = [0.45, 0.53, 0.61, 0.69, 0.76, 0.82, 0.88, 0.93, 0.96, 0.985]
-        for m_idx in range(mini_num_leds):
-            m_x = mini_start_x + m_idx * (mini_led_w + mini_gap)
-            m_rect = QRectF(m_x, mini_led_y, mini_led_w, mini_led_h)
-
-            if m_idx < 4:
-                m_color = COLOR_SHIFT_GREEN
-                m_dim = QColor(0, 45, 25, 200)
-            elif m_idx < 7:
-                m_color = COLOR_SHIFT_RED
-                m_dim = QColor(55, 10, 18, 200)
-            else:
-                m_color = COLOR_SHIFT_PURPLE
-                m_dim = QColor(42, 10, 52, 200)
-
-            if is_redline:
-                painter.setBrush(QBrush(COLOR_SHIFT_FLASH if flash_state else COLOR_SHIFT_PURPLE))
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.drawRoundedRect(m_rect, 1.5, 1.5)
-            elif rpm_ratio >= mini_thresholds[m_idx]:
-                painter.setBrush(QBrush(m_color))
-                painter.setPen(QPen(QColor(255, 255, 255, 180), 0.5))
-                painter.drawRoundedRect(m_rect, 1.5, 1.5)
-            else:
-                painter.setBrush(QBrush(m_dim))
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.drawRoundedRect(m_rect, 1.5, 1.5)
-
-        # 2. Header: Icon + SPEED and Gear Pill
-        hdr_y = mini_led_y + mini_led_h + 4.0
+        # Header: Icon + SPEED and Gear Pill
+        hdr_y = 8.0
         hdr_font_sz = max(7, min(10, int(w * 0.040)))
         painter.setFont(QFont("Segoe UI", hdr_font_sz, QFont.Weight.Bold))
         painter.setPen(COLOR_MINT)
@@ -2295,6 +2726,7 @@ class VoltesseDashboard(QMainWindow):
         self.current_page_idx = 0
         self.active_hero_view = "SPEED"
         self.swap_wings = False
+        self.cluster_theme = "OLED"
         self._last_record: Optional[TelemetryRecord] = None
 
         # Track currently held keys for video game simulation
@@ -2608,6 +3040,7 @@ class VoltesseDashboard(QMainWindow):
             w.setMinimumWidth(0)
 
         self._apply_dynamic_scale()
+        self._apply_cluster_theme_styles()
 
     def set_user_scale(self, multiplier: float) -> None:
         """Sets an explicit UI zoom scale factor (e.g. 0.85 for denser display, 1.0 for default)."""
@@ -2767,19 +3200,19 @@ class VoltesseDashboard(QMainWindow):
             self.op_mode_badge.setStyleSheet(
                 "background-color: rgba(0, 245, 160, 0.22); color: #00F5A0; padding: 2px 10px; border-radius: 4px; border: 1px solid #00F5A0; font-weight: bold;"
             )
-            self.controls_hint.setText("[KEYS: 1:RACE | 2:SIM | 3:TEST | V:VIEW | X:SWAP | T:TRANS | E/C:SHIFT | U:UNITS | L:LOG]")
+            self.controls_hint.setText("[KEYS: 1:RACE | 2:SIM | 3:TEST | V:VIEW | X:SWAP | B:THEME | T:TRANS | E/C:SHIFT | U:UNITS | L:LOG]")
         elif mode == "SIMULATION":
             self.op_mode_badge.setText("SIMULATION [GAME]")
             self.op_mode_badge.setStyleSheet(
                 "background-color: rgba(0, 229, 255, 0.22); color: #00E5FF; padding: 2px 10px; border-radius: 4px; border: 1px solid #00E5FF; font-weight: bold;"
             )
-            self.controls_hint.setText("[V:VIEW | X:SWAP | T:TRANS | W/S:PEDALS | A/D:STEER | E/C:SHIFT | U:UNITS | L:LOG | M:MODE]")
+            self.controls_hint.setText("[V:VIEW | X:SWAP | B:THEME | T:TRANS | W/S:PEDALS | A/D:STEER | E/C:SHIFT | U:UNITS | L:LOG | M:MODE]")
         elif mode == "TEST":
             self.op_mode_badge.setText("TEST [MOCK]")
             self.op_mode_badge.setStyleSheet(
                 "background-color: rgba(154, 230, 180, 0.20); color: #5CFFC7; padding: 2px 10px; border-radius: 4px; border: 1px solid #5CFFC7; font-weight: bold;"
             )
-            self.controls_hint.setText("[TEST: AUTO ONLY | V:VIEW | X:SWAP | 1:RACE | 2:SIM | U:UNITS | L:LOG | SPACE:PAUSE]")
+            self.controls_hint.setText("[TEST: AUTO ONLY | V:VIEW | X:SWAP | B:THEME | 1:RACE | 2:SIM | U:UNITS | L:LOG | SPACE:PAUSE]")
 
     def _flash_nav_btn(self, btn: QPushButton) -> None:
         """Briefly flashes chevron button for tactile visual feedback."""
@@ -2943,6 +3376,74 @@ class VoltesseDashboard(QMainWindow):
         self.set_page(self.current_page_idx)
         self.wing_swap_changed.emit(self.swap_wings)
 
+    def set_cluster_theme(self, theme: str) -> None:
+        """Sets the visual theme for the cluster ('OLED' or 'CLASSIC')."""
+        self.cluster_theme = theme.upper().strip()
+        if hasattr(self, "speed_gauge") and hasattr(self.speed_gauge, "set_cluster_theme"):
+            self.speed_gauge.set_cluster_theme(self.cluster_theme)
+        for pod in getattr(self, "compact_speed_pods", []):
+            if hasattr(pod, "set_cluster_theme"):
+                pod.set_cluster_theme(self.cluster_theme)
+        self._apply_cluster_theme_styles()
+
+    def toggle_cluster_theme(self) -> str:
+        """Toggles between OLED Beta theme and Classic theme."""
+        new_theme = "CLASSIC" if self.cluster_theme == "OLED" else "OLED"
+        self.set_cluster_theme(new_theme)
+        if hasattr(self, "status_badge"):
+            self.status_badge.setText(f"THEME: {self.cluster_theme} BETA" if self.cluster_theme == "OLED" else "THEME: CLASSIC")
+            self.status_badge.setVisible(True)
+            QTimer.singleShot(
+                2000,
+                lambda: self.status_badge.setVisible(False) if not (hasattr(self, "_last_record") and self._last_record and self._last_record.warnings) else None,
+            )
+        return self.cluster_theme
+
+    def _apply_cluster_theme_styles(self) -> None:
+        """Applies global styling tokens matching the active cluster theme."""
+        if getattr(self, "cluster_theme", "OLED") == "OLED":
+            self.setStyleSheet(
+                """
+                QMainWindow {
+                    background-color: #000000;
+                }
+                QWidget {
+                    color: #FFFFFF;
+                }
+                """
+            )
+            if hasattr(self, "top_bar"):
+                self.top_bar.setStyleSheet("background-color: #000000; border-bottom: 1px solid rgba(0, 229, 255, 0.25); border-radius: 4px;")
+            if hasattr(self, "bottom_bar"):
+                self.bottom_bar.setStyleSheet(
+                    "background-color: #000000; border-top: 1px solid rgba(0, 229, 255, 0.20); border-radius: 6px; padding: 2px;"
+                )
+            if hasattr(self, "trip_pod"):
+                self.trip_pod.setStyleSheet(
+                    "background-color: #000000; border: 1px solid rgba(0, 229, 255, 0.35); border-radius: 6px;"
+                )
+        else:
+            self.setStyleSheet(
+                """
+                QMainWindow {
+                    background-color: #030706;
+                }
+                QWidget {
+                    color: #FFFFFF;
+                }
+                """
+            )
+            if hasattr(self, "top_bar"):
+                self.top_bar.setStyleSheet("background-color: rgba(4, 12, 8, 0.65); border-bottom: 1px solid rgba(0, 245, 160, 0.2); border-radius: 4px;")
+            if hasattr(self, "bottom_bar"):
+                self.bottom_bar.setStyleSheet(
+                    "background-color: rgba(4, 14, 10, 0.75); border-top: 1px solid rgba(0, 245, 160, 0.25); border-radius: 6px; padding: 2px;"
+                )
+            if hasattr(self, "trip_pod"):
+                self.trip_pod.setStyleSheet(
+                    "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(10, 26, 20, 0.95), stop:1 rgba(6, 16, 12, 0.95)); border: 1px solid rgba(0, 245, 160, 0.35); border-radius: 6px;"
+                )
+
     def toggle_units(self) -> str:
         """In v4.1.0+, system is locked to IMPERIAL; returns active unit system."""
         self.set_unit_system("IMPERIAL")
@@ -3013,6 +3514,14 @@ class VoltesseDashboard(QMainWindow):
             steering_angle=record.steering_angle,
             transmission_mode=trans_mode,
         )
+        if hasattr(self.speed_gauge, "set_aux_telemetry"):
+            disp_dist = record.trip_distance_km * 0.621371
+            self.speed_gauge.set_aux_telemetry(
+                soc=record.battery_soc,
+                motor_temp_c=record.motor_temp_c,
+                inverter_temp_c=record.inverter_temp_c,
+                trip_dist_mi=disp_dist,
+            )
 
         # Compact Speed Pods (for non-speed hero views)
         for pod in getattr(self, "compact_speed_pods", [self.compact_speed_widget]):
@@ -3263,6 +3772,9 @@ class VoltesseDashboard(QMainWindow):
             return
         elif key == Qt.Key.Key_X:
             self.toggle_wing_swap()
+            return
+        elif key == Qt.Key.Key_B:
+            self.toggle_cluster_theme()
             return
         elif key == Qt.Key.Key_Space:
             self.pause_requested.emit()

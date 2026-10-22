@@ -69,6 +69,8 @@ class VoltesseApp:
             self.gui.set_wing_swap(args.swap_wings)
         if getattr(args, "no_animation", False):
             self.gui.set_animation_enabled(False)
+        if getattr(args, "theme", None):
+            self.gui.set_cluster_theme(args.theme)
 
         # Screen enumeration & hardware detection
         screens = self.app.screens()
@@ -579,6 +581,13 @@ def parse_args() -> argparse.Namespace:
         "--no-animation",
         action="store_true",
         help="Disable slide animations when switching cockpit views",
+    )
+    parser.add_argument(
+        "--theme",
+        type=str,
+        default="oled",
+        choices=["oled", "classic"],
+        help="Cockpit display visual theme (oled [beta full black mint] or classic; default: oled)",
     )
     return parser.parse_args()
 

@@ -73,31 +73,22 @@ Voltesse Dash is a production-grade, distraction-free automotive digital instrum
   - **Immediate Interruption Settlement**: Rapid inputs must call `finish_animation()` to immediately settle the in-flight view and transition to the target page without stutter or ghosting.
   - **Tactile Chevrons**: Nav frame chevrons (`◄` / `►`) flash white briefly upon click/press. Single-shot timers MUST pass the button context object (`QTimer.singleShot(150, btn, callback)`) to prevent callbacks on deleted C++ pointers.
 
-### 🏁 Voltesse Race Cockpit Display Specification (v5.1.0+)
-- **Top 15-LED Multi-Stage Rev Shift Light Array**:
-  - Positioned across the top of `SpeedometerDialWidget` in a recessed bezel tray (`rgba(4, 10, 7, 0.94)`).
-  - 15 illuminated indicators across 3 progressive staging bands:
-    - Stage 1 (LEDs 1–5): Neon Mint (`#00F5A0`, 45%–72% RPM).
-    - Stage 2 (LEDs 6–10): Vivid Race Red (`#FF2A55`, 76%–92% RPM).
-    - Stage 3 (LEDs 11–15): Rev-Limit Purple (`#A855F7` / `#D946EF`, 94%–99% RPM).
-  - **Peripheral Redline Flash**: At ≥ 98% RPM (≥ 7,850 RPM), all 15 LEDs pulse synchronously with high-contrast specular white core flash (`#FFFFFF`) and purple halos.
-  - Specular core highlights on active LEDs; unlit states render as tinted dark smoked glass.
-- **Enlarged High-Contrast Center Race Gear Hub**:
-  - Sculpted central capsule (`rgba(6, 16, 12, 0.94)`) with prominent gear numeral (`1`–`6`, `N`, `R`, `D1`–`D6`, `P`, `B`) and transmission mode tag.
-  - State-aware glowing borders: Cyan for Manual, Mint for Auto, Race Red for Reverse, and Amber for Neutral.
-  - Paired with the transmission selector capsule and top ribbon badge.
-- **Concentric Dual-Arc Architecture**:
-  - Outer arc: Speed graduation (0–120 MPH) with glowing needle tip beacon.
-  - Inner arc: Motor tachometer ribbon (0–8,000 RPM) with dynamic color zoning (Emerald Cyan ➔ Amber ➔ Race Red).
-- **Motorsport Telemetry Input Meters**:
-  - High-visibility dual horizontal meters for Brake (`BRK %` in vivid race coral red `#FF2A55`) and Throttle (`THR %` with cyan-to-mint gradient fill `#00E5FF` ➔ `#00F5A0`).
-  - Collision-free layout with generous spacing preventing text overlaps across resolutions.
-- **CompactSpeedPod Race Sync**:
-  - Integrated 10-LED mini shift rev strip (4 Green, 3 Red, 3 Purple) across the header of `CompactSpeedPod` ensuring continuous shift cues when navigating Battery Hero, Powertrain, or TPMS pages.
+### 🏁 Voltesse Black Mint OLED Beta Display Specification (v5.2.1+)
+- **Full Black Mint OLED Beta Theme**:
+  - Engineered for pure pitch-black OLED automotive displays (`#000000` void) with zero card or grey box overhead.
+  - Three-pod illuminated binnacle contoured with an ethereal Voltesse cyan/mint cowl contour brow arching over the cluster.
+  - **Left Pod**: Tachometer (0–8 x1000 RPM) with luminous needle, 7–8 redline zone in vivid race coral red, and vertical coolant/motor temperature sub-gauge (`100–320°F`).
+  - **Center Pod**: Speedometer centerpiece with concentric cyan glowing bezel rings, curved glass reflection highlight crescent, speed graduation (0–180 MPH), glowing white needle, bold digital numerals (`70` / `MPH`), vector chevrons (`▲`/`▼`), gear `D3`, odometer `009999 mi`, and flanking curved vertical `ACCEL` / `BRAKE` dynamic ribbon meter.
+  - **Right Pod**: Dual-meter gauge with Powertrain Thermal scale (`C` to `H`), Battery SoC (`E` to `F`), vector EV battery icon, and twin needles.
+- **Permanent Removal of Shift LED Strips**:
+  - Shift light arrays (the legacy 15-LED shift array on the speedometer and 10-LED mini strip on `CompactSpeedPod`) have been permanently removed from both OLED and Classic themes to provide an unobstructed, premium cockpit experience.
+- **Theme Selection & Hotkey (`B` key / `--theme [oled|classic]`)**:
+  - Hotkey `B` instantly toggles between **OLED Beta** and **Classic** themes with an animated on-screen HUD badge.
+  - CLI argument `--theme [oled|classic]` defaults to `oled`.
 
 ### ⚡ Always-Visible Speed Pod on Non-Speed Pages
 - When navigated away from Page 0 (`SPEED`) to Page 1 (`BATTERY`), Page 2 (`POWERTRAIN`), or Page 3 (`TPMS`), an integrated `CompactSpeedPod` MUST remain permanently visible.
-- Displays: Speed (`MPH`), dynamic cyan-to-mint speed bar, RPM, transmission mode & dynamic gear pill (e.g. `AUTO [4]`, `MANUAL [5]`), mini 10-LED shift light strip, and micro-indicators for throttle (`THR %`), brake (`BRK %`), and steering (`STR °`).
+- Displays: Speed (`MPH`), dynamic cyan-to-mint speed bar, RPM, transmission mode & dynamic gear pill (e.g. `AUTO [4]`, `MANUAL [5]`), and micro-indicators for throttle (`THR %`), brake (`BRK %`), and steering (`STR °`).
 - **Wing Swapping (`X` key / `--swap-wings`)**: Positions of the compact speed pod and the hero diagnostic widget can be dynamically swapped left ⮂ right.
 
 ### 💎 Translucent Obsidian Cyber-Dock (Bottom Telemetry Deck)
@@ -156,14 +147,14 @@ Voltesse Dash is a production-grade, distraction-free automotive digital instrum
 - **Local Python Environment**: `.\.venv\Scripts\python.exe`
 - **Unit Test Discovery**:
   ```powershell
-  # Cockpit GUI and telemetry tests (30 tests)
+  # Cockpit GUI and telemetry tests (31 tests)
   .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 
   # Technician web portal tests (12 tests)
   .\.venv\Scripts\python.exe -m unittest discover -s technician-gui/tests -v
   ```
 - **Requirements for PRs / Changes**:
-  - **100% Green**: All tests across both test suites must pass with zero failures or errors (42 total tests).
+  - **100% Green**: All tests across both test suites must pass with zero failures or errors (43 total tests).
   - **Preserve Existing Attributes**: Do NOT break legacy or test-inspected attributes on `VoltesseDashboard` (`page_stack`, `center_stack`, `speed_gauge`, `battery_hero`, `powertrain_hero`, `tpms_widget`, `compact_speed_widget`, `compact_speed_pods`, `trip_pod`, `thermal_widget`, `bottom_bar`).
   - **QTimer & Thread Safety**: Always supply a context QObject when scheduling single-shot timers to prevent dangling callbacks on destructed widgets.
 
