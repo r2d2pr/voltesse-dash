@@ -1225,44 +1225,30 @@ class SpeedometerDialWidget(QWidget):
         painter.setPen(COLOR_RED if self.brake_pct > 1.0 else QColor(255, 77, 109, 180))
         painter.drawText(QRectF(meter_x - 30, bot_y + 4, 60, 14), Qt.AlignmentFlag.AlignCenter, brake_text)
 
-        # 8. Bottom Center Readouts: Gear Pill & Odometer (Cleanly Spaced Inside Dial, Zero Circle Overlap)
-        # 8a. Sculpted Glass Gear & Drive Mode Pill
-        pill_w = max(84.0, r * 0.58)
-        pill_h = max(20.0, r * 0.15)
-        pill_x = cx - (pill_w / 2.0)
-        pill_y = cy + r * 0.38
-        pill_rect = QRectF(pill_x, pill_y, pill_w, pill_h)
+        # 8. Bottom Center Readouts (Gear, Drive Mode, Odometer - Clean Original Layout, Zero Circle Collision)
+        gear_y = cy + r * 0.62
+        h_row = max(16.0, r * 0.12)
 
-        painter.setBrush(QBrush(QColor(6, 18, 14, 220)))
-        painter.setPen(QPen(QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 140), 1.0))
-        painter.drawRoundedRect(pill_rect, pill_h / 2.0, pill_h / 2.0)
+        # 8a. Active Gear (Left, bold cyan, right-aligned with generous margin)
+        font_gear = QFont("Segoe UI", max(9, min(16, int(r * 0.100))), QFont.Weight.Bold)
+        painter.setFont(font_gear)
+        painter.setPen(self.palette.secondary)
+        painter.drawText(QRectF(cx - r * 0.42, gear_y, r * 0.32, h_row), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, self.active_gear)
 
-        # Gear (Left side of pill: bold, prominent)
-        gear_font = QFont("Segoe UI", max(9, min(13, int(pill_h * 0.52))), QFont.Weight.Bold)
-        painter.setFont(gear_font)
+        # 8b. Drive Mode Indicator (Center, vibrant mint, centered on axis)
+        mode_char = self.drive_mode[0] if self.drive_mode else "D"
+        font_mode = QFont("Segoe UI", max(8, min(14, int(r * 0.088))), QFont.Weight.Bold)
+        painter.setFont(font_mode)
         painter.setPen(self.palette.primary)
-        painter.drawText(QRectF(pill_x + 8, pill_y, pill_w * 0.45 - 8, pill_h), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, self.active_gear)
+        painter.drawText(QRectF(cx - r * 0.08, gear_y, r * 0.16, h_row), Qt.AlignmentFlag.AlignCenter, mode_char)
 
-        # Divider pip
-        painter.setPen(QPen(QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 100), 1.0))
-        painter.drawLine(QPointF(cx, pill_y + 4), QPointF(cx, pill_y + pill_h - 4))
-
-        # Drive Mode (Right side of pill)
-        mode_font = QFont("Segoe UI", max(7, min(10, int(pill_h * 0.42))), QFont.Weight.Bold)
-        mode_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
-        painter.setFont(mode_font)
-        painter.setPen(self.palette.highlight)
-        mode_str = self.drive_mode if self.drive_mode else "DRIVE"
-        painter.drawText(QRectF(cx + 8, pill_y, pill_w * 0.50 - 12, pill_h), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, mode_str)
-
-        # 8b. Odometer Readout (Centered below gear pill with 38+ pixels margin to bottom circle)
-        odo_y = cy + r * 0.60
+        # 8c. Odometer Readout (Right, crisp Segoe UI, left-aligned with generous margin)
         odo_str = f"{int(round(self.trip_dist_mi)):05d} mi"
-        odo_font = QFont("Segoe UI", max(8, min(12, int(r * 0.076))), QFont.Weight.Bold)
-        odo_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
-        painter.setFont(odo_font)
-        painter.setPen(COLOR_TEXT_PRIMARY)
-        painter.drawText(QRectF(cx - r * 0.40, odo_y, r * 0.80, 18), Qt.AlignmentFlag.AlignCenter, odo_str)
+        font_odo = QFont("Segoe UI", max(7, min(12, int(r * 0.076))), QFont.Weight.Bold)
+        font_odo.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
+        painter.setFont(font_odo)
+        painter.setPen(self.palette.highlight)
+        painter.drawText(QRectF(cx + r * 0.10, gear_y, r * 0.38, h_row), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, odo_str)
 
     def _paint_classic_theme(self, painter: QPainter, w: int, h: int) -> None:
         """Renders Classic Dial Theme (shift LED light strip removed)."""
