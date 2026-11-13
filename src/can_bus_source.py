@@ -468,7 +468,7 @@ class CANMockTransmitter(threading.Thread):
                 mode = 1  # DRIVE
                 gear_byte = 3  # D in auto
 
-            f1_data = struct.pack(">HHBBBBx", int(speed * 10), rpm, int(thr), int(brk), mode, gear_byte)
+            f1_data = struct.pack(">HHBBBB", int(speed * 10), rpm, int(thr), int(brk), mode, gear_byte)
             msg1 = can.Message(arbitration_id=CAN_ID_SPEED_MOTOR, data=f1_data, is_extended_id=False)
 
             soc = max(10.0, soc - 0.002)

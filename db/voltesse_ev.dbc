@@ -35,26 +35,26 @@ BS_:
 BU_: VCU INV BMS DASH
 
 BO_ 256 EV_MotorDynamics: 8 VCU
- SG_ VehicleSpeed : 0|16@0+ (0.1,0) [0|300] "km/h" DASH
- SG_ MotorRPM : 16|16@0+ (1,0) [0|12000] "rpm" DASH
- SG_ ThrottlePct : 32|8@0+ (1,0) [0|100] "%" DASH
- SG_ BrakePct : 40|8@0+ (1,0) [0|100] "%" DASH
- SG_ DriveMode : 48|8@0+ (1,0) [0|3] "" DASH
- SG_ GearByte : 56|8@0+ (1,0) [0|255] "" DASH
+ SG_ VehicleSpeed : 7|16@0+ (0.1,0) [0|300] "km/h" DASH
+ SG_ MotorRPM : 23|16@0+ (1,0) [0|12000] "rpm" DASH
+ SG_ ThrottlePct : 39|8@0+ (1,0) [0|100] "%" DASH
+ SG_ BrakePct : 47|8@0+ (1,0) [0|100] "%" DASH
+ SG_ DriveMode : 55|8@0+ (1,0) [0|3] "" DASH
+ SG_ GearByte : 63|8@0+ (1,0) [0|255] "" DASH
 
 BO_ 257 EV_BatteryState: 8 BMS
- SG_ BatterySoC : 0|16@0+ (0.1,0) [0|100] "%" DASH
- SG_ BatteryVoltage : 16|16@0+ (0.1,0) [0|500] "V" DASH
- SG_ BatteryCurrent : 32|16@0- (0.1,0) [-500|500] "A" DASH
- SG_ TripDistance : 48|16@0+ (0.1,0) [0|6553.5] "km" DASH
+ SG_ BatterySoC : 7|16@0+ (0.1,0) [0|100] "%" DASH
+ SG_ BatteryVoltage : 23|16@0+ (0.1,0) [0|500] "V" DASH
+ SG_ BatteryCurrent : 39|16@0- (0.1,0) [-500|500] "A" DASH
+ SG_ TripDistance : 55|16@0+ (0.1,0) [0|6553.5] "km" DASH
 
 BO_ 258 EV_ThermalsAndSafety: 8 VCU
- SG_ BatteryTemp : 0|8@0+ (1,-40) [-40|120] "degC" DASH
- SG_ MotorTemp : 8|8@0+ (1,-40) [-40|200] "degC" DASH
- SG_ InverterTemp : 16|8@0+ (1,-40) [-40|150] "degC" DASH
- SG_ AmbientTemp : 24|8@0+ (1,-40) [-40|80] "degC" DASH
- SG_ WarningBits : 32|16@0+ (1,0) [0|65535] "" DASH
- SG_ SteeringAngle : 48|16@0- (0.1,0) [-720|720] "deg" DASH
+ SG_ BatteryTemp : 7|8@0+ (1,-40) [-40|120] "degC" DASH
+ SG_ MotorTemp : 15|8@0+ (1,-40) [-40|200] "degC" DASH
+ SG_ InverterTemp : 23|8@0+ (1,-40) [-40|150] "degC" DASH
+ SG_ AmbientTemp : 31|8@0+ (1,-40) [-40|80] "degC" DASH
+ SG_ WarningBits : 39|16@0+ (1,0) [0|65535] "" DASH
+ SG_ SteeringAngle : 55|16@0- (0.1,0) [-720|720] "deg" DASH
 
 CM_ BO_ 256 "High-frequency dynamic powertrain signals";
 CM_ BO_ 257 "High-voltage battery pack status";

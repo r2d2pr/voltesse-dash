@@ -3706,7 +3706,7 @@ class VoltesseDashboard(QMainWindow):
         self._apply_dynamic_scale()
 
     def _update_clock(self) -> None:
-        self.clock_label.setText(time.strftime("%I:%M:%S %p"))
+        self.clock_label.setText(time.strftime("%I:%M:%S %p").upper())
 
     def set_operating_mode(self, mode: str) -> None:
         """Updates the active operating mode display in the UI and resets held input keys."""
