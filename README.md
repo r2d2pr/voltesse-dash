@@ -1,8 +1,8 @@
-# Voltesse Dash ⚡ v5.4.0
+# Voltesse Dash ⚡ v6.0.0
 
 > **Authenticated Figma Technician Interface:** See [figma-gui/README.md](figma-gui/README.md) for the React/Vite laptop GUI, FastAPI backend, local setup, and [Figma handoff](figma-gui/FIGMA_HANDOFF.md).
 
-[![Version](https://img.shields.io/badge/version-5.4.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
+[![Version](https://img.shields.io/badge/version-6.0.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/PyQt-6-green.svg)](https://riverbankcomputing.com/software/pyqt/)
 [![Web](https://img.shields.io/badge/FastAPI%20%7C%20React%2019-20Hz%20F1%20Push-00F5D4.svg)](figma-gui/)
@@ -10,27 +10,27 @@
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 5.4.0 introduces the **Dynamic Ambient Theme & Accent Palette Engine** with 5 signature OLED colorways, hotkey `P` cycling, centered glassmorphic speedometer toast overlay, technician portal calibration swatches, and `--palette` CLI support. Built with **Python**, **PyQt6**, **FastAPI**, **React 19**, **python-can**, and **PostgreSQL**.
+A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 6.0.0 delivers full hardware CAN HAT integration (Waveshare RS485 CAN HAT via SocketCAN at 500k baud), real-time 20Hz F1 telemetry streaming, driver cluster normalization, and persistent automotive telltale DTC warning lamps. Built with **Python**, **PyQt6**, **FastAPI**, **React 19**, **python-can**, and **PostgreSQL**.
 
 ---
 
-## What's New in Version 5.4.0 🚀
+## What's New in Version 6.0.0 🏁
 
-- 🎨 **Dynamic Ambient Theme & Accent Palette Engine**:
-  - Engineered 5 signature automotive-grade OLED colorways tailored for pure black void (`#000000`):
-    - **`CYBER_MINT`** (`mint`, default): Voltesse signature cybernetic electric neon (`#00F5A0` primary, `#5CFFC7` highlight, `#00E5FF` secondary).
-    - **`STEALTH_MONOCHROME`** (`stealth`): Pure hypercar titanium silver & white (`#E2E8F0` primary, `#FFFFFF` highlight, `#94A3B8` secondary).
-    - **`SOLAR_AMBER`** (`amber`): Endurance motorsport amber tachometer (`#FFB800` primary, `#FFD166` highlight, `#FF9F1C` secondary).
-    - **`TRACK_REDLINE`** (`redline`): Aggressive track attack crimson (`#FF3366` primary, `#FF6B8B` highlight, `#FF9900` secondary).
-    - **`NEON_SYNTHWAVE`** (`synthwave`): Cyberpunk night drive magenta & cyan (`#D946EF` primary, `#F472B6` highlight, `#06B6D4` secondary).
-  - **Hotkey `P` & Auto-Switch UX**: Pressing `P` cycles between palettes in sequence (`mint` ➔ `stealth` ➔ `amber` ➔ `redline` ➔ `synthwave` ➔ loop). If pressed in Classic mode, the cluster automatically switches to OLED mode and activates the next palette.
-  - **Centered Glassmorphic Speedometer Toast**: Switching palettes triggers an animated floating glassmorphic pill directly across the center dial (`🎨 PALETTE: [NAME]`) with a smooth 1.5-second cubic fade out and top HUD ribbon status badge.
-  - **Coordinated Cockpit Styling Across All Pages**: The illuminated binnacle cowl, dial halos, battery SoC arc, powertrain torque split bars, TPMS chassis wireframe, and compact speed pod accent seam all dynamically adapt to the active palette.
-  - **Strict ISO/SAE Safety Invariant Lock**: Tachometer redline (7–8k RPM), brake pedal indicators, and critical thermal/pressure warnings remain invariant in standardized Coral Red (`#FF4D6D`) and Amber (`#FFB800`).
-  - **Technician Pit-Wall Calibration Preview**: Settings channel in the technician portal features interactive swatch cards, live hex/RGB breakdown, contrast metrics, and an SVG/CSS cluster speedometer simulation preview.
-  - **CLI Argument Support**: Launch directly into any colorway via `--palette [mint|stealth|amber|redline|synthwave]`.
+- 🏎️ **Waveshare RS485 CAN HAT Hardware Integration**:
+  - Full SocketCAN `can0` support via MCP2515 SPI overlay at 500,000 baud with automated persistent bring-up service (`voltesse-can0.service`).
+  - Standard Vector DBC Motorola start-bit alignment in `db/voltesse_ev.dbc` and robust `cantools` named signal decoding.
+- ⚡ **Driver Cockpit & OLED Cluster Normalization**:
+  - Balanced bottom center readout row: Active Gear (`D1`), Drive Mode (`D`/`S`/`E`), and Odometer with 33+ px clearance to dial bezels and 60+ px side margin.
+  - Isolated vertical motor temperature bar from temperature text labels (`320`, `200`, `100`), repositioning thermometer icon and `°F` tag to header.
+  - Re-engineered Accel and Brake indicators into a straight vertical precision pedal meter on the cluster flank (`meter_x = cx + 1.09r`) with live percentages (`ACC 45%`, `BRK 80%`).
+  - Transitioned persistent DTC faults to authentic ISO 7000-1393 Check Engine / MIL illuminated telltale lamps in the bottom-left corner with multi-code counters.
+  - Permanent lock to 3-pod OLED binnacle; eliminated legacy Classic dial theme and high-speed threshold alarms.
+- 💻 **Technician Portal & WebSocket Telemetry**:
+  - Real-time 20Hz UDP/WebSocket telemetry push to React 19 / Vite technician dashboard on port 8501.
+  - ErrorBoundary protection and fixed session table crashes.
+  - Full systemd auto-restart persistence via `voltesse-technician.service`.
 - 🧪 **Automated Test Suite Verification**:
-  - 33 cockpit unit and integration tests passing with 100% green status.
+  - 34 cockpit unit and integration tests passing with 100% green status.
 
 ---
 
@@ -102,7 +102,7 @@ voltesse-dash/
 ├── data/
 │   └── exports/               # Generated CSV & JSON session dumps (auto-created)
 ├── src/
-│   ├── __init__.py            # Package version (v5.4.0)
+│   ├── __init__.py            # Package version (v6.0.0)
 │   ├── can_bus_source.py      # CAN Bus interface, frame decoders, and synchronized mock transmitter
 │   ├── simulation_source.py   # Video-game interactive EV dynamics engine (W/A/S/D, 6-speed manual, D1-D6 auto)
 │   ├── telemetry_source.py    # Autonomous EV driving cycle telemetry stream (Test Mode, D1-D6 auto)
