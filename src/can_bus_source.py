@@ -304,14 +304,12 @@ class CANTelemetrySource(QThread):
                     self.current_gear = base_g
 
     def _decode_warning_bits(self, warn_bits: int) -> None:
-        warnings: List[str] = []
-        if warn_bits & 0x01:
+        warnings: List[str] = [w for w in getattr(self, "warnings", []) if w not in ("LOW BATTERY", "THERMAL WARNING", "CAN BUS ERROR")]
+        if warn_bits & 0x01 and "LOW BATTERY" not in warnings:
             warnings.append("LOW BATTERY")
-        if warn_bits & 0x02:
+        if warn_bits & 0x02 and "THERMAL WARNING" not in warnings:
             warnings.append("THERMAL WARNING")
-        if warn_bits & 0x04:
-            warnings.append("HIGH SPEED")
-        if warn_bits & 0x08:
+        if warn_bits & 0x08 and "CAN BUS ERROR" not in warnings:
             warnings.append("CAN BUS ERROR")
         self.warnings = warnings
 

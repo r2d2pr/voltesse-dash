@@ -1212,16 +1212,15 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertEqual(gui.speed_gauge.battery_power_kw, 18.0)
         self.assertAlmostEqual(gui.speed_gauge.trip_dist_mi, 25.0 * 0.621371, places=2)
 
-        # 4. Programmatic Theme Toggling
-        theme = gui.toggle_cluster_theme()
-        self.assertEqual(theme, "CLASSIC")
-        self.assertEqual(gui.cluster_theme, "CLASSIC")
-        self.assertEqual(gui.speed_gauge.cluster_theme, "CLASSIC")
-        self.assertEqual(gui.compact_speed_widget.cluster_theme, "CLASSIC")
-        self.assertEqual(gui.battery_hero.cluster_theme, "CLASSIC")
-        self.assertEqual(gui.powertrain_hero.cluster_theme, "CLASSIC")
-        self.assertEqual(gui.tpms_widget.cluster_theme, "CLASSIC")
+        # 4. Standardized OLED Cluster Theme Persistence
+        self.assertEqual(gui.cluster_theme, "OLED")
+        self.assertEqual(gui.speed_gauge.cluster_theme, "OLED")
+        self.assertEqual(gui.compact_speed_widget.cluster_theme, "OLED")
+        self.assertEqual(gui.battery_hero.cluster_theme, "OLED")
+        self.assertEqual(gui.powertrain_hero.cluster_theme, "OLED")
+        self.assertEqual(gui.tpms_widget.cluster_theme, "OLED")
 
+        # Toggling stays locked to OLED
         theme = gui.toggle_cluster_theme()
         self.assertEqual(theme, "OLED")
         self.assertEqual(gui.cluster_theme, "OLED")
@@ -1229,17 +1228,14 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertEqual(gui.powertrain_hero.cluster_theme, "OLED")
         self.assertEqual(gui.tpms_widget.cluster_theme, "OLED")
 
-        # 5. Hotkey 'B' Theme Toggle
+        # 5. Hotkey 'B' / Cluster locked to OLED
         b_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_B, Qt.KeyboardModifier.NoModifier)
-        gui.keyPressEvent(b_event)
-        self.assertEqual(gui.cluster_theme, "CLASSIC")
-
         gui.keyPressEvent(b_event)
         self.assertEqual(gui.cluster_theme, "OLED")
 
-        # 6. Set Theme Explicitly
+        # 6. Set Theme Explicitly always stays OLED
         gui.set_cluster_theme("classic")
-        self.assertEqual(gui.cluster_theme, "CLASSIC")
+        self.assertEqual(gui.cluster_theme, "OLED")
         gui.set_cluster_theme("oled")
         self.assertEqual(gui.cluster_theme, "OLED")
 
@@ -1317,9 +1313,8 @@ class TestDashboardGUI(unittest.TestCase):
         self.assertEqual(gui.palette_key, "stealth")
         self.assertEqual(gui.palette.name, "STEALTH-MONOCHROME")
 
-        # 5. Pressing 'P' in Classic mode auto-switches to OLED mode
-        gui.set_cluster_theme("CLASSIC")
-        self.assertEqual(gui.cluster_theme, "CLASSIC")
+        # 5. Lock to OLED mode across all palette cycles
+        self.assertEqual(gui.cluster_theme, "OLED")
         gui.keyPressEvent(p_event)
         self.assertEqual(gui.cluster_theme, "OLED")
         self.assertEqual(gui.palette_key, "amber")

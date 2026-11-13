@@ -420,7 +420,7 @@ class SpeedometerDialWidget(QWidget):
         painter.restore()
 
     def show_dtc_toast(self, dtc_text: str) -> None:
-        """Triggers a 3.5-second prominent notification overlay on the center gauge."""
+        """Triggers a 3.5-second non-invasive notification overlay in the bottom-left corner."""
         self._dtc_toast_text = dtc_text
         self._dtc_toast_alpha = 1.0
         self._dtc_toast_start_time = time.time()
@@ -430,6 +430,12 @@ class SpeedometerDialWidget(QWidget):
             self._dtc_toast_timer.timeout.connect(self._step_dtc_toast)
         self._dtc_toast_timer.start()
         self.update()
+
+    def set_active_dtcs(self, dtcs: List[str]) -> None:
+        new_dtcs = list(dtcs or [])
+        if new_dtcs != getattr(self, "active_dtcs", []):
+            self.active_dtcs = new_dtcs
+            self.update()
 
     def _step_dtc_toast(self) -> None:
         now = time.time()
@@ -446,38 +452,65 @@ class SpeedometerDialWidget(QWidget):
                 self._dtc_toast_timer.stop()
         self.update()
 
-    def _draw_dtc_toast(self, painter: QPainter, cx: float, cy: float, r: float) -> None:
+    def _draw_dtc_hud(self, painter: QPainter, w: float, h: float) -> None:
         alpha = getattr(self, "_dtc_toast_alpha", 0.0)
-        if alpha <= 0.01:
+        active_dtcs = getattr(self, "active_dtcs", [])
+
+        if alpha <= 0.01 and not active_dtcs:
             return
 
-        text = getattr(self, "_dtc_toast_text", "DTC ACTIVE")
-        pill_w = max(210.0, r * 1.25)
-        pill_h = max(38.0, r * 0.25)
-        pill_x = cx - (pill_w / 2.0)
-        pill_y = cy - (pill_h / 2.0)
-        pill_rect = QRectF(pill_x, pill_y, pill_w, pill_h)
-
-        bg_col = QColor(28, 6, 10, int(235 * alpha))
-        border_col = QColor(255, 77, 109, int(230 * alpha))
+        margin_x = 22.0
+        margin_y = h - 46.0
+        pill_h = 30.0
 
         painter.save()
-        painter.setBrush(QBrush(bg_col))
-        painter.setPen(QPen(border_col, 1.8))
-        painter.drawRoundedRect(pill_rect, pill_h / 2.0, pill_h / 2.0)
 
-        # Ambient red warning halo glow
-        glow_pen_col = QColor(255, 77, 109, int(80 * alpha))
-        painter.setPen(QPen(glow_pen_col, 4.0))
-        painter.drawRoundedRect(pill_rect.adjusted(-2, -2, 2, 2), (pill_h + 4) / 2.0, (pill_h + 4) / 2.0)
+        if alpha > 0.01:
+            # 1. Transient arrival toast: full text in bottom-left corner
+            text = getattr(self, "_dtc_toast_text", "DTC ACTIVE")
+            pill_w = max(220.0, min(360.0, w * 0.38))
+            pill_rect = QRectF(margin_x, margin_y, pill_w, pill_h)
 
-        # Centered text: ⚠️ FAULT: [DTC_TEXT]
-        text_col = QColor(255, 163, 180, int(255 * alpha))
-        painter.setPen(text_col)
-        font = QFont("Segoe UI", max(8, min(12, int(r * 0.076))), QFont.Weight.Bold)
-        font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
-        painter.setFont(font)
-        painter.drawText(pill_rect, Qt.AlignmentFlag.AlignCenter, f"⚠️ {text}")
+            bg_col = QColor(28, 6, 10, int(235 * alpha))
+            border_col = QColor(255, 77, 109, int(230 * alpha))
+
+            painter.setBrush(QBrush(bg_col))
+            painter.setPen(QPen(border_col, 1.6))
+            painter.drawRoundedRect(pill_rect, 6.0, 6.0)
+
+            # Red warning ambient glow
+            glow_pen_col = QColor(255, 77, 109, int(70 * alpha))
+            painter.setPen(QPen(glow_pen_col, 3.5))
+            painter.drawRoundedRect(pill_rect.adjusted(-2, -2, 2, 2), 7.0, 7.0)
+
+            text_col = QColor(255, 163, 180, int(255 * alpha))
+            painter.setPen(text_col)
+            font = QFont("Segoe UI", max(8, min(11, int(pill_h * 0.38))), QFont.Weight.Bold)
+            font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
+            painter.setFont(font)
+            painter.drawText(pill_rect.adjusted(10, 0, -10, 0), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"⚠️ FAULT: {text}")
+
+        elif active_dtcs:
+            # 2. Persistent compact MIL indicator in bottom-left corner
+            first_w = active_dtcs[0]
+            count_str = f" [{len(active_dtcs)}]" if len(active_dtcs) > 1 else ""
+            label_text = f"⚠️ DTC{count_str}: {first_w}"
+
+            pill_w = max(180.0, min(280.0, w * 0.32))
+            pill_rect = QRectF(margin_x, margin_y, pill_w, pill_h)
+
+            bg_col = QColor(22, 6, 9, 215)
+            border_col = QColor(255, 77, 109, 180)
+
+            painter.setBrush(QBrush(bg_col))
+            painter.setPen(QPen(border_col, 1.2))
+            painter.drawRoundedRect(pill_rect, 6.0, 6.0)
+
+            painter.setPen(QColor("#FFA3B4"))
+            font = QFont("Segoe UI", max(8, min(10, int(pill_h * 0.36))), QFont.Weight.Bold)
+            painter.setFont(font)
+            painter.drawText(pill_rect.adjusted(8, 0, -8, 0), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, label_text)
+
         painter.restore()
 
     def paintEvent(self, event) -> None:
@@ -488,10 +521,7 @@ class SpeedometerDialWidget(QWidget):
         try:
             w = self.width()
             h = self.height()
-            if getattr(self, "cluster_theme", "OLED") == "OLED":
-                self._paint_oled_theme(painter, w, h)
-            else:
-                self._paint_classic_theme(painter, w, h)
+            self._paint_oled_theme(painter, w, h)
         finally:
             painter.end()
 
@@ -506,8 +536,7 @@ class SpeedometerDialWidget(QWidget):
             self._draw_center_pod(painter, w / 2.0, h / 2.0, min(w, h) * 0.44)
             if getattr(self, "_palette_toast_alpha", 0.0) > 0.01:
                 self._draw_palette_toast(painter, w / 2.0, h / 2.0, min(w, h) * 0.44)
-            elif getattr(self, "_dtc_toast_alpha", 0.0) > 0.01:
-                self._draw_dtc_toast(painter, w / 2.0, h / 2.0, min(w, h) * 0.44)
+            self._draw_dtc_hud(painter, w, h)
             return
 
         # 2. Geometry for 3-Pod Instrument Binnacle
@@ -535,8 +564,9 @@ class SpeedometerDialWidget(QWidget):
         # 6. Centered Glassmorphic Palette Overlay Notification (if active)
         if getattr(self, "_palette_toast_alpha", 0.0) > 0.01:
             self._draw_palette_toast(painter, cx, cy_center, center_r)
-        elif getattr(self, "_dtc_toast_alpha", 0.0) > 0.01:
-            self._draw_dtc_toast(painter, cx, cy_center, center_r)
+
+        # 7. Non-Invasive Bottom-Left Corner Fault HUD
+        self._draw_dtc_hud(painter, w, h)
 
     def _draw_flowing_cowl(
         self, painter: QPainter, cx_l: float, cy_l: float, r_l: float,
@@ -832,42 +862,42 @@ class SpeedometerDialWidget(QWidget):
             painter.setPen(QPen(soc_col if is_passed else QColor(10, 32, 22, 220), 1.2))
             painter.drawLine(QPointF(tx1, ty1), QPointF(tx2, ty2))
 
-        # 5. Top Center Vector EV Battery Icon
-        icon_w = max(18.0, r * 0.16)
+        # 5. Top Center Vector EV Battery Icon (Normalized vertical rhythm)
+        icon_w = max(22.0, r * 0.20)
         icon_h = icon_w * 0.50
         icon_x = cx - (icon_w / 2.0)
-        icon_y = cy - r * 0.56
-        painter.setPen(QPen(soc_col, 1.2))
+        icon_y = cy - r * 0.45
+        painter.setPen(QPen(soc_col, 1.3))
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRoundedRect(QRectF(icon_x, icon_y, icon_w, icon_h), 1.5, 1.5)
+        painter.drawRoundedRect(QRectF(icon_x, icon_y, icon_w, icon_h), 2.0, 2.0)
         # Terminal nub
         painter.fillRect(QRectF(icon_x + icon_w, icon_y + (icon_h * 0.25), 2.0, icon_h * 0.50), soc_col)
         # Inner fill level
-        fill_w = max(0.0, (icon_w - 3.0) * soc_ratio)
+        fill_w = max(0.0, (icon_w - 3.2) * soc_ratio)
         if fill_w > 0:
-            painter.fillRect(QRectF(icon_x + 1.5, icon_y + 1.5, fill_w, icon_h - 3.0), soc_col)
+            painter.fillRect(QRectF(icon_x + 1.6, icon_y + 1.6, fill_w, icon_h - 3.2), soc_col)
 
-        # 6. Central Large Digital SoC Numerals & Tag
+        # 6. Central Large Digital SoC Numerals & Tag (Proper breathing room, zero collision)
         disp_soc = int(round(soc_ratio * 100.0))
-        font_soc = QFont("Segoe UI", max(22, min(50, int(r * 0.32))), QFont.Weight.Bold)
+        font_soc = QFont("Segoe UI", max(20, min(44, int(r * 0.28))), QFont.Weight.Bold)
         painter.setFont(font_soc)
         painter.setPen(COLOR_TEXT_PRIMARY)
-        soc_rect = QRectF(cx - r * 0.50, cy - r * 0.28, r * 1.0, r * 0.34)
+        soc_rect = QRectF(cx - r * 0.50, cy - r * 0.22, r * 1.0, r * 0.28)
         painter.drawText(soc_rect, Qt.AlignmentFlag.AlignCenter, f"{disp_soc}%")
 
         font_sub = QFont("Segoe UI", max(6, min(10, int(r * 0.068))), QFont.Weight.Bold)
         font_sub.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
         painter.setFont(font_sub)
         painter.setPen(soc_col)
-        sub_tag_rect = QRectF(cx - r * 0.40, cy + r * 0.04, r * 0.80, r * 0.12)
+        sub_tag_rect = QRectF(cx - r * 0.40, cy + r * 0.07, r * 0.80, r * 0.11)
         painter.drawText(sub_tag_rect, Qt.AlignmentFlag.AlignCenter, "BATTERY")
 
         # 7. Prominent Estimated Range Pill Badge
         range_mi = int(round(soc_ratio * 261.0))
         badge_w = r * 0.72
-        badge_h = max(16.0, r * 0.18)
+        badge_h = max(16.0, r * 0.17)
         badge_x = cx - (badge_w / 2.0)
-        badge_y = cy + r * 0.18
+        badge_y = cy + r * 0.22
         badge_rect = QRectF(badge_x, badge_y, badge_w, badge_h)
         painter.setBrush(QBrush(self.palette.dim))
         painter.setPen(QPen(self.palette.border, 1.0))
@@ -1129,20 +1159,21 @@ class SpeedometerDialWidget(QWidget):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawEllipse(QPointF(px, py), 2.5, 2.5)
 
-        # 8. Bottom Center Readouts (Gear, Drive Mode, Odometer)
-        gear_y = cy + r * 0.82
+        # 8. Bottom Center Readouts (Gear, Drive Mode, Odometer - Balanced & Centered)
+        gear_y = cy + r * 0.80
+        badge_w = r * 0.30
         painter.setFont(QFont("Segoe UI", max(8, min(14, int(r * 0.090))), QFont.Weight.Bold))
         painter.setPen(self.palette.secondary)
-        painter.drawText(QRectF(cx - r * 0.40, gear_y, r * 0.35, 18), Qt.AlignmentFlag.AlignRight, self.active_gear)
+        painter.drawText(QRectF(cx - r * 0.42, gear_y, badge_w, 18), Qt.AlignmentFlag.AlignRight, self.active_gear)
 
         mode_char = self.drive_mode[0] if self.drive_mode else "D"
         painter.setPen(self.palette.primary)
-        painter.drawText(QRectF(cx - r * 0.02, gear_y, r * 0.20, 18), Qt.AlignmentFlag.AlignLeft, mode_char)
+        painter.drawText(QRectF(cx - r * 0.07, gear_y, r * 0.14, 18), Qt.AlignmentFlag.AlignCenter, mode_char)
 
-        odo_str = f"{int(round(self.trip_dist_mi)):06d} mi"
-        painter.setFont(QFont("Segoe UI", max(8, min(13, int(r * 0.076))), QFont.Weight.Bold))
+        odo_str = f"{int(round(self.trip_dist_mi)):05d} mi"
+        painter.setFont(QFont("Segoe UI", max(7, min(12, int(r * 0.074))), QFont.Weight.Bold))
         painter.setPen(self.palette.highlight)
-        painter.drawText(QRectF(cx + r * 0.38, gear_y, r * 0.60, 18), Qt.AlignmentFlag.AlignLeft, odo_str)
+        painter.drawText(QRectF(cx + r * 0.12, gear_y, r * 0.42, 18), Qt.AlignmentFlag.AlignLeft, odo_str)
 
     def _paint_classic_theme(self, painter: QPainter, w: int, h: int) -> None:
         """Renders Classic Dial Theme (shift LED light strip removed)."""
@@ -3932,31 +3963,23 @@ class VoltesseDashboard(QMainWindow):
             )
         return self.palette_key
 
-    def set_cluster_theme(self, theme: str) -> None:
-        """Sets the visual theme for the cluster ('OLED' or 'CLASSIC')."""
-        self.cluster_theme = theme.upper().strip()
+    def set_cluster_theme(self, theme: str = "OLED") -> None:
+        """Standardized exclusively to OLED 3-Pod Cyber Binnacle across all pages."""
+        self.cluster_theme = "OLED"
         if hasattr(self, "speed_gauge") and hasattr(self.speed_gauge, "set_cluster_theme"):
-            self.speed_gauge.set_cluster_theme(self.cluster_theme)
+            self.speed_gauge.set_cluster_theme("OLED")
         for pod in getattr(self, "compact_speed_pods", []):
             if hasattr(pod, "set_cluster_theme"):
-                pod.set_cluster_theme(self.cluster_theme)
+                pod.set_cluster_theme("OLED")
         for hero in (getattr(self, "battery_hero", None), getattr(self, "powertrain_hero", None), getattr(self, "tpms_widget", None)):
             if hero and hasattr(hero, "set_cluster_theme"):
-                hero.set_cluster_theme(self.cluster_theme)
+                hero.set_cluster_theme("OLED")
         self._apply_cluster_theme_styles()
 
     def toggle_cluster_theme(self) -> str:
-        """Toggles between OLED Beta theme and Classic theme."""
-        new_theme = "CLASSIC" if self.cluster_theme == "OLED" else "OLED"
-        self.set_cluster_theme(new_theme)
-        if hasattr(self, "status_badge"):
-            self.status_badge.setText(f"THEME: {self.cluster_theme} BETA" if self.cluster_theme == "OLED" else "THEME: CLASSIC")
-            self.status_badge.setVisible(True)
-            QTimer.singleShot(
-                2000,
-                lambda: self.status_badge.setVisible(False) if not (hasattr(self, "_last_record") and self._last_record and self._last_record.warnings) else None,
-            )
-        return self.cluster_theme
+        """Lock cluster to modern customizable OLED speedometer design."""
+        self.set_cluster_theme("OLED")
+        return "OLED"
 
     def _apply_cluster_theme_styles(self) -> None:
         """Applies global styling tokens matching the active cluster theme."""
@@ -4175,6 +4198,8 @@ class VoltesseDashboard(QMainWindow):
             self.speed_gauge.show_dtc_toast(latest_new)
 
         self._known_warnings = curr_warnings
+        if hasattr(self, "speed_gauge") and hasattr(self.speed_gauge, "set_active_dtcs"):
+            self.speed_gauge.set_active_dtcs(record.warnings or [])
 
         if record.warnings:
             first_w = record.warnings[0]
@@ -4357,9 +4382,6 @@ class VoltesseDashboard(QMainWindow):
             return
         elif key == Qt.Key.Key_X:
             self.toggle_wing_swap()
-            return
-        elif key == Qt.Key.Key_B:
-            self.toggle_cluster_theme()
             return
         elif key == Qt.Key.Key_P:
             self.cycle_palette()

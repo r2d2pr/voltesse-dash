@@ -128,6 +128,36 @@ function Brand() {
   );
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('Tab render error:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="notice danger" style={{ marginTop: 20 }}>
+          <AlertTriangle size={18} />
+          <div>
+            <strong>Encountered an error displaying this view.</strong>
+            <p style={{ marginTop: 4, fontSize: 12, color: '#FFA3B4' }}>{this.state.error?.message || 'Unknown view error'}</p>
+            <button className="text-button" style={{ marginTop: 8 }} onClick={() => this.setState({ hasError: false })}>
+              Try reload view
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function ErrorBox({ error }) {
   return (
     <div role="alert" className="notice danger">
@@ -755,7 +785,7 @@ function Sessions({ api, onSelect, selected }) {
           </thead>
           <tbody>
             {data.map(s => {
-              const maxF = s.max_temp != null ? round((s.max_temp * 9 / 5) + 32, 1) : null;
+              const maxF = s.max_temp != null ? Math.round((s.max_temp * 9 / 5) + 32) : null;
               return (
                 <tr key={s.id} className={selected === s.id ? 'selected' : ''}>
                   <td><strong>#{s.id}</strong><small>{s.driver_identifier || 'Driver not specified'}</small></td>
@@ -1196,19 +1226,21 @@ export default function App() {
 
         <div className="page-content">
           {error && <ErrorBox error={error} />}
-          {!prefs ? (
-            <Loading />
-          ) : page === 'Live' ? (
-            <Live api={api} prefs={prefs} />
-          ) : page === 'Sessions' ? (
-            <Sessions api={api} selected={selected} onSelect={id => { setSelected(id); setPage('Diagnostics'); }} />
-          ) : page === 'Diagnostics' ? (
-            <Diagnostics api={api} prefs={prefs} selected={selected} onSelect={setSelected} />
-          ) : page === 'Settings' ? (
-            <Settings api={api} prefs={prefs} onSaved={setPrefs} />
-          ) : (
-            <Backups api={api} />
-          )}
+          <ErrorBoundary key={page}>
+            {!prefs ? (
+              <Loading />
+            ) : page === 'Live' ? (
+              <Live api={api} prefs={prefs} />
+            ) : page === 'Sessions' ? (
+              <Sessions api={api} selected={selected} onSelect={id => { setSelected(id); setPage('Diagnostics'); }} />
+            ) : page === 'Diagnostics' ? (
+              <Diagnostics api={api} prefs={prefs} selected={selected} onSelect={setSelected} />
+            ) : page === 'Settings' ? (
+              <Settings api={api} prefs={prefs} onSaved={setPrefs} />
+            ) : (
+              <Backups api={api} />
+            )}
+          </ErrorBoundary>
         </div>
 
         <footer>

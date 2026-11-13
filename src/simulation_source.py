@@ -392,14 +392,12 @@ class SimulationTelemetryStream(QThread):
         self.trip_distance_km += dist_delta
 
     def _build_record(self) -> TelemetryRecord:
-        warnings: List[str] = []
-        if self.battery_soc < 15.0:
+        warnings: List[str] = list(getattr(self, "warnings", []))
+        if self.battery_soc < 15.0 and "LOW BATTERY" not in warnings:
             warnings.append("LOW BATTERY")
-        if self.battery_temp_c > 45.0 or self.motor_temp_c > 85.0 or self.inverter_temp_c > 75.0:
+        if (self.battery_temp_c > 45.0 or self.motor_temp_c > 85.0 or self.inverter_temp_c > 75.0) and "THERMAL WARNING" not in warnings:
             warnings.append("THERMAL WARNING")
-        if self.speed_kmh > 150.0:
-            warnings.append("HIGH SPEED")
-        if self.battery_current < -70.0:
+        if self.battery_current < -70.0 and "HIGH REGEN" not in warnings:
             warnings.append("HIGH REGEN")
 
         return TelemetryRecord(
