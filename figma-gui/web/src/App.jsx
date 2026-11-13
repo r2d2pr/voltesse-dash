@@ -29,7 +29,7 @@ function Brand(){return <div className="brand"><div className="brand-symbol"><Za
 function ErrorBox({error}){return <div role="alert" className="notice danger"><AlertTriangle size={17}/>{error.message || error}</div>;}
 function Loading(){return <div className="empty"><RefreshCw size={20} className="spin"/> Loading data…</div>;}
 function fmt(value, digits=1){return value == null ? '—' : Number(value).toLocaleString(undefined,{maximumFractionDigits:digits});}
-function date(value){return new Date(value).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'});}
+function date(value){return new Date(value).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'medium'});}
 function duration(seconds){return `${Math.floor(Number(seconds)/60)}:${String(Math.floor(Number(seconds)%60)).padStart(2,'0')}`;}
 function Plot({title,subtitle,data,color='#c88721',limit,height=215}){
   return <section className="panel plot"><div className="panel-heading"><div><h3>{title}</h3><p>{subtitle}</p></div><Activity size={17}/></div>
@@ -49,20 +49,67 @@ function Login({onLogin,initialError}){
 const PAGES=[['Live','Live telemetry',Activity],['Diagnostics','Diagnostics',Wrench],['Sessions','Sessions',History],['Settings','Settings',Settings2],['Backups','Backups',Database]];
 function Live({api,prefs}){
   const [t,setT]=useState(30),[playing,setPlaying]=useState(false);
-  const {data,error}=useResource('live:'+t,()=>api('/live?t='+t),2000);
+  const [wsData,setWsData]=useState(null);
+  const [wsActive,setWsActive]=useState(false);
+  const {data:pollData,error:pollError}=useResource('live:'+t,()=>api('/live?t='+t), wsActive ? 0 : 1000);
+
+  useEffect(()=>{
+    let ws;
+    let timer;
+    let deadCheck;
+    function connect(){
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const url = `${proto}//${location.host}/api/ws/telemetry`;
+      ws = new WebSocket(url);
+      ws.onopen = () => {};
+      ws.onmessage = (e) => {
+        try {
+          const frame = JSON.parse(e.data);
+          setWsData(frame);
+          setWsActive(true);
+        } catch(err){}
+      };
+      ws.onerror = () => { try { ws.close(); } catch(err){} };
+      ws.onclose = () => {
+        setWsActive(false);
+        timer = setTimeout(connect, 2000);
+      };
+    }
+    connect();
+
+    deadCheck = setInterval(() => {
+      setWsData(current => {
+        if (!current) return current;
+        const age = (Date.now() - new Date(current.timestamp).getTime()) / 1000;
+        if (age > 3.0) setWsActive(false);
+        return current;
+      });
+    }, 1000);
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(deadCheck);
+      if (ws) ws.close();
+    };
+  }, []);
+
+  const data = wsActive && wsData ? wsData : pollData;
+  const error = pollError;
+
   useEffect(()=>{if(!playing)return;const id=setInterval(()=>setT(n=>{if(n>=120){setPlaying(false);return 120;}return n+1;}),1000);return()=>clearInterval(id);},[playing]);
-  if(error)return <ErrorBox error={error}/>;if(!data)return <Loading/>;
+  if(error && !data)return <ErrorBox error={error}/>;if(!data)return <Loading/>;
   const m=data.metrics;
+  const isStream = wsActive && wsData;
   const simulated=data.mode==='SIMULATION'||data.source_type==='SIMULATION';
   const hot=m?.temperature!=null&&m.temperature>=prefs.warning_temp;
   const low=m?.battery!=null&&m.battery<=prefs.warning_battery;
-  return <><div className="section-line"><div><h2>Vehicle overview</h2><p>Critical measurements, in one place.</p></div><span className={'pill '+(simulated?'amber':'')}><Radio size={13}/>{simulated?'SIMULATED':'DATABASE SOURCE'}</span></div>
+  return <><div className="section-line"><div><h2>Vehicle overview</h2><p>Critical measurements, in one place.</p></div><span className={'pill '+(isStream?'green':simulated?'amber':'')}><Radio size={13}/>{isStream?'LIVE (20 Hz · F1 PUSH)':simulated?'SIMULATED':'STANDBY (DATABASE)'}</span></div>
     {data.mode==='SIMULATION' && <div className="simulation-bar"><div><strong>Simulation time</strong><span>{t} seconds · adjust the development scenario</span></div><input aria-label="Simulation time" type="range" min="0" max="120" value={t} onChange={e=>{setPlaying(false);setT(Number(e.target.value));}}/><button className="icon-button" onClick={()=>setPlaying(!playing)} aria-label={playing?'Pause simulation':'Play simulation'}>{playing?<Pause size={18}/>:<Play size={18}/>}</button></div>}
     {data.stale && <div className="notice danger"><AlertTriangle size={17}/>Telemetry is unavailable or older than 5 seconds. Displayed values are not current.</div>}
-    <div className="metrics">{[['Speed',m?.speed,'MPH',Gauge],['Motor speed',m?.rpm,'RPM',Activity],['Battery',m?.battery,'%',Battery],['Motor temperature',m?.temperature,'°C',Thermometer],['Power draw',m?.power,'W',Zap]].map(([label,value,unit,Icon])=><section className="panel metric" key={label}><div className="metric-label">{label}<Icon size={19}/></div><div className="metric-value">{fmt(value,label==='Motor speed'||label==='Power draw'?0:1)}<small>{unit}</small></div><div className="metric-caption">{simulated?'Simulated reading':data.timestamp?date(data.timestamp):'No data'}</div></section>)}</div>
+    <div className="metrics">{[['Speed',m?.speed,'MPH',Gauge],['Motor speed',m?.rpm,'RPM',Activity],['Battery',m?.battery,'%',Battery],['Motor temperature',m?.temperature,'°C',Thermometer],['Power draw',m?.power,'W',Zap]].map(([label,value,unit,Icon])=><section className="panel metric" key={label}><div className="metric-label">{label}<Icon size={19}/></div><div className="metric-value">{fmt(value,label==='Motor speed'||label==='Power draw'?0:1)}<small>{unit}</small></div><div className="metric-caption">{isStream?'Live 20 Hz push stream':simulated?'Simulated reading':data.timestamp?date(data.timestamp):'No data'}</div></section>)}</div>
     <div className={'notice '+(hot||low?'danger':data.stale?'':'success')}>{hot||low?<AlertTriangle size={17}/>:data.stale?<Radio size={17}/>:<Check size={17}/>}<strong>{hot?'High motor temperature':low?'Low battery':data.stale?'Waiting for current telemetry':'Vehicle status: normal'}</strong><span>{hot&&low?'Low battery warning is also active.':`Warning limits: ${prefs.warning_temp} °C / ${prefs.warning_battery}% battery`}</span></div>
-    <Plot title="Motor temperature" subtitle="Last 60 seconds · time (s) / temperature (°C)" data={data.history.map(r=>({x:Number(r.seconds),y:r.temperature}))} limit={prefs.warning_temp} height={285}/>
-    <p className="footnote">{simulated?'Simulated data; these are not vehicle measurements or approved safety limits.':'Source: onboard telemetry database. Connection through the configured API.'}</p></>;
+    <Plot title="Motor temperature" subtitle="Last 60 seconds · time (s) / temperature (°C)" data={(data.history||[]).map(r=>({x:Number(r.seconds),y:r.temperature}))} limit={prefs.warning_temp} height={285}/>
+    <p className="footnote">{isStream?'Source: high-frequency memory stream (<15ms latency).':simulated?'Simulated data; these are not vehicle measurements or approved safety limits.':'Source: onboard telemetry database. Connection through the configured API.'}</p></>;
 }
 function Sessions({api,onSelect,selected}){
   const {data,error}=useResource('sessions',()=>api('/sessions'));

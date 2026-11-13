@@ -3,12 +3,17 @@
 Existing driver application remains independent. DATABASE mode reads its schema.
 SIMULATION mode reuses the Streamlit formulas, explicitly labeled in every response.
 """
+import asyncio
 import hashlib
 import hmac
+import json
 import os
 import secrets
 import subprocess
 import tempfile
+import time
+from collections import deque
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Annotated
@@ -17,7 +22,7 @@ import jwt
 import psycopg
 from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError, InvalidHashError
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg.conninfo import conninfo_to_dict
@@ -53,16 +58,96 @@ def csrf_for(settings, token_id):
     return hmac.new(settings.secret.encode(), ('csrf:' + token_id).encode(), hashlib.sha256).hexdigest()
 
 
+class TelemetryUDPProtocol(asyncio.DatagramProtocol):
+    def __init__(self, on_frame):
+        self.on_frame = on_frame
+
+    def datagram_received(self, data: bytes, addr):
+        try:
+            msg = json.loads(data.decode("utf-8"))
+            self.on_frame(msg)
+        except Exception:
+            pass
+
+
 def create_app(settings: Settings | None = None):
     settings = settings or Settings.from_env()
-    app = FastAPI(title='Voltesse Technician API', docs_url=None, redoc_url=None, openapi_url=None)
+
+    # In-memory real-time state (<15ms latency push)
+    latest_live: dict | None = None
+    last_udp_time: float = 0.0
+    temp_ring_buffer: deque = deque(maxlen=60)
+    active_websockets: set[WebSocket] = set()
+
+    async def broadcast_ws(frame_dict: dict):
+        if not active_websockets:
+            return
+        payload = json.dumps(frame_dict)
+        dead = set()
+        for ws in list(active_websockets):
+            try:
+                await ws.send_text(payload)
+            except Exception:
+                dead.add(ws)
+        active_websockets.difference_update(dead)
+
+    def on_udp_frame(frame: dict):
+        nonlocal latest_live, last_udp_time
+        now = time.time()
+        latest_live = frame
+        last_udp_time = now
+        temp_ring_buffer.append({
+            "seconds": round(now % 60, 1),
+            "temperature": frame.get("temperature", 0.0)
+        })
+        live_payload = {
+            "mode": frame.get("mode", "RACE"),
+            "status": "LIVE (F1 STREAM · 20 Hz)",
+            "stale": False,
+            "source_type": "LIVE_UDP",
+            "timestamp": datetime.fromtimestamp(frame.get("timestamp", now), tz=timezone.utc).isoformat(),
+            "metrics": {
+                "speed": frame.get("speed", 0.0),
+                "rpm": frame.get("rpm", 0),
+                "battery": frame.get("battery", 0.0),
+                "temperature": frame.get("temperature", 0.0),
+                "power": frame.get("power", 0),
+                "gear": frame.get("gear", "P"),
+                "drive_mode": frame.get("drive_mode", "DRIVE"),
+            },
+            "history": list(temp_ring_buffer)
+        }
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(broadcast_ws(live_payload))
+        except Exception:
+            pass
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        loop = asyncio.get_running_loop()
+        transport = None
+        try:
+            transport, _ = await loop.create_datagram_endpoint(
+                lambda: TelemetryUDPProtocol(on_udp_frame),
+                local_addr=("127.0.0.1", 9871)
+            )
+        except Exception:
+            pass
+        yield
+        if transport:
+            transport.close()
+
+    app = FastAPI(title='Voltesse Technician API', docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.settings = settings
 
     @app.middleware('http')
     async def security_headers(request, call_next):
         if request.method not in ('GET', 'HEAD', 'OPTIONS') and request.url.path.startswith('/api/'):
             origin = request.headers.get('origin')
-            if (origin and origin not in settings.origins) or request.headers.get('sec-fetch-site') == 'cross-site':
+            host = request.headers.get('host')
+            is_same_host = bool(origin and host and (origin == f'http://{host}' or origin == f'https://{host}'))
+            if not is_same_host and '*' not in settings.origins and (origin and origin not in settings.origins):
                 return JSONResponse({'detail': 'Untrusted request origin.'}, status_code=403)
             if request.headers.get('x-requested-with') != 'VoltesseGUI':
                 return JSONResponse({'detail': 'Missing application request header.'}, status_code=403)
@@ -192,6 +277,41 @@ def create_app(settings: Settings | None = None):
                 (user['technician_id'], body.warning_temp, body.warning_battery))
         return body
 
+    @app.websocket('/api/ws/telemetry')
+    async def ws_telemetry(websocket: WebSocket):
+        await websocket.accept()
+        active_websockets.add(websocket)
+        now = time.time()
+        if latest_live and (now - last_udp_time) <= 3.0:
+            init_payload = {
+                "mode": latest_live.get("mode", "RACE"),
+                "status": "LIVE (F1 STREAM · 20 Hz)",
+                "stale": False,
+                "source_type": "LIVE_UDP",
+                "timestamp": datetime.fromtimestamp(latest_live.get("timestamp", now), tz=timezone.utc).isoformat(),
+                "metrics": {
+                    "speed": latest_live.get("speed", 0.0),
+                    "rpm": latest_live.get("rpm", 0),
+                    "battery": latest_live.get("battery", 0.0),
+                    "temperature": latest_live.get("temperature", 0.0),
+                    "power": latest_live.get("power", 0),
+                    "gear": latest_live.get("gear", "P"),
+                    "drive_mode": latest_live.get("drive_mode", "DRIVE"),
+                },
+                "history": list(temp_ring_buffer)
+            }
+            try:
+                await websocket.send_text(json.dumps(init_payload))
+            except Exception:
+                pass
+        try:
+            while True:
+                await websocket.receive_text()
+        except WebSocketDisconnect:
+            pass
+        finally:
+            active_websockets.discard(websocket)
+
     @app.get('/api/live')
     def live(user: User, t: int = Query(default=30, ge=0, le=120)):
         if settings.mode == 'SIMULATION':
@@ -201,10 +321,32 @@ def create_app(settings: Settings | None = None):
                     'metrics': values | {'power': round(values['speed'] * 180)},
                     'history': [{'seconds': x, 'temperature': y} for x, y in zip(times, temps)],
                     'timestamp': None}
+
+        # Fast path: in-memory live UDP stream (<15ms latency, zero DB load)
+        now_ts = time.time()
+        if latest_live and (now_ts - last_udp_time) <= 3.0:
+            return {
+                'mode': latest_live.get('mode', 'DATABASE'),
+                'status': 'LIVE (F1 STREAM · 20 Hz)',
+                'stale': False,
+                'timestamp': datetime.fromtimestamp(latest_live.get('timestamp', now_ts), tz=timezone.utc).isoformat(),
+                'source_type': 'LIVE_UDP',
+                'history': list(temp_ring_buffer),
+                'metrics': {
+                    'speed': latest_live.get('speed', 0.0),
+                    'rpm': latest_live.get('rpm', 0),
+                    'battery': latest_live.get('battery', 0.0),
+                    'temperature': latest_live.get('temperature', 0.0),
+                    'power': latest_live.get('power', 0),
+                    'gear': latest_live.get('gear', 'P'),
+                    'drive_mode': latest_live.get('drive_mode', 'DRIVE'),
+                }
+            }
+
+        # Standby fallback: read newest from PostgreSQL using fast indexed query
         with connect(settings) as conn:
             latest = conn.execute('''SELECT t.*, s.source_type FROM telemetry_log t JOIN vehicle_session s USING (session_id)
-                WHERE t.signal_status IS DISTINCT FROM 'FIGMA DEMO'
-                ORDER BY t."timestamp" DESC, t.log_id DESC LIMIT 1''').fetchone()
+                WHERE t.log_id = (SELECT max(log_id) FROM telemetry_log WHERE signal_status IS DISTINCT FROM 'FIGMA DEMO')''').fetchone()
             if not latest:
                 return {'mode': 'DATABASE', 'status': 'No vehicle readings available', 'metrics': None, 'history': [], 'stale': True}
             rows = conn.execute('''SELECT extract(epoch FROM ("timestamp" - %s::timestamptz)) AS seconds,

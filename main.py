@@ -8,10 +8,13 @@ as well as runtime write access controls and session export capabilities.
 """
 
 import argparse
+import json
 import logging
 import os
 import signal
+import socket
 import sys
+import time
 from typing import Optional
 
 # Prevent Qt from auto-zooming or applying fractional High-DPI scaling
@@ -225,8 +228,36 @@ class VoltesseApp:
         self._total_distance = 0.0
         self._final_soc = 88.5
 
+        # UDP Broadcaster for real-time pit-wall stream (20 Hz)
+        self._udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._udp_target = ("127.0.0.1", 9871)
+        self._last_udp_broadcast = 0.0
+        self._udp_interval = 0.05  # 20 Hz (50 ms)
+
         # 5. Activate Default Mode (Default: RACE)
         self.switch_mode(initial_mode)
+
+    def _broadcast_telemetry_udp(self, record) -> None:
+        """Broadcasts live telemetry over local UDP loopback at 20 Hz."""
+        now = time.time()
+        if (now - self._last_udp_broadcast) < self._udp_interval:
+            return
+        self._last_udp_broadcast = now
+        try:
+            payload = json.dumps({
+                "speed": round(getattr(record, "speed_mph", 0.0) or 0.0, 1),
+                "rpm": int(getattr(record, "motor_rpm", 0) or 0),
+                "battery": round(getattr(record, "battery_percent", 0.0) or 0.0, 1),
+                "temperature": round(getattr(record, "motor_temperature", 0.0) or 0.0, 1),
+                "power": round(getattr(record, "power_draw_watts", 0.0) or 0.0),
+                "gear": getattr(record, "gear", "P") or "P",
+                "drive_mode": getattr(record, "drive_mode", "DRIVE") or "DRIVE",
+                "timestamp": now,
+                "mode": self.current_mode,
+            }).encode("utf-8")
+            self._udp_sock.sendto(payload, self._udp_target)
+        except Exception:
+            pass  # Non-blocking fire-and-forget; never stall vehicle GUI
 
     def switch_mode(self, mode: str) -> None:
         """
@@ -247,6 +278,7 @@ class VoltesseApp:
                 self.can_stream.telemetry_received.disconnect(self.gui.update_telemetry)
                 self.can_stream.telemetry_received.disconnect(self.db_manager.log_telemetry)
                 self.can_stream.telemetry_received.disconnect(self._track_stats)
+                self.can_stream.telemetry_received.disconnect(self._broadcast_telemetry_udp)
             except Exception:
                 pass
             if self.can_stream.isRunning():
@@ -257,6 +289,7 @@ class VoltesseApp:
                 self.sim_stream.telemetry_received.disconnect(self.gui.update_telemetry)
                 self.sim_stream.telemetry_received.disconnect(self.db_manager.log_telemetry)
                 self.sim_stream.telemetry_received.disconnect(self._track_stats)
+                self.sim_stream.telemetry_received.disconnect(self._broadcast_telemetry_udp)
             except Exception:
                 pass
             if self.sim_stream.isRunning():
@@ -267,6 +300,7 @@ class VoltesseApp:
                 self.test_stream.telemetry_received.disconnect(self.gui.update_telemetry)
                 self.test_stream.telemetry_received.disconnect(self.db_manager.log_telemetry)
                 self.test_stream.telemetry_received.disconnect(self._track_stats)
+                self.test_stream.telemetry_received.disconnect(self._broadcast_telemetry_udp)
             except Exception:
                 pass
             if self.test_stream.isRunning():
@@ -278,6 +312,7 @@ class VoltesseApp:
             self.can_stream.telemetry_received.connect(self.gui.update_telemetry)
             self.can_stream.telemetry_received.connect(self.db_manager.log_telemetry)
             self.can_stream.telemetry_received.connect(self._track_stats)
+            self.can_stream.telemetry_received.connect(self._broadcast_telemetry_udp)
             if not self.can_stream.isRunning():
                 self.can_stream.start()
 
@@ -285,6 +320,7 @@ class VoltesseApp:
             self.sim_stream.telemetry_received.connect(self.gui.update_telemetry)
             self.sim_stream.telemetry_received.connect(self.db_manager.log_telemetry)
             self.sim_stream.telemetry_received.connect(self._track_stats)
+            self.sim_stream.telemetry_received.connect(self._broadcast_telemetry_udp)
             if not self.sim_stream.isRunning():
                 self.sim_stream.start()
 
@@ -292,6 +328,7 @@ class VoltesseApp:
             self.test_stream.telemetry_received.connect(self.gui.update_telemetry)
             self.test_stream.telemetry_received.connect(self.db_manager.log_telemetry)
             self.test_stream.telemetry_received.connect(self._track_stats)
+            self.test_stream.telemetry_received.connect(self._broadcast_telemetry_udp)
             if not self.test_stream.isRunning():
                 self.test_stream.start()
 
@@ -433,6 +470,13 @@ class VoltesseApp:
 
         # Flush batched writes and close database
         self.db_manager.close()
+
+        # Close UDP broadcast socket
+        try:
+            self._udp_sock.close()
+        except Exception:
+            pass
+
         logger.info("Shutdown complete.")
 
 

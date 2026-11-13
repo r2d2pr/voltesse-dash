@@ -1,0 +1,16 @@
+[Unit]
+Description=Voltesse Technician Interface (FastAPI / Figma GUI)
+After=network-online.target postgresql.service voltesse-dash.service
+Wants=postgresql.service voltesse-dash.service
+
+[Service]
+Type=simple
+User=admin
+WorkingDirectory=/home/admin/voltesse-dash/figma-gui
+EnvironmentFile=/home/admin/voltesse-dash/figma-gui/.env
+ExecStart=/home/admin/voltesse-dash/figma-gui/.venv/bin/python -m uvicorn backend.app:create_app --factory --host 0.0.0.0 --port 8501
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
