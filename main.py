@@ -675,8 +675,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--interval-ms",
         type=int,
-        default=40,
-        help="Telemetry poll interval in milliseconds (default: 40ms = 25Hz)",
+        default=50,
+        help="Telemetry poll interval in milliseconds (default: 50ms = 20Hz)",
     )
     parser.add_argument(
         "--batch-size",

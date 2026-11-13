@@ -29,7 +29,7 @@ class MockTelemetryStream(QThread):
 
     def __init__(
         self,
-        update_interval_ms: int = 40,
+        update_interval_ms: int = 50,
         parent: Optional[QObject] = None,
     ):
         super().__init__(parent)
