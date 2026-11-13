@@ -1,8 +1,8 @@
-# Voltesse Dash ⚡ v6.0.0
+# Voltesse Dash ⚡ v6.1.0
 
 > **Authenticated Figma Technician Interface:** See [figma-gui/README.md](figma-gui/README.md) for the React/Vite laptop GUI, FastAPI backend, local setup, and [Figma handoff](figma-gui/FIGMA_HANDOFF.md).
 
-[![Version](https://img.shields.io/badge/version-6.0.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
+[![Version](https://img.shields.io/badge/version-6.1.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/PyQt-6-green.svg)](https://riverbankcomputing.com/software/pyqt/)
 [![Web](https://img.shields.io/badge/FastAPI%20%7C%20React%2019-20Hz%20F1%20Push-00F5D4.svg)](figma-gui/)
@@ -10,7 +10,25 @@
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 6.0.0 delivers full hardware CAN HAT integration (Waveshare RS485 CAN HAT via SocketCAN at 500k baud), real-time 20Hz F1 telemetry streaming, driver cluster normalization, and persistent automotive telltale DTC warning lamps. Built with **Python**, **PyQt6**, **FastAPI**, **React 19**, **python-can**, and **PostgreSQL**.
+A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 6.1.0 delivers technician driver profile assignment with real-time cockpit uplink, single/batch/all session deletion controls, normalized telemetry persistence, and streamlined dashboard settings. Built with **Python**, **PyQt6**, **FastAPI**, **React 19**, **python-can**, and **PostgreSQL**.
+
+---
+
+## What's New in Version 6.1.0 🏁
+
+- 👤 **Driver Profile Assignment & Cockpit Telecommand Uplink**:
+  - Live driver name input directly inside Technician Portal on both **Sessions** and **Live Pit-Wall Console** tabs.
+  - Two-way UDP telecommand dispatch (`SET_DRIVER_NAME`) to embedded cockpit cluster on loopback port 9872.
+  - Persistent database tracking in `vehicle_session.driver_identifier` and ongoing real-time telemetry streaming frames.
+- 🗑️ **Comprehensive Session Deletion & Database Management**:
+  - Single session deletion with row-level action button `[ 🗑️ ]` and foreign key cascade to `telemetry_log`.
+  - Batch multi-select deletion with master select/deselect-all and selected count badge (`Delete Selected ({N})`).
+  - One-click danger **Clear All Sessions** database wipe executing `TRUNCATE TABLE telemetry_log, vehicle_session RESTART IDENTITY CASCADE`.
+- 🎨 **Technician GUI Streamlining**:
+  - Removed redundant cluster OLED simulation dial preview from Settings tab.
+  - Added responsive 4-column pit-wall telecommand grid with active driver display and status toast feedback.
+- 🧪 **Expanded Unit Test Suite**:
+  - 38 automated test cases passing with 100% green status, including coverage for driver updates, cascade deletion, batch deletion, and session clearing.
 
 ---
 
@@ -102,7 +120,7 @@ voltesse-dash/
 ├── data/
 │   └── exports/               # Generated CSV & JSON session dumps (auto-created)
 ├── src/
-│   ├── __init__.py            # Package version (v6.0.0)
+│   ├── __init__.py            # Package version (v6.1.0)
 │   ├── can_bus_source.py      # CAN Bus interface, frame decoders, and synchronized mock transmitter
 │   ├── simulation_source.py   # Video-game interactive EV dynamics engine (W/A/S/D, 6-speed manual, D1-D6 auto)
 │   ├── telemetry_source.py    # Autonomous EV driving cycle telemetry stream (Test Mode, D1-D6 auto)
