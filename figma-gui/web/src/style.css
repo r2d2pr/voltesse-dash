@@ -1019,7 +1019,7 @@ footer {
 
 .pitwall-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   margin-top: 14px;
 }
@@ -1342,6 +1342,9 @@ tr.checked-row td {
 }
 
 @media(max-width: 1280px) {
+  .pitwall-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .metrics-6 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1366,6 +1369,9 @@ tr.checked-row td {
 }
 
 @media(max-width: 640px) {
+  .pitwall-grid {
+    grid-template-columns: 1fr;
+  }
   .sidebar {
     position: static;
     width: 100%;

@@ -306,6 +306,7 @@ function Live({ api, prefs }) {
   const [wsActive, setWsActive] = useState(false);
   const [cmdBusy, setCmdBusy] = useState(false);
   const [cmdStatus, setCmdStatus] = useState(null);
+  const [driverInputLive, setDriverInputLive] = useState('');
   const { data: pollData, error: pollError } = useResource('live:' + t, () => api('/live?t=' + t), wsActive ? 0 : 1000);
 
   async function sendCmd(cmd) {
@@ -709,6 +710,49 @@ function Live({ api, prefs }) {
               ))}
             </div>
             <small className="pitwall-hint">Limits peak high-voltage inverter output wattage.</small>
+          </div>
+
+          {/* Driver Name Assignment */}
+          <div className="pitwall-subcard">
+            <div className="pitwall-label"><User size={13} /> Driver Assignment</div>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const name = driverInputLive.trim();
+                if (!name) return;
+                setCmdBusy(true);
+                try {
+                  await sendCmd({ action: 'SET_DRIVER_NAME', value: name });
+                  await api('/sessions/driver', { method: 'POST', body: JSON.stringify({ name }) });
+                  setDriverInputLive('');
+                } finally {
+                  setCmdBusy(false);
+                }
+              }}
+              style={{ display: 'flex', gap: '6px' }}
+            >
+              <input
+                type="text"
+                className="driver-input"
+                style={{ flex: 1, minWidth: 0, padding: '6px 8px', fontSize: '11px' }}
+                placeholder={m.driver ? `Current: ${m.driver}` : 'Enter driver...'}
+                value={driverInputLive}
+                onChange={e => setDriverInputLive(e.target.value)}
+                disabled={cmdBusy}
+                maxLength={64}
+              />
+              <button
+                type="submit"
+                className="btn-mode active"
+                style={{ padding: '6px 12px', flex: '0 0 auto', cursor: 'pointer' }}
+                disabled={cmdBusy || !driverInputLive.trim()}
+              >
+                Set
+              </button>
+            </form>
+            <small className="pitwall-hint">
+              Active Driver: <strong style={{ color: 'var(--v-highlight)' }}>{m.driver || 'Driver 1'}</strong>
+            </small>
           </div>
         </div>
 
@@ -1240,56 +1284,6 @@ function Settings({ api, prefs, onSaved }) {
           <div className="matrix-subcard">
             <label>OLED Contrast</label>
             <strong style={{ color: '#00F5D4' }}>{activeP.contrast}</strong>
-          </div>
-        </div>
-
-        {/* SVG High-Fidelity Cluster Dial Preview */}
-        <div style={{ background: '#000000', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: 18, marginTop: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.08em' }}>
-              CLUSTER OLED SIMULATION PREVIEW — {activeP.name}
-            </span>
-            <span style={{ background: 'rgba(255,255,255,0.08)', color: activeP.primary, fontSize: 10, fontFamily: 'monospace', padding: '2px 8px', borderRadius: 4, border: `1px solid ${activeP.primary}60` }}>
-              HOTKEY [P] AUTO-CYCLE
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            {/* Left Pod: Tachometer */}
-            <div style={{ flex: 1, minWidth: 130, maxWidth: 170, textAlign: 'center', background: 'rgba(12,18,22,0.6)', borderRadius: 8, padding: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
-              <svg viewBox="0 0 100 100" style={{ width: 90, height: 90, margin: '0 auto', display: 'block' }}>
-                <path d="M 20 80 A 42 42 0 1 1 80 80" fill="none" stroke="#1A242B" strokeWidth="6" strokeLinecap="round" />
-                <path d="M 20 80 A 42 42 0 0 1 65 24" fill="none" stroke={activeP.primary} strokeWidth="6" strokeLinecap="round" />
-                <path d="M 68 22 A 42 42 0 0 1 80 80" fill="none" stroke="#FF4D6D" strokeWidth="6" strokeLinecap="round" />
-                <text x="50" y="52" fill="#FFFFFF" fontSize="14" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">4.2</text>
-                <text x="50" y="66" fill={activeP.highlight} fontSize="8" fontFamily="sans-serif" textAnchor="middle">x1000 RPM</text>
-              </svg>
-              <div style={{ fontSize: 10, color: '#94A3B8', marginTop: 4 }}>TACHOMETER &amp; REDLINE</div>
-            </div>
-
-            {/* Center Pod: Speedometer */}
-            <div style={{ flex: 1.4, minWidth: 170, maxWidth: 220, textAlign: 'center', background: 'rgba(12,18,22,0.8)', borderRadius: 8, padding: 14, border: `1px solid ${activeP.primary}50`, boxShadow: `0 0 15px ${activeP.primary}25` }}>
-              <svg viewBox="0 0 120 120" style={{ width: 110, height: 110, margin: '0 auto', display: 'block' }}>
-                <circle cx="60" cy="60" r="54" fill="none" stroke={activeP.dim} strokeWidth="4" />
-                <circle cx="60" cy="60" r="48" fill="none" stroke="#1A242B" strokeWidth="3" />
-                <path d="M 22 98 A 48 48 0 1 1 98 98" fill="none" stroke={activeP.primary} strokeWidth="4" strokeDasharray="2 4" />
-                <text x="60" y="56" fill="#FFFFFF" fontSize="26" fontWeight="900" fontFamily="sans-serif" textAnchor="middle">70</text>
-                <text x="60" y="72" fill={activeP.highlight} fontSize="11" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">MPH</text>
-                <text x="60" y="88" fill={activeP.secondary} fontSize="8" fontFamily="monospace" textAnchor="middle">D3 • 009999 mi</text>
-              </svg>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#FFFFFF', marginTop: 4 }}>SPEEDOMETER CENTERPIECE</div>
-            </div>
-
-            {/* Right Pod: Battery & SoC */}
-            <div style={{ flex: 1, minWidth: 130, maxWidth: 170, textAlign: 'center', background: 'rgba(12,18,22,0.6)', borderRadius: 8, padding: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
-              <svg viewBox="0 0 100 100" style={{ width: 90, height: 90, margin: '0 auto', display: 'block' }}>
-                <path d="M 20 80 A 42 42 0 1 1 80 80" fill="none" stroke="#1A242B" strokeWidth="6" strokeLinecap="round" />
-                <path d="M 20 80 A 42 42 0 1 1 76 68" fill="none" stroke={activeP.primary} strokeWidth="6" strokeLinecap="round" />
-                <text x="50" y="50" fill="#FFFFFF" fontSize="16" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">85%</text>
-                <text x="50" y="65" fill={activeP.highlight} fontSize="8" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">222 mi</text>
-              </svg>
-              <div style={{ fontSize: 10, color: '#94A3B8', marginTop: 4 }}>STATE OF CHARGE</div>
-            </div>
           </div>
         </div>
       </section>
