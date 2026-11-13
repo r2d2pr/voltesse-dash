@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import {
   Activity, ArrowUpRight, Battery, Check, ChevronRight, Database,
   Gauge, History, LockKeyhole, LogOut, Radio, Settings2, ShieldCheck,
-  Thermometer, Wrench, Zap, Play, Pause, RefreshCw, Download, AlertTriangle, Palette, Cpu
+  Thermometer, Wrench, Zap, Play, Pause, RefreshCw, Download, AlertTriangle, Palette, Cpu,
+  Trash2, User, UserCheck
 } from 'lucide-react';
 import {
   ResponsiveContainer, LineChart, Line, AreaChart, Area, CartesianGrid,
@@ -769,31 +770,262 @@ function Live({ api, prefs }) {
 }
 
 function Sessions({ api, onSelect, selected }) {
-  const { data, error } = useResource('sessions', () => api('/sessions'));
+  const [version, setVersion] = useState(0);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [driverInput, setDriverInput] = useState('');
+  const [driverBusy, setDriverBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [statusMsg, setStatusMsg] = useState(null);
+
+  const { data, error } = useResource('sessions:' + version, () => api('/sessions'));
+
+  useEffect(() => {
+    if (!statusMsg) return;
+    const t = setTimeout(() => setStatusMsg(null), 4000);
+    return () => clearTimeout(t);
+  }, [statusMsg]);
+
   if (error) return <ErrorBox error={error} />;
   if (!data) return <Loading />;
+
+  const activeDriver = data[0]?.driver_identifier || 'Driver 1';
+
+  async function handleSetDriver(e) {
+    e?.preventDefault();
+    const name = driverInput.trim();
+    if (!name) return;
+    setDriverBusy(true);
+    try {
+      await api('/sessions/driver', {
+        method: 'POST',
+        body: JSON.stringify({ name })
+      });
+      setStatusMsg(`Driver profile updated to: ${name}`);
+      setDriverInput('');
+      setVersion(v => v + 1);
+    } catch (err) {
+      alert(`Could not set driver: ${err.message}`);
+    } finally {
+      setDriverBusy(false);
+    }
+  }
+
+  async function handleDeleteSingle(sessionId, e) {
+    e?.stopPropagation();
+    if (!window.confirm(`Delete Session #${sessionId} and all its recorded telemetry logs?`)) return;
+    setDeleteBusy(true);
+    try {
+      await api(`/sessions/${sessionId}`, { method: 'DELETE' });
+      setSelectedIds(prev => prev.filter(id => id !== sessionId));
+      if (selected === sessionId) onSelect(null);
+      setVersion(v => v + 1);
+      setStatusMsg(`Session #${sessionId} deleted.`);
+    } catch (err) {
+      alert(`Delete failed: ${err.message}`);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
+  async function handleDeleteSelected() {
+    if (!selectedIds.length) return;
+    if (!window.confirm(`Delete ${selectedIds.length} selected session(s) and all associated telemetry?`)) return;
+    setDeleteBusy(true);
+    try {
+      const res = await api('/sessions/delete', {
+        method: 'POST',
+        body: JSON.stringify({ session_ids: selectedIds })
+      });
+      if (selectedIds.includes(selected)) onSelect(null);
+      setSelectedIds([]);
+      setVersion(v => v + 1);
+      setStatusMsg(`Deleted ${res.deleted_count || selectedIds.length} sessions.`);
+    } catch (err) {
+      alert(`Batch delete failed: ${err.message}`);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
+  async function handleClearAll() {
+    if (!window.confirm("⚠️ DANGER: Are you sure you want to permanently delete ALL vehicle sessions and wipe all telemetry logs? This cannot be undone.")) return;
+    setDeleteBusy(true);
+    try {
+      await api('/sessions/delete-all', { method: 'POST' });
+      onSelect(null);
+      setSelectedIds([]);
+      setVersion(v => v + 1);
+      setStatusMsg("All vehicle sessions and telemetry database logs cleared.");
+    } catch (err) {
+      alert(`Clear all failed: ${err.message}`);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
+  const allSelected = data.length > 0 && selectedIds.length === data.length;
+  const someSelected = selectedIds.length > 0 && !allSelected;
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(data.map(s => s.id));
+    }
+  }
+
+  function toggleSelect(id, e) {
+    e?.stopPropagation();
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  }
+
   return (
     <>
+      <section className="driver-panel">
+        <div className="driver-panel-left">
+          <User size={20} style={{ color: 'var(--v-primary)' }} />
+          <div>
+            <h3>Driver Profile & Uplink</h3>
+            <p>Active Cockpit Driver: <strong style={{ color: 'var(--v-highlight)' }}>{activeDriver}</strong></p>
+          </div>
+        </div>
+        <form className="driver-form" onSubmit={handleSetDriver}>
+          <input
+            type="text"
+            className="driver-input"
+            placeholder={activeDriver ? `Current: ${activeDriver}` : "Enter Driver Name / Callsign"}
+            value={driverInput}
+            onChange={e => setDriverInput(e.target.value)}
+            disabled={driverBusy}
+            maxLength={64}
+          />
+          <button
+            type="submit"
+            className="btn-driver-save"
+            disabled={driverBusy || !driverInput.trim()}
+          >
+            <UserCheck size={14} />
+            {driverBusy ? 'Assigning...' : 'Assign Driver'}
+          </button>
+        </form>
+      </section>
+
       <div className="section-line">
-        <div><h2>Recent sessions</h2><p>Review the latest 20 recorded vehicle sessions.</p></div>
-        <span className="pill">{data.length} SESSIONS</span>
+        <div>
+          <h2>Recorded Vehicle Sessions</h2>
+          <p>Review telemetry history, manage driver assignments, and prune data records.</p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {selectedIds.length > 0 && (
+            <span className="pill amber">{selectedIds.length} SELECTED</span>
+          )}
+          <span className="pill">{data.length} SESSIONS</span>
+        </div>
       </div>
+
+      {statusMsg && (
+        <div className="cmd-status-toast" style={{ marginBottom: '12px' }}>
+          🟢 {statusMsg}
+        </div>
+      )}
+
+      <div className="session-actions-bar">
+        <div className="session-actions-left">
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--v-silver)', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              className="session-checkbox"
+              checked={allSelected}
+              ref={el => { if (el) el.indeterminate = someSelected; }}
+              onChange={toggleSelectAll}
+            />
+            <span>{allSelected ? 'Deselect All' : 'Select All'}</span>
+          </label>
+          {selectedIds.length > 0 && (
+            <button
+              type="button"
+              className="btn-danger-outline"
+              onClick={handleDeleteSelected}
+              disabled={deleteBusy}
+            >
+              <Trash2 size={13} />
+              Delete Selected ({selectedIds.length})
+            </button>
+          )}
+        </div>
+        <div className="session-actions-right">
+          <button
+            type="button"
+            className="btn-danger-solid"
+            onClick={handleClearAll}
+            disabled={deleteBusy || data.length === 0}
+          >
+            <Trash2 size={13} />
+            Clear All Sessions
+          </button>
+        </div>
+      </div>
+
       <section className="panel table-panel">
         <table>
           <thead>
-            <tr>{['Session', 'Date', 'Duration', 'Peak Temp', 'Source', ''].map((h, i) => <th key={i}>{h}</th>)}</tr>
+            <tr>
+              <th style={{ width: '40px', textAlign: 'center' }}></th>
+              <th>Session</th>
+              <th>Date</th>
+              <th>Duration</th>
+              <th>Peak Temp</th>
+              <th>Source</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
+            </tr>
           </thead>
           <tbody>
             {data.map(s => {
               const maxF = s.max_temp != null ? Math.round((s.max_temp * 9 / 5) + 32) : null;
+              const isRowSelected = selectedIds.includes(s.id);
               return (
-                <tr key={s.id} className={selected === s.id ? 'selected' : ''}>
-                  <td><strong>#{s.id}</strong><small>{s.driver_identifier || 'Driver not specified'}</small></td>
+                <tr key={s.id} className={(selected === s.id ? 'selected ' : '') + (isRowSelected ? 'checked-row' : '')}>
+                  <td style={{ textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      className="session-checkbox"
+                      checked={isRowSelected}
+                      onChange={e => toggleSelect(s.id, e)}
+                    />
+                  </td>
+                  <td>
+                    <strong>#{s.id}</strong>
+                    <small>{s.driver_identifier || 'Driver not specified'}</small>
+                  </td>
                   <td>{date(s.start_timestamp)}</td>
                   <td>{duration(s.duration_seconds)}</td>
                   <td>{fmt(maxF != null ? maxF : s.max_temp, 0)} °F</td>
-                  <td><span className={'pill ' + (s.source_type === 'SIMULATION' ? 'amber' : 'green')}>{s.source_type}</span></td>
-                  <td><button className="text-button" onClick={() => onSelect(s.id)}>View diagnostics<ChevronRight size={15} /></button></td>
+                  <td>
+                    <span className={'pill ' + (s.source_type === 'SIMULATION' ? 'amber' : 'green')}>
+                      {s.source_type}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        type="button"
+                        className="text-button"
+                        onClick={() => onSelect(s.id)}
+                      >
+                        View diagnostics
+                        <ChevronRight size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-delete-row"
+                        title={`Delete Session #${s.id}`}
+                        onClick={e => handleDeleteSingle(s.id, e)}
+                        disabled={deleteBusy}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               );
             })}

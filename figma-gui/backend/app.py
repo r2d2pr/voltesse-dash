@@ -54,6 +54,15 @@ class VehicleCommand(BaseModel):
     desc: str | None = None
 
 
+class SetDriver(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    session_id: int | None = None
+
+
+class BatchDelete(BaseModel):
+    session_ids: list[int] = Field(default_factory=list)
+
+
 def connect(settings):
     return psycopg.connect(settings.database_url, row_factory=dict_row, connect_timeout=5, prepare_threshold=None)
 
@@ -141,6 +150,7 @@ def create_app(settings: Settings | None = None):
                 "pit_limiter": frame.get("pit_limiter", False),
                 "power_limit_pct": frame.get("power_limit_pct", 100.0),
                 "warnings": frame.get("warnings", []),
+                "driver": frame.get("driver", "Driver 1"),
             },
             "history": list(trace_ring_buffer)
         }
@@ -353,6 +363,7 @@ def create_app(settings: Settings | None = None):
                     "pit_limiter": latest_live.get("pit_limiter", False),
                     "power_limit_pct": latest_live.get("power_limit_pct", 100.0),
                     "warnings": latest_live.get("warnings", []),
+                    "driver": latest_live.get("driver", "Driver 1"),
                 },
                 "history": list(trace_ring_buffer)
             }
@@ -433,12 +444,13 @@ def create_app(settings: Settings | None = None):
                     'pit_limiter': latest_live.get('pit_limiter', False),
                     'power_limit_pct': latest_live.get('power_limit_pct', 100.0),
                     'warnings': latest_live.get('warnings', []),
+                    'driver': latest_live.get('driver', 'Driver 1'),
                 }
             }
 
         # Standby fallback: read newest from PostgreSQL using fast indexed query
         with connect(settings) as conn:
-            latest = conn.execute('''SELECT t.*, s.source_type FROM telemetry_log t JOIN vehicle_session s USING (session_id)
+            latest = conn.execute('''SELECT t.*, s.source_type, s.driver_identifier FROM telemetry_log t JOIN vehicle_session s USING (session_id)
                 WHERE t.log_id = (SELECT max(log_id) FROM telemetry_log WHERE signal_status IS DISTINCT FROM 'FIGMA DEMO')''').fetchone()
             if not latest:
                 return {'mode': 'DATABASE', 'status': 'No vehicle readings available', 'metrics': None, 'history': [], 'stale': True}
@@ -471,6 +483,7 @@ def create_app(settings: Settings | None = None):
                             'gear': latest.get('gear') or 'D',
                             'transmission_mode': latest.get('transmission_mode') or 'AUTO',
                             'drive_mode': latest.get('drive_mode') or 'DRIVE',
+                            'driver': latest.get('driver_identifier') or 'Driver 1',
                             'est_range_mi': est_range_mi}}
 
     @app.get('/api/sessions')
@@ -480,7 +493,59 @@ def create_app(settings: Settings | None = None):
                 s.source_type, s.status, extract(epoch FROM (coalesce(s.end_timestamp, now())-s.start_timestamp)) AS duration_seconds,
                 max(t.motor_temperature) AS max_temp, count(t.log_id) AS sample_count
                 FROM vehicle_session s LEFT JOIN telemetry_log t USING(session_id)
-                GROUP BY s.session_id ORDER BY s.start_timestamp DESC LIMIT 20''').fetchall()
+                GROUP BY s.session_id ORDER BY s.start_timestamp DESC LIMIT 100''').fetchall()
+
+    @app.post('/api/sessions/driver')
+    def set_driver(body: SetDriver, user: User):
+        name = body.name.strip()
+        with connect(settings) as conn:
+            if body.session_id is not None:
+                conn.execute(
+                    "UPDATE vehicle_session SET driver_identifier = %s WHERE session_id = %s",
+                    (name, body.session_id)
+                )
+                sid = body.session_id
+            else:
+                row = conn.execute(
+                    "UPDATE vehicle_session SET driver_identifier = %s WHERE session_id = (SELECT max(session_id) FROM vehicle_session) RETURNING session_id",
+                    (name,)
+                ).fetchone()
+                sid = row["session_id"] if row else None
+
+        # Dispatch UDP command to cockpit if running
+        import socket
+        try:
+            payload = json.dumps({"action": "SET_DRIVER_NAME", "value": name}).encode("utf-8")
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.sendto(payload, ("127.0.0.1", 9872))
+            sock.close()
+        except Exception:
+            pass
+
+        return {"ok": True, "driver_identifier": name, "session_id": sid}
+
+    @app.delete('/api/sessions/{session_id}')
+    def delete_single_session(session_id: int, user: User):
+        with connect(settings) as conn:
+            res = conn.execute("DELETE FROM vehicle_session WHERE session_id = %s", (session_id,))
+            if (res.rowcount or 0) == 0:
+                raise HTTPException(404, "Session not found.")
+        return {"ok": True, "deleted": session_id}
+
+    @app.post('/api/sessions/delete')
+    def delete_multiple_sessions(body: BatchDelete, user: User):
+        if not body.session_ids:
+            return {"ok": True, "deleted_count": 0}
+        with connect(settings) as conn:
+            res = conn.execute("DELETE FROM vehicle_session WHERE session_id = ANY(%s)", (body.session_ids,))
+            deleted_count = res.rowcount or 0
+        return {"ok": True, "deleted_count": deleted_count}
+
+    @app.post('/api/sessions/delete-all')
+    def delete_all_sessions(user: User):
+        with connect(settings) as conn:
+            conn.execute("TRUNCATE TABLE telemetry_log, vehicle_session RESTART IDENTITY CASCADE")
+        return {"ok": True, "message": "All vehicle sessions and telemetry logs wiped."}
 
     @app.get('/api/sessions/{session_id}/diagnostics')
     def diagnostics(session_id: int, user: User):

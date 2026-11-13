@@ -369,6 +369,34 @@ class TestDatabaseManager(unittest.TestCase):
         self.assertEqual(len(window), 2)  # readings at +20 s and +30 s
         self.assertLessEqual(window[0]["timestamp"], window[1]["timestamp"])
 
+    def test_update_driver_identifier(self):
+        sid = self.db.start_session(initial_soc=90.0)
+        self.assertTrue(self.db.update_driver_identifier("Max Verstappen", sid))
+        sessions = [s for s in self.db.get_all_sessions() if s["session_id"] == sid]
+        self.assertEqual(sessions[0]["driver_identifier"], "Max Verstappen")
+
+    def test_delete_session_and_cascade(self):
+        sid = self.db.start_session(initial_soc=85.0)
+        self.db.log_telemetry(make_record())
+        time.sleep(0.5)
+        self.assertTrue(self.db.delete_session(sid))
+        sessions = [s for s in self.db.get_all_sessions() if s["session_id"] == sid]
+        self.assertEqual(len(sessions), 0)
+
+    def test_delete_sessions_batch(self):
+        s1 = self.db.start_session(initial_soc=80.0)
+        self.db.end_session(70.0, 50.0, 40.0, 10.0, 2.0)
+        s2 = self.db.start_session(initial_soc=70.0)
+        self.db.end_session(60.0, 50.0, 40.0, 10.0, 2.0)
+        deleted = self.db.delete_sessions([s1, s2])
+        self.assertEqual(deleted, 2)
+
+    def test_clear_all_sessions(self):
+        self.db.start_session(initial_soc=90.0)
+        self.db.end_session(80.0, 50.0, 40.0, 10.0, 2.0)
+        self.assertTrue(self.db.clear_all_sessions())
+        self.assertEqual(len(self.db.get_all_sessions()), 0)
+
 
 class TestCANTelemetrySource(unittest.TestCase):
     @classmethod

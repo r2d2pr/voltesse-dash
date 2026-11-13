@@ -404,6 +404,81 @@ class DatabaseManager:
             logger.error("Retention pruning failed: %s", e)
             return 0
 
+    def update_driver_identifier(
+        self, driver_identifier: str, session_id: Optional[int] = None
+    ) -> bool:
+        """Updates driver_identifier on the given session, or active session if omitted."""
+        if not self.is_write_enabled():
+            return False
+        target_id = session_id if session_id is not None else self._current_session_id
+        if target_id is None:
+            return False
+        try:
+            with self._get_connection(read_only=False) as conn:
+                conn.execute(
+                    "UPDATE vehicle_session SET driver_identifier = %s WHERE session_id = %s",
+                    (driver_identifier.strip(), target_id),
+                )
+            logger.info("Updated driver for session %d: %s", target_id, driver_identifier)
+            return True
+        except psycopg.Error as e:
+            logger.error("Could not update driver for session %d: %s", target_id, e)
+            return False
+
+    def delete_session(self, session_id: int) -> bool:
+        """Deletes a session and cascades to its telemetry logs."""
+        if self.read_only or not self.is_write_enabled():
+            return False
+        try:
+            with self._get_connection(read_only=False) as conn:
+                res = conn.execute(
+                    "DELETE FROM vehicle_session WHERE session_id = %s", (session_id,)
+                )
+                deleted = (res.rowcount or 0) > 0
+            if session_id == self._current_session_id:
+                self._current_session_id = None
+                self._session_source = None
+            if deleted:
+                logger.info("Deleted session ID: %d", session_id)
+            return deleted
+        except psycopg.Error as e:
+            logger.error("Could not delete session %d: %s", session_id, e)
+            return False
+
+    def delete_sessions(self, session_ids: List[int]) -> int:
+        """Deletes multiple sessions by ID, cascading to their telemetry logs."""
+        if not session_ids or self.read_only or not self.is_write_enabled():
+            return 0
+        try:
+            with self._get_connection(read_only=False) as conn:
+                res = conn.execute(
+                    "DELETE FROM vehicle_session WHERE session_id = ANY(%s)", (session_ids,)
+                )
+                deleted_count = res.rowcount or 0
+            if self._current_session_id in session_ids:
+                self._current_session_id = None
+                self._session_source = None
+            logger.info("Deleted %d sessions", deleted_count)
+            return deleted_count
+        except psycopg.Error as e:
+            logger.error("Could not batch delete sessions: %s", e)
+            return 0
+
+    def clear_all_sessions(self) -> bool:
+        """Truncates all sessions and telemetry, resetting identity sequence."""
+        if self.read_only or not self.is_write_enabled():
+            return False
+        try:
+            with self._get_connection(read_only=False) as conn:
+                conn.execute("TRUNCATE TABLE telemetry_log, vehicle_session RESTART IDENTITY CASCADE")
+            self._current_session_id = None
+            self._session_source = None
+            logger.info("Cleared all vehicle sessions and telemetry logs")
+            return True
+        except psycopg.Error as e:
+            logger.error("Could not clear all sessions: %s", e)
+            return False
+
     # -----------------------------------------------------------------
     # Telemetry writing (TELEMETRY_LOG)
     # -----------------------------------------------------------------

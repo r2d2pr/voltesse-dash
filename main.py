@@ -175,7 +175,10 @@ class VoltesseApp:
         if keep_sessions and keep_sessions > 0:
             self.db_manager.prune_old_sessions(keep_sessions=keep_sessions)
 
-        self.session_id = self.db_manager.start_session(initial_soc=88.5)
+        self.driver_name = getattr(args, "driver", "Driver 1") or "Driver 1"
+        self.session_id = self.db_manager.start_session(
+            initial_soc=88.5, driver_identifier=self.driver_name
+        )
 
         # Reflect database write logging state on top HUD ribbon
         self.gui.set_logging_state(
@@ -291,6 +294,7 @@ class VoltesseApp:
                 "pit_limiter": getattr(self, "pit_limiter_active", False),
                 "power_limit_pct": getattr(self, "power_limit_pct", 100.0),
                 "warnings": list(getattr(record, "warnings", []) or []),
+                "driver": getattr(self, "driver_name", "Driver 1"),
                 "timestamp": now,
                 "mode": self.current_mode,
             }).encode("utf-8")
@@ -366,6 +370,14 @@ class VoltesseApp:
                 self.gui.status_badge.setVisible(False)
             if hasattr(self.gui, "_known_warnings"):
                 self.gui._known_warnings.clear()
+
+        elif action == "SET_DRIVER_NAME":
+            name = str(cmd.get("value") or cmd.get("name") or "").strip()
+            if name:
+                self.driver_name = name
+                if hasattr(self, "db_manager") and self.db_manager:
+                    self.db_manager.update_driver_identifier(name)
+                logger.info("Updated driver name to '%s' via pitwall command", name)
 
     def switch_mode(self, mode: str) -> None:
         """
@@ -529,7 +541,9 @@ class VoltesseApp:
         self.db_manager.set_write_access(True)
         self.gui.set_logging_state(True, False)
         if self.db_manager._current_session_id is None:
-            self.session_id = self.db_manager.start_session(initial_soc=self._final_soc)
+            self.session_id = self.db_manager.start_session(
+                initial_soc=self._final_soc, driver_identifier=self.driver_name
+            )
         self.gui.status_badge.setText("DATABASE LOGGING ALWAYS ACTIVE")
         self.gui.status_badge.setStyleSheet(
             "background-color: rgba(0, 245, 160, 0.20); color: #00F5A0; padding: 2px 8px; border-radius: 4px; font-weight: bold;"
@@ -749,6 +763,12 @@ def parse_args() -> argparse.Namespace:
         default="mint",
         choices=["mint", "stealth", "amber", "redline", "synthwave"],
         help="Initial ambient accent palette in OLED mode (mint, stealth, amber, redline, synthwave; default: mint)",
+    )
+    parser.add_argument(
+        "--driver",
+        type=str,
+        default="Driver 1",
+        help="Active driver identifier / name for session recording (default: Driver 1)",
     )
     return parser.parse_args()
 
