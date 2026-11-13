@@ -328,10 +328,14 @@ class CANTelemetrySource(QThread):
                     self.throttle_pct = float(decoded.get("ThrottlePct", self.throttle_pct))
                     self.brake_pct = float(decoded.get("BrakePct", self.brake_pct))
                     dm = decoded.get("DriveMode")
-                    if isinstance(dm, str):
-                        self.drive_mode = dm
-                    elif isinstance(dm, int):
-                        self.drive_mode = DRIVE_MODE_MAP.get(dm, "DRIVE")
+                    if dm is not None:
+                        dm_str = str(dm)
+                        if dm_str in ("ECO", "DRIVE", "SPORT"):
+                            self.drive_mode = dm_str
+                        elif isinstance(dm, (int, float)):
+                            self.drive_mode = DRIVE_MODE_MAP.get(int(dm), "DRIVE")
+                        elif dm_str.isdigit():
+                            self.drive_mode = DRIVE_MODE_MAP.get(int(dm_str), "DRIVE")
                     gear_byte = decoded.get("GearByte")
                     if gear_byte is not None:
                         self._decode_gear_byte(int(gear_byte))
