@@ -1,5 +1,7 @@
 # Voltesse Dash ⚡ v5.4.0
 
+> **Authenticated Figma Technician Interface:** See [figma-gui/README.md](figma-gui/README.md) for the React/Vite laptop GUI, FastAPI backend, local setup, and [Figma handoff](figma-gui/FIGMA_HANDOFF.md).
+
 [![Version](https://img.shields.io/badge/version-5.4.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/PyQt-6-green.svg)](https://riverbankcomputing.com/software/pyqt/)
