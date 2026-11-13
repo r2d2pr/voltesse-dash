@@ -1,3 +1,15 @@
+# Voltesse Dash - Unified Dependencies (Driver Cockpit + Technician Web Portal)
+
+# Driver Digital Cockpit (PyQt6 & CAN-bus)
 PyQt6>=6.5.0
 python-can>=4.0.0
 psycopg[binary]>=3.1
+
+# Technician Web Portal (FastAPI & Real-Time F1 Telemetry Stream)
+fastapi>=0.115.0
+uvicorn>=0.30.0
+websockets>=13.0
+argon2-cffi>=23.1.0
+PyJWT>=2.8.0
+python-dotenv>=1.0.0
+pydantic>=2.0.0

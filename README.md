@@ -5,12 +5,12 @@
 [![Version](https://img.shields.io/badge/version-5.4.0-00F5A0.svg)](https://github.com/r2d2pr/voltesse-dash)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI](https://img.shields.io/badge/PyQt-6-green.svg)](https://riverbankcomputing.com/software/pyqt/)
-[![Web](https://img.shields.io/badge/Streamlit-1.66-red.svg)](https://streamlit.io/)
+[![Web](https://img.shields.io/badge/FastAPI%20%7C%20React%2019-20Hz%20F1%20Push-00F5D4.svg)](figma-gui/)
 [![Database](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 [![CAN](https://img.shields.io/badge/CAN-SocketCAN%20%7C%20virtual-orange.svg)](https://python-can.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 5.4.0 introduces the **Dynamic Ambient Theme & Accent Palette Engine** with 5 signature OLED colorways, hotkey `P` cycling, centered glassmorphic speedometer toast overlay, technician portal calibration swatches, and `--palette` CLI support. Built with **Python**, **PyQt6**, **Streamlit**, **python-can**, and **PostgreSQL**.
+A modern automotive digital cockpit, web-based technician admin portal, and local telemetry logging engine for embedded displays, including Raspberry Pi, and EV powertrains. Version 5.4.0 introduces the **Dynamic Ambient Theme & Accent Palette Engine** with 5 signature OLED colorways, hotkey `P` cycling, centered glassmorphic speedometer toast overlay, technician portal calibration swatches, and `--palette` CLI support. Built with **Python**, **PyQt6**, **FastAPI**, **React 19**, **python-can**, and **PostgreSQL**.
 
 ---
 
@@ -27,10 +27,10 @@ A modern automotive digital cockpit, web-based technician admin portal, and loca
   - **Centered Glassmorphic Speedometer Toast**: Switching palettes triggers an animated floating glassmorphic pill directly across the center dial (`🎨 PALETTE: [NAME]`) with a smooth 1.5-second cubic fade out and top HUD ribbon status badge.
   - **Coordinated Cockpit Styling Across All Pages**: The illuminated binnacle cowl, dial halos, battery SoC arc, powertrain torque split bars, TPMS chassis wireframe, and compact speed pod accent seam all dynamically adapt to the active palette.
   - **Strict ISO/SAE Safety Invariant Lock**: Tachometer redline (7–8k RPM), brake pedal indicators, and critical thermal/pressure warnings remain invariant in standardized Coral Red (`#FF4D6D`) and Amber (`#FFB800`).
-  - **Technician Pit-Wall Calibration Preview**: Settings channel in the Streamlit portal features interactive swatch cards, live hex/RGB breakdown, contrast metrics, and an SVG/CSS cluster speedometer simulation preview.
+  - **Technician Pit-Wall Calibration Preview**: Settings channel in the technician portal features interactive swatch cards, live hex/RGB breakdown, contrast metrics, and an SVG/CSS cluster speedometer simulation preview.
   - **CLI Argument Support**: Launch directly into any colorway via `--palette [mint|stealth|amber|redline|synthwave]`.
 - 🧪 **Automated Test Suite Verification**:
-  - 47 unit tests passing with 100% green status (33 cockpit GUI tests + 14 technician portal tests).
+  - 33 cockpit unit and integration tests passing with 100% green status.
 
 ---
 
@@ -108,18 +108,15 @@ voltesse-dash/
 │   ├── telemetry_source.py    # Autonomous EV driving cycle telemetry stream (Test Mode, D1-D6 auto)
 │   ├── dashboard_gui.py       # PyQt6 digital cluster interface & 800x480 auto-scaling engine
 │   └── database.py            # PostgreSQL persistence: batched writer, sessions, retention, write controls, exports
-├── technician-gui/            # Voltesse Pit-Wall Streamlit web interface
-│   ├── app.py                 # Streamlit entrypoint and navigation controller
-│   ├── data/
-│   │   ├── db.py              # PostgreSQL database queries, authentication & real-time telemetry feed
-│   │   └── simulator.py       # Deterministic fallback simulator for bench testing
-│   ├── ui/                    # Modular UI pages (Live, Diagnostics, Sessions, Settings, Login)
-│   ├── tests/                 # Unit tests for database integration and simulator
-│   └── requirements.txt       # Streamlit dependencies (streamlit, pandas, plotly, psycopg)
+├── figma-gui/                 # Authenticated Technician Web Portal (FastAPI + React 19)
+│   ├── backend/               # FastAPI async REST/WebSocket engine & database adapter
+│   ├── web/                   # React 19 / Vite cyber pit-wall client (Recharts traces)
+│   ├── tests/                 # PostgreSQL integration tests
+│   └── README.md              # Technician interface documentation
 ├── tests/
 │   └── test_voltesse.py       # Comprehensive unit and integration test suite (33 tests)
 ├── main.py                    # Application lifecycle, transmission, and mode controller
-├── requirements.txt           # Driver cockpit dependencies (PyQt6, python-can, psycopg)
+├── requirements.txt           # Unified project dependencies (PyQt6, FastAPI, uvicorn, psycopg)
 ├── AGENTS.md                  # Embedded developer rules, architecture contracts & specifications
 └── README.md                  # Project documentation
 ```
@@ -159,17 +156,17 @@ voltesse-dash/
 
 ## Technician Web Portal (Voltesse Pit-Wall)
 
-The technician portal provides pit-wall telemetry monitoring, session playback, and calibration diagnostics. Run with:
+The technician portal provides real-time pit-wall telemetry monitoring, session playback, and calibration diagnostics. Run with:
 
 ```bash
-streamlit run technician-gui/app.py
+cd figma-gui
+python3 -m uvicorn backend.app:create_app --factory --host 0.0.0.0 --port 8501
 ```
 
-- **Live Telemetry Channel**: Real-time 1-second auto-streaming (`@st.fragment`) telemetry from PostgreSQL with link status (`ACTIVE`, `STANDBY`, `DISCONNECTED`), packet latency indicators, 6-card primary strip, stutter-free synchronized traces, and full thermal matrix (`°F`).
+- **Live Telemetry Channel**: Real-time 20 Hz push stream (`WebSocket /api/ws/telemetry`) directly from in-memory ring buffer with packet latency indicators (<15ms), 6-card primary strip, stacked synchronized Recharts traces (Speed/RPM, Driver Demand/Net Power, Motor Core Temp), and full thermal matrix (`°F`).
 - **Diagnostics Channel**: High-resolution performance curves (Energy Efficiency vs. Speed, Power Draw vs. Motor Temp, Battery SoC vs. Distance, Power Draw vs. RPM, Motor Temp rise vs. Time).
 - **Sessions Channel**: Historical timing-board log with session duration, peak thermals (`°F`), max speed (`MPH`), and total distance (`mi`).
-- **Settings Channel**: Calibration of motor thermal warning limit (`110°F`–`230°F`, default `160°F`), low battery alert threshold (`5%`–`40%`, default `20%`), and database link diagnostics.
-
+- **Settings Channel**: Calibration of motor thermal warning limit (`110°F`–`230°F`, default `160°F`), low battery alert threshold (`5%`–`40%`, default `20%`), and dynamic OLED palette calibration.
 
 ---
 
@@ -177,7 +174,7 @@ streamlit run technician-gui/app.py
 
 Systemd unit definitions are located in `services/` for running the driver cockpit and technician portal automatically on boot (e.g. Raspberry Pi with 800×480 touchscreen):
 - `services/voltesse-dash.service`: Fullscreen kiosk launcher via `cage` Wayland compositor running the PyQt6 cluster GUI.
-- `services/voltesse-technician.service`: Streamlit technician web interface running on port 8501.
+- `services/voltesse-figma-gui.service`: FastAPI/React technician web interface running on port 8501.
 
 ### Quick Setup on Raspberry Pi:
 
@@ -190,7 +187,7 @@ sudo systemctl daemon-reload
 
 # 3. Enable and start services on boot
 sudo systemctl enable --now voltesse-dash.service
-sudo systemctl enable --now voltesse-technician.service
+sudo systemctl enable --now voltesse-figma-gui.service
 ```
 
 ### Monitoring & Logs:
@@ -200,21 +197,18 @@ sudo systemctl enable --now voltesse-technician.service
 journalctl -u voltesse-dash.service -f
 
 # Technician Portal logs
-journalctl -u voltesse-technician.service -f
+journalctl -u voltesse-figma-gui.service -f
 ```
 
 ---
 
 ## Running Tests
 
-Execute the automated test suites with Python's built-in `unittest` (46 total tests):
+Execute the automated test suites with Python's built-in `unittest` (33 total tests):
 
 ```bash
-# Run cockpit unit and integration tests (32 tests)
+# Run cockpit unit and integration tests (33 tests)
 python -m unittest discover tests
-
-# Run technician web app database and simulation tests (14 tests)
-python -m unittest discover technician-gui/tests
 ```
 
 ---

@@ -5,11 +5,8 @@ Systemd service unit definitions for running the Voltesse Cockpit and Technician
 ## Files
 - `voltesse-dash.service`: Runs the PyQt6 driver cockpit in kiosk mode using the `cage` Wayland kiosk compositor.
 - `voltesse-figma-gui.service`: Runs the React + FastAPI technician web portal on port 8501 with real-time 20 Hz push stream.
-- `voltesse-technician.service`: Runs the Streamlit web portal on port 8501.
 
 ## Installation on Raspberry Pi
-
-Choose either `voltesse-figma-gui.service` (React/FastAPI F1 real-time portal) or `voltesse-technician.service` (Streamlit portal):
 
 ```bash
 # 1. Copy service files to systemd directory
@@ -34,6 +31,6 @@ sudo systemctl restart voltesse-figma-gui.service
 # Cockpit logs
 journalctl -u voltesse-dash.service -f
 
-# Technician Portal logs (Figma GUI)
+# Technician Portal logs (FastAPI/React GUI)
 journalctl -u voltesse-figma-gui.service -f
 ```

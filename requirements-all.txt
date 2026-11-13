@@ -1,3 +1,0 @@
-# Complete dependency manifest for Voltesse Dash (Cockpit + Technician Web Portal)
--r requirements.txt
--r technician-gui/requirements.txt
