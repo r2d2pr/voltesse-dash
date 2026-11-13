@@ -244,12 +244,14 @@ class VoltesseApp:
             return
         self._last_udp_broadcast = now
         try:
+            speed_kmh = getattr(record, "speed_kmh", 0.0) or 0.0
+            power_kw = getattr(record, "battery_power_kw", 0.0) or 0.0
             payload = json.dumps({
-                "speed": round(getattr(record, "speed_mph", 0.0) or 0.0, 1),
+                "speed": round(speed_kmh * 0.621371, 1),
                 "rpm": int(getattr(record, "motor_rpm", 0) or 0),
-                "battery": round(getattr(record, "battery_percent", 0.0) or 0.0, 1),
-                "temperature": round(getattr(record, "motor_temperature", 0.0) or 0.0, 1),
-                "power": round(getattr(record, "power_draw_watts", 0.0) or 0.0),
+                "battery": round(getattr(record, "battery_soc", 0.0) or 0.0, 1),
+                "temperature": round(getattr(record, "motor_temp_c", 0.0) or 0.0, 1),
+                "power": round(power_kw * 1000.0),
                 "gear": getattr(record, "gear", "P") or "P",
                 "drive_mode": getattr(record, "drive_mode", "DRIVE") or "DRIVE",
                 "timestamp": now,
