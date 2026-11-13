@@ -1488,6 +1488,50 @@ class TestVoltesseAppModes(unittest.TestCase):
 
         app_imp.shutdown()
 
+    def test_pitwall_udp_commands_and_dtc_handling(self):
+        args = argparse.Namespace(
+            mode="TEST",
+            can_interface=None,
+            can_channel=None,
+            can_mock=False,
+            db_url=self.db_url,
+            interval_ms=10,
+            batch_size=5,
+            flush_interval=0.2,
+            windowed=True,
+            read_only=False,
+            no_logging=True,
+        )
+        app = VoltesseApp(args)
+
+        # 1. SET_DRIVE_MODE
+        app._handle_pitwall_command({"action": "SET_DRIVE_MODE", "value": "SPORT"})
+        self.assertEqual(app.test_stream.drive_mode, "SPORT")
+
+        # 2. SET_PIT_LIMIT
+        app._handle_pitwall_command({"action": "SET_PIT_LIMIT", "enabled": True})
+        self.assertTrue(app.pit_limiter_active)
+        self.assertIn("PIT SPEED LIMITER", app.gui.status_badge.text())
+
+        app._handle_pitwall_command({"action": "SET_PIT_LIMIT", "enabled": False})
+        self.assertFalse(app.pit_limiter_active)
+
+        # 3. SET_POWER_LIMIT
+        app._handle_pitwall_command({"action": "SET_POWER_LIMIT", "value": 50.0})
+        self.assertEqual(app.power_limit_pct, 50.0)
+
+        # 4. INJECT_DTC
+        app._handle_pitwall_command({"action": "INJECT_DTC", "code": "P0A38", "desc": "Motor Overheat"})
+        self.assertIn("P0A38: Motor Overheat", app.test_stream.warnings)
+        self.assertEqual(app.gui.speed_gauge._dtc_toast_text, "P0A38: Motor Overheat")
+        self.assertGreater(app.gui.speed_gauge._dtc_toast_alpha, 0.0)
+
+        # 5. CLEAR_DTC
+        app._handle_pitwall_command({"action": "CLEAR_DTC"})
+        self.assertEqual(len(app.test_stream.warnings), 0)
+
+        app.shutdown()
+
 
 if __name__ == "__main__":
     unittest.main()

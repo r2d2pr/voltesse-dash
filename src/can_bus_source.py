@@ -11,6 +11,7 @@ Includes an integrated multi-threaded mock CAN transmitter for bench testing.
 
 import logging
 import math
+from pathlib import Path
 import struct
 import threading
 import time
@@ -24,6 +25,11 @@ try:
     import can
 except ImportError:
     can = None
+
+try:
+    import cantools
+except ImportError:
+    cantools = None
 
 logger = logging.getLogger("voltesse.can_bus")
 
@@ -74,6 +80,7 @@ class CANTelemetrySource(QThread):
         channel: Optional[str] = None,
         bitrate: int = 500000,
         enable_mock_bus: bool = False,
+        dbc_path: Optional[str] = None,
         parent: Optional[QObject] = None,
     ):
         super().__init__(parent)
@@ -81,6 +88,21 @@ class CANTelemetrySource(QThread):
         self.channel = channel
         self.bitrate = bitrate
         self.enable_mock_bus = enable_mock_bus
+        self.dbc_path = dbc_path
+
+        self._dbc_db = None
+        if cantools:
+            target_dbc = self.dbc_path
+            if target_dbc is None:
+                default_p = Path(__file__).resolve().parent.parent / "db" / "voltesse_ev.dbc"
+                if default_p.exists():
+                    target_dbc = str(default_p)
+            if target_dbc and Path(target_dbc).exists():
+                try:
+                    self._dbc_db = cantools.database.load_file(target_dbc)
+                    logger.info("Loaded CAN DBC database from: %s", target_dbc)
+                except Exception as e:
+                    logger.warning("Failed to load CAN DBC database '%s': %s", target_dbc, e)
 
         self._bus: Optional["can.Bus"] = None
         self._running = False
@@ -260,11 +282,80 @@ class CANTelemetrySource(QThread):
         self.status_changed.emit("PAUSED" if self._paused else "CAN ACTIVE")
         return self._paused
 
+    def _decode_gear_byte(self, gear_byte: int) -> None:
+        is_manual = bool(gear_byte & 0x80)
+        if is_manual:
+            self.transmission_mode = "MANUAL"
+            gear_num = gear_byte & 0x0F
+            if 1 <= gear_num <= 6:
+                self.current_gear = str(gear_num)
+            elif gear_num == 0:
+                self.current_gear = "N"
+            elif gear_num == 0x0E:
+                self.current_gear = "R"
+        elif self.transmission_mode == "AUTO":
+            gear_code = gear_byte & 0x07
+            auto_map = {0: "P", 1: "R", 2: "N", 3: "D", 4: "B"}
+            if gear_code in auto_map:
+                base_g = auto_map[gear_code]
+                if base_g == "D":
+                    self.current_gear = f"D{self.get_auto_gear_for_speed(self.speed_kmh)}"
+                else:
+                    self.current_gear = base_g
+
+    def _decode_warning_bits(self, warn_bits: int) -> None:
+        warnings: List[str] = []
+        if warn_bits & 0x01:
+            warnings.append("LOW BATTERY")
+        if warn_bits & 0x02:
+            warnings.append("THERMAL WARNING")
+        if warn_bits & 0x04:
+            warnings.append("HIGH SPEED")
+        if warn_bits & 0x08:
+            warnings.append("CAN BUS ERROR")
+        self.warnings = warnings
+
     def _decode_message(self, msg: "can.Message") -> None:
-        """Decodes raw binary CAN message payloads according to arbitration ID."""
+        """Decodes CAN message payloads using optional DBC definition or raw byte unpacking."""
         data = msg.data
         if not data or len(data) < 6:
             return
+
+        if self._dbc_db:
+            try:
+                decoded = self._dbc_db.decode_message(msg.arbitration_id, msg.data)
+                if msg.arbitration_id == CAN_ID_SPEED_MOTOR:
+                    self.speed_kmh = float(decoded.get("VehicleSpeed", self.speed_kmh))
+                    self.motor_rpm = int(decoded.get("MotorRPM", self.motor_rpm))
+                    self.throttle_pct = float(decoded.get("ThrottlePct", self.throttle_pct))
+                    self.brake_pct = float(decoded.get("BrakePct", self.brake_pct))
+                    dm = decoded.get("DriveMode")
+                    if isinstance(dm, str):
+                        self.drive_mode = dm
+                    elif isinstance(dm, int):
+                        self.drive_mode = DRIVE_MODE_MAP.get(dm, "DRIVE")
+                    gear_byte = decoded.get("GearByte")
+                    if gear_byte is not None:
+                        self._decode_gear_byte(int(gear_byte))
+                    return
+                elif msg.arbitration_id == CAN_ID_BATTERY:
+                    self.battery_soc = float(decoded.get("BatterySoC", self.battery_soc))
+                    self.battery_voltage = float(decoded.get("BatteryVoltage", self.battery_voltage))
+                    self.battery_current = float(decoded.get("BatteryCurrent", self.battery_current))
+                    self.battery_power_kw = (self.battery_voltage * self.battery_current) / 1000.0
+                    self.trip_distance_km = float(decoded.get("TripDistance", self.trip_distance_km))
+                    return
+                elif msg.arbitration_id == CAN_ID_THERMALS_WARN:
+                    self.battery_temp_c = float(decoded.get("BatteryTemp", self.battery_temp_c))
+                    self.motor_temp_c = float(decoded.get("MotorTemp", self.motor_temp_c))
+                    self.inverter_temp_c = float(decoded.get("InverterTemp", self.inverter_temp_c))
+                    self.ambient_temp_c = float(decoded.get("AmbientTemp", self.ambient_temp_c))
+                    self.steering_angle = float(decoded.get("SteeringAngle", self.steering_angle))
+                    warn_bits = int(decoded.get("WarningBits", 0))
+                    self._decode_warning_bits(warn_bits)
+                    return
+            except Exception as e:
+                logger.debug("DBC decode error on 0x%X, using raw unpack: %s", msg.arbitration_id, e)
 
         try:
             if msg.arbitration_id == CAN_ID_SPEED_MOTOR:
@@ -277,27 +368,7 @@ class CANTelemetrySource(QThread):
                 self.drive_mode = DRIVE_MODE_MAP.get(mode_code, "DRIVE")
 
                 if len(data) >= 8:
-                    gear_byte = data[7]
-                    # Bit 7: Manual flag
-                    is_manual = bool(gear_byte & 0x80)
-                    if is_manual:
-                        self.transmission_mode = "MANUAL"
-                        gear_num = gear_byte & 0x0F
-                        if 1 <= gear_num <= 6:
-                            self.current_gear = str(gear_num)
-                        elif gear_num == 0:
-                            self.current_gear = "N"
-                        elif gear_num == 0x0E:
-                            self.current_gear = "R"
-                    elif self.transmission_mode == "AUTO":
-                        gear_code = gear_byte & 0x07
-                        auto_map = {0: "P", 1: "R", 2: "N", 3: "D", 4: "B"}
-                        if gear_code in auto_map:
-                            base_g = auto_map[gear_code]
-                            if base_g == "D":
-                                self.current_gear = f"D{self.get_auto_gear_for_speed(self.speed_kmh)}"
-                            else:
-                                self.current_gear = base_g
+                    self._decode_gear_byte(data[7])
 
             elif msg.arbitration_id == CAN_ID_BATTERY:
                 soc_raw, volt_raw, curr_raw, dist_raw = struct.unpack_from(">HHhH", data, 0)
@@ -314,17 +385,7 @@ class CANTelemetrySource(QThread):
                 self.inverter_temp_c = float(it - 40)
                 self.ambient_temp_c = float(amb - 40)
                 self.steering_angle = steer_raw / 10.0
-
-                warnings: List[str] = []
-                if warn_bits & 0x01:
-                    warnings.append("LOW BATTERY")
-                if warn_bits & 0x02:
-                    warnings.append("THERMAL WARNING")
-                if warn_bits & 0x04:
-                    warnings.append("HIGH SPEED")
-                if warn_bits & 0x08:
-                    warnings.append("CAN BUS ERROR")
-                self.warnings = warnings
+                self._decode_warning_bits(warn_bits)
         except Exception as e:
             logger.debug("Failed to unpack CAN message ID 0x%X: %s", msg.arbitration_id, e)
 

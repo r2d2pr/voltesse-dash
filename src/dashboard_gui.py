@@ -228,6 +228,10 @@ class SpeedometerDialWidget(QWidget):
         self._palette_toast_alpha: float = 0.0
         self._palette_toast_start_time: float = 0.0
         self._palette_toast_timer: Optional[QTimer] = None
+        self._dtc_toast_text: str = ""
+        self._dtc_toast_alpha: float = 0.0
+        self._dtc_toast_start_time: float = 0.0
+        self._dtc_toast_timer: Optional[QTimer] = None
         self.is_sweeping = False
         self.sweep_progress = 0.0
         self._sweep_anim: Optional[QVariantAnimation] = None
@@ -415,6 +419,67 @@ class SpeedometerDialWidget(QWidget):
         painter.drawText(pill_rect, Qt.AlignmentFlag.AlignCenter, f"🎨 {name}")
         painter.restore()
 
+    def show_dtc_toast(self, dtc_text: str) -> None:
+        """Triggers a 3.5-second prominent notification overlay on the center gauge."""
+        self._dtc_toast_text = dtc_text
+        self._dtc_toast_alpha = 1.0
+        self._dtc_toast_start_time = time.time()
+        if not hasattr(self, "_dtc_toast_timer") or self._dtc_toast_timer is None:
+            self._dtc_toast_timer = QTimer(self)
+            self._dtc_toast_timer.setInterval(30)
+            self._dtc_toast_timer.timeout.connect(self._step_dtc_toast)
+        self._dtc_toast_timer.start()
+        self.update()
+
+    def _step_dtc_toast(self) -> None:
+        now = time.time()
+        elapsed = now - getattr(self, "_dtc_toast_start_time", now)
+        if elapsed < 2.5:
+            self._dtc_toast_alpha = 1.0
+        elif elapsed < 3.5:
+            # Smooth cubic fade out
+            t = (elapsed - 2.5) / 1.0
+            self._dtc_toast_alpha = max(0.0, 1.0 - (t * t))
+        else:
+            self._dtc_toast_alpha = 0.0
+            if hasattr(self, "_dtc_toast_timer") and self._dtc_toast_timer is not None:
+                self._dtc_toast_timer.stop()
+        self.update()
+
+    def _draw_dtc_toast(self, painter: QPainter, cx: float, cy: float, r: float) -> None:
+        alpha = getattr(self, "_dtc_toast_alpha", 0.0)
+        if alpha <= 0.01:
+            return
+
+        text = getattr(self, "_dtc_toast_text", "DTC ACTIVE")
+        pill_w = max(210.0, r * 1.25)
+        pill_h = max(38.0, r * 0.25)
+        pill_x = cx - (pill_w / 2.0)
+        pill_y = cy - (pill_h / 2.0)
+        pill_rect = QRectF(pill_x, pill_y, pill_w, pill_h)
+
+        bg_col = QColor(28, 6, 10, int(235 * alpha))
+        border_col = QColor(255, 77, 109, int(230 * alpha))
+
+        painter.save()
+        painter.setBrush(QBrush(bg_col))
+        painter.setPen(QPen(border_col, 1.8))
+        painter.drawRoundedRect(pill_rect, pill_h / 2.0, pill_h / 2.0)
+
+        # Ambient red warning halo glow
+        glow_pen_col = QColor(255, 77, 109, int(80 * alpha))
+        painter.setPen(QPen(glow_pen_col, 4.0))
+        painter.drawRoundedRect(pill_rect.adjusted(-2, -2, 2, 2), (pill_h + 4) / 2.0, (pill_h + 4) / 2.0)
+
+        # Centered text: ⚠️ FAULT: [DTC_TEXT]
+        text_col = QColor(255, 163, 180, int(255 * alpha))
+        painter.setPen(text_col)
+        font = QFont("Segoe UI", max(8, min(12, int(r * 0.076))), QFont.Weight.Bold)
+        font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
+        painter.setFont(font)
+        painter.drawText(pill_rect, Qt.AlignmentFlag.AlignCenter, f"⚠️ {text}")
+        painter.restore()
+
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -441,6 +506,8 @@ class SpeedometerDialWidget(QWidget):
             self._draw_center_pod(painter, w / 2.0, h / 2.0, min(w, h) * 0.44)
             if getattr(self, "_palette_toast_alpha", 0.0) > 0.01:
                 self._draw_palette_toast(painter, w / 2.0, h / 2.0, min(w, h) * 0.44)
+            elif getattr(self, "_dtc_toast_alpha", 0.0) > 0.01:
+                self._draw_dtc_toast(painter, w / 2.0, h / 2.0, min(w, h) * 0.44)
             return
 
         # 2. Geometry for 3-Pod Instrument Binnacle
@@ -468,6 +535,8 @@ class SpeedometerDialWidget(QWidget):
         # 6. Centered Glassmorphic Palette Overlay Notification (if active)
         if getattr(self, "_palette_toast_alpha", 0.0) > 0.01:
             self._draw_palette_toast(painter, cx, cy_center, center_r)
+        elif getattr(self, "_dtc_toast_alpha", 0.0) > 0.01:
+            self._draw_dtc_toast(painter, cx, cy_center, center_r)
 
     def _draw_flowing_cowl(
         self, painter: QPainter, cx_l: float, cy_l: float, r_l: float,
@@ -4098,10 +4167,19 @@ class VoltesseDashboard(QMainWindow):
                 "background-color: rgba(0, 245, 160, 0.15); color: #5CFFC7; padding: 2px 10px; border-radius: 4px; border: 1px solid rgba(0, 245, 160, 0.4); font-weight: bold;"
             )
 
-        # Warnings / Status
+        # Warnings / Status & DTC Toast
+        curr_warnings = set(record.warnings) if record.warnings else set()
+        new_warnings = curr_warnings - getattr(self, "_known_warnings", set())
+        if new_warnings and hasattr(self, "speed_gauge") and hasattr(self.speed_gauge, "show_dtc_toast"):
+            latest_new = sorted(list(new_warnings))[-1]
+            self.speed_gauge.show_dtc_toast(latest_new)
+
+        self._known_warnings = curr_warnings
+
         if record.warnings:
-            warn_text = " | ".join(record.warnings)
-            self.status_badge.setText(f"⚠️ {warn_text}")
+            first_w = record.warnings[0]
+            count_str = f" [{len(record.warnings)}]" if len(record.warnings) > 1 else ""
+            self.status_badge.setText(f"⚠️ DTC{count_str}: {first_w}")
             self.status_badge.setStyleSheet(
                 "background-color: rgba(255, 77, 109, 0.25); color: #FFA3B4; padding: 2px 10px; border-radius: 4px; border: 1px solid #FF4D6D; font-weight: bold;"
             )

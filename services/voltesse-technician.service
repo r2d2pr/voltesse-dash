@@ -1,0 +1,19 @@
+[Unit]
+Description=Voltesse Technician Web Portal & Real-Time Telemetry Stream
+Documentation=https://github.com/david/voltesse-dash
+After=network-online.target voltesse-dash.service postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=admin
+WorkingDirectory=/home/admin/voltesse-dash/figma-gui
+Environment="VOLTESSE_DB_URL=postgresql://voltesse:voltesse@localhost:5432/voltesse_dash"
+Environment="WEB_DIST=/home/admin/voltesse-dash/figma-gui/web/dist"
+Environment="VOLTESSE_ORIGINS=*"
+ExecStart=/home/admin/voltesse-dash/figma-gui/.venv/bin/python -m uvicorn backend.app:create_app --factory --host 0.0.0.0 --port 8501
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

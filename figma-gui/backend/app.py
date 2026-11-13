@@ -16,7 +16,7 @@ from collections import deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import jwt
 import psycopg
@@ -45,6 +45,13 @@ class Preferences(BaseModel):
     warning_temp: int = Field(default=160, ge=100, le=250)
     warning_battery: int = Field(default=20, ge=5, le=40)
     palette: str = Field(default='mint')
+
+class VehicleCommand(BaseModel):
+    action: str = Field(min_length=1, max_length=64)
+    value: Any = None
+    enabled: bool | None = None
+    code: str | None = None
+    desc: str | None = None
 
 
 def connect(settings):
@@ -131,6 +138,9 @@ def create_app(settings: Settings | None = None):
                 "transmission_mode": frame.get("transmission_mode", "AUTO"),
                 "drive_mode": frame.get("drive_mode", "DRIVE"),
                 "est_range_mi": frame.get("est_range_mi", 0),
+                "pit_limiter": frame.get("pit_limiter", False),
+                "power_limit_pct": frame.get("power_limit_pct", 100.0),
+                "warnings": frame.get("warnings", []),
             },
             "history": list(trace_ring_buffer)
         }
@@ -296,6 +306,19 @@ def create_app(settings: Settings | None = None):
                 (user['technician_id'], body.warning_temp, body.warning_battery, body.palette))
         return body
 
+    @app.post('/api/vehicle/command')
+    def send_vehicle_command(cmd: VehicleCommand, user: User):
+        import socket
+        payload = json.dumps(cmd.model_dump(exclude_none=True)).encode("utf-8")
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sock.sendto(payload, ("127.0.0.1", 9872))
+            return {"status": "DISPATCHED", "command": cmd.model_dump(exclude_none=True)}
+        except Exception as e:
+            raise HTTPException(503, f"Vehicle command dispatch failed: {e}")
+        finally:
+            sock.close()
+
     @app.websocket('/api/ws/telemetry')
     async def ws_telemetry(websocket: WebSocket):
         await websocket.accept()
@@ -327,6 +350,9 @@ def create_app(settings: Settings | None = None):
                     "transmission_mode": latest_live.get("transmission_mode", "AUTO"),
                     "drive_mode": latest_live.get("drive_mode", "DRIVE"),
                     "est_range_mi": latest_live.get("est_range_mi", 0),
+                    "pit_limiter": latest_live.get("pit_limiter", False),
+                    "power_limit_pct": latest_live.get("power_limit_pct", 100.0),
+                    "warnings": latest_live.get("warnings", []),
                 },
                 "history": list(trace_ring_buffer)
             }
@@ -404,6 +430,9 @@ def create_app(settings: Settings | None = None):
                     'transmission_mode': latest_live.get('transmission_mode', 'AUTO'),
                     'drive_mode': latest_live.get('drive_mode', 'DRIVE'),
                     'est_range_mi': latest_live.get('est_range_mi', 0),
+                    'pit_limiter': latest_live.get('pit_limiter', False),
+                    'power_limit_pct': latest_live.get('power_limit_pct', 100.0),
+                    'warnings': latest_live.get('warnings', []),
                 }
             }
 

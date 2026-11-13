@@ -1,0 +1,63 @@
+VERSION ""
+
+NS_ :
+    NS_DESC_
+    CM_
+    BA_DEF_
+    BA_
+    VAL_
+    CAT_DEF_
+    CAT_
+    FILTER
+    BA_DEF_DEF_
+    EV_DATA_
+    ENVVAR_DATA_
+    SGTYPE_
+    SGTYPE_VAL_
+    BA_DEF_SGTYPE_
+    BA_SGTYPE_
+    SIG_TYPE_REF_
+    VAL_TABLE_
+    SIG_GROUP_
+    SIG_VALTYPE_
+    SIGTYPE_VALTYPE_
+    BO_TX_BU_
+    BA_DEF_REL_
+    BA_REL_
+    BA_DEF_DEF_REL_
+    BU_SG_REL_
+    BU_EV_REL_
+    BU_BO_REL_
+    SG_MUL_VAL_
+
+BS_:
+
+BU_: VCU INV BMS DASH
+
+BO_ 256 EV_MotorDynamics: 8 VCU
+ SG_ VehicleSpeed : 0|16@0+ (0.1,0) [0|300] "km/h" DASH
+ SG_ MotorRPM : 16|16@0+ (1,0) [0|12000] "rpm" DASH
+ SG_ ThrottlePct : 32|8@0+ (1,0) [0|100] "%" DASH
+ SG_ BrakePct : 40|8@0+ (1,0) [0|100] "%" DASH
+ SG_ DriveMode : 48|8@0+ (1,0) [0|3] "" DASH
+ SG_ GearByte : 56|8@0+ (1,0) [0|255] "" DASH
+
+BO_ 257 EV_BatteryState: 8 BMS
+ SG_ BatterySoC : 0|16@0+ (0.1,0) [0|100] "%" DASH
+ SG_ BatteryVoltage : 16|16@0+ (0.1,0) [0|500] "V" DASH
+ SG_ BatteryCurrent : 32|16@0- (0.1,0) [-500|500] "A" DASH
+ SG_ TripDistance : 48|16@0+ (0.1,0) [0|6553.5] "km" DASH
+
+BO_ 258 EV_ThermalsAndSafety: 8 VCU
+ SG_ BatteryTemp : 0|8@0+ (1,-40) [-40|120] "degC" DASH
+ SG_ MotorTemp : 8|8@0+ (1,-40) [-40|200] "degC" DASH
+ SG_ InverterTemp : 16|8@0+ (1,-40) [-40|150] "degC" DASH
+ SG_ AmbientTemp : 24|8@0+ (1,-40) [-40|80] "degC" DASH
+ SG_ WarningBits : 32|16@0+ (1,0) [0|65535] "" DASH
+ SG_ SteeringAngle : 48|16@0- (0.1,0) [-720|720] "deg" DASH
+
+CM_ BO_ 256 "High-frequency dynamic powertrain signals";
+CM_ BO_ 257 "High-voltage battery pack status";
+CM_ BO_ 258 "Powertrain thermal monitoring and safety warnings";
+
+VAL_ 256 DriveMode 0 "ECO" 1 "DRIVE" 2 "SPORT" ;

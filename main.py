@@ -234,6 +234,23 @@ class VoltesseApp:
         self._last_udp_broadcast = 0.0
         self._udp_interval = 0.05  # 20 Hz (50 ms)
 
+        # UDP Command Receiver for Two-Way Pit-Wall Controls (Port 9872)
+        self._cmd_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            self._cmd_sock.bind(("127.0.0.1", 9872))
+            self._cmd_sock.setblocking(False)
+        except Exception as e:
+            logger.warning("Could not bind UDP command socket on 127.0.0.1:9872: %s", e)
+
+        from PyQt6.QtCore import QTimer
+        self._cmd_timer = QTimer()
+        self._cmd_timer.setInterval(50)
+        self._cmd_timer.timeout.connect(self._poll_udp_commands)
+        self._cmd_timer.start()
+
+        self.pit_limiter_active = False
+        self.power_limit_pct = 100.0
+
         # 5. Activate Default Mode (Default: RACE)
         self.switch_mode(initial_mode)
 
@@ -271,12 +288,84 @@ class VoltesseApp:
                 "transmission_mode": getattr(record, "transmission_mode", "AUTO") or "AUTO",
                 "drive_mode": getattr(record, "drive_mode", "DRIVE") or "DRIVE",
                 "est_range_mi": int(round(soc * 2.6)),
+                "pit_limiter": getattr(self, "pit_limiter_active", False),
+                "power_limit_pct": getattr(self, "power_limit_pct", 100.0),
+                "warnings": list(getattr(record, "warnings", []) or []),
                 "timestamp": now,
                 "mode": self.current_mode,
             }).encode("utf-8")
             self._udp_sock.sendto(payload, self._udp_target)
         except Exception:
             pass  # Non-blocking fire-and-forget; never stall vehicle GUI
+
+    def _poll_udp_commands(self) -> None:
+        """Polls incoming pit-wall vehicle commands over UDP loopback."""
+        if not hasattr(self, "_cmd_sock"):
+            return
+        try:
+            while True:
+                data, _ = self._cmd_sock.recvfrom(4096)
+                if not data:
+                    break
+                cmd = json.loads(data.decode("utf-8"))
+                self._handle_pitwall_command(cmd)
+        except (BlockingIOError, socket.error):
+            pass
+        except Exception as e:
+            logger.debug("Error processing UDP command: %s", e)
+
+    def _handle_pitwall_command(self, cmd: dict) -> None:
+        action = cmd.get("action")
+        logger.info("Received pit-wall vehicle command: %s", cmd)
+
+        stream = None
+        if self.current_mode == "RACE":
+            stream = self.can_stream
+        elif self.current_mode == "SIMULATION":
+            stream = self.sim_stream
+        elif self.current_mode == "TEST":
+            stream = self.test_stream
+
+        if action == "SET_DRIVE_MODE":
+            mode = cmd.get("value")
+            if mode in ("ECO", "DRIVE", "SPORT"):
+                if stream and hasattr(stream, "drive_mode"):
+                    stream.drive_mode = mode
+                if hasattr(self.gui, "mode_badge"):
+                    self.gui.mode_badge.setText(mode)
+
+        elif action == "SET_PIT_LIMIT":
+            self.pit_limiter_active = bool(cmd.get("enabled", False))
+            if hasattr(self.gui, "status_badge"):
+                if self.pit_limiter_active:
+                    self.gui.status_badge.setText("⚠️ PIT SPEED LIMITER (35 MPH)")
+                    self.gui.status_badge.setStyleSheet(
+                        "background-color: rgba(255, 184, 0, 0.25); color: #FFD166; padding: 2px 10px; border-radius: 4px; border: 1px solid #FFB800; font-weight: bold;"
+                    )
+                    self.gui.status_badge.setVisible(True)
+                elif not (stream and getattr(stream, "warnings", [])):
+                    self.gui.status_badge.setVisible(False)
+
+        elif action == "SET_POWER_LIMIT":
+            self.power_limit_pct = float(cmd.get("value", 100.0))
+
+        elif action == "INJECT_DTC":
+            code = cmd.get("code", "P0A38")
+            desc = cmd.get("desc", "FAULT")
+            dtc_str = f"{code}: {desc}"
+            if stream and hasattr(stream, "warnings"):
+                if dtc_str not in stream.warnings:
+                    stream.warnings.append(dtc_str)
+                    if hasattr(self.gui, "speed_gauge") and hasattr(self.gui.speed_gauge, "show_dtc_toast"):
+                        self.gui.speed_gauge.show_dtc_toast(dtc_str)
+
+        elif action == "CLEAR_DTC":
+            if stream and hasattr(stream, "warnings"):
+                stream.warnings.clear()
+            if hasattr(self.gui, "status_badge") and not self.pit_limiter_active:
+                self.gui.status_badge.setVisible(False)
+            if hasattr(self.gui, "_known_warnings"):
+                self.gui._known_warnings.clear()
 
     def switch_mode(self, mode: str) -> None:
         """

@@ -273,7 +273,25 @@ function Live({ api, prefs }) {
   const [t, setT] = useState(30), [playing, setPlaying] = useState(false);
   const [wsData, setWsData] = useState(null);
   const [wsActive, setWsActive] = useState(false);
+  const [cmdBusy, setCmdBusy] = useState(false);
+  const [cmdStatus, setCmdStatus] = useState(null);
   const { data: pollData, error: pollError } = useResource('live:' + t, () => api('/live?t=' + t), wsActive ? 0 : 1000);
+
+  async function sendCmd(cmd) {
+    setCmdBusy(true);
+    try {
+      const res = await api('/vehicle/command', {
+        method: 'POST',
+        body: JSON.stringify(cmd)
+      });
+      setCmdStatus(res.command);
+      setTimeout(() => setCmdStatus(null), 3500);
+    } catch (err) {
+      console.error('Vehicle command failed:', err);
+    } finally {
+      setCmdBusy(false);
+    }
+  }
 
   useEffect(() => {
     let ws;
@@ -588,6 +606,130 @@ function Live({ api, prefs }) {
           </div>
         </section>
       </div>
+
+      {/* 6. Two-Way Pit-Wall Telecommand Console */}
+      <section className="panel pitwall-panel">
+        <div className="panel-heading">
+          <div>
+            <h3>Two-Way Pit-Wall Telecommand Console</h3>
+            <p>Direct low-latency uplink to vehicle ECU (Port 9872 UDP loopback)</p>
+          </div>
+          <Radio size={17} style={{ color: 'var(--v-primary)' }} />
+        </div>
+
+        <div className="pitwall-grid">
+          {/* Drive Mode Override */}
+          <div className="pitwall-subcard">
+            <div className="pitwall-label">Drive Mode Override</div>
+            <div className="button-group">
+              {['ECO', 'DRIVE', 'SPORT'].map(mode => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={`btn-mode ${m.drive_mode === mode ? 'active' : ''}`}
+                  onClick={() => sendCmd({ action: 'SET_DRIVE_MODE', value: mode })}
+                  disabled={cmdBusy}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+            <small className="pitwall-hint">Overrides motor torque map &amp; throttle curve in real-time.</small>
+          </div>
+
+          {/* Pit Speed Limiter */}
+          <div className="pitwall-subcard">
+            <div className="pitwall-label">Pit Speed Limiter (35 MPH)</div>
+            <div className="button-group">
+              <button
+                type="button"
+                className={`btn-toggle ${!m.pit_limiter ? 'active-off' : ''}`}
+                onClick={() => sendCmd({ action: 'SET_PIT_LIMIT', enabled: false })}
+                disabled={cmdBusy}
+              >
+                OFF
+              </button>
+              <button
+                type="button"
+                className={`btn-toggle ${m.pit_limiter ? 'active-warn' : ''}`}
+                onClick={() => sendCmd({ action: 'SET_PIT_LIMIT', enabled: true })}
+                disabled={cmdBusy}
+              >
+                ⚠️ 35 MPH LIMIT
+              </button>
+            </div>
+            <small className="pitwall-hint">Pins vehicle governor to 35 MPH and notifies cockpit HUD.</small>
+          </div>
+
+          {/* Power Derate Limit */}
+          <div className="pitwall-subcard">
+            <div className="pitwall-label">Inverter Power Limit</div>
+            <div className="button-group">
+              {[25, 50, 75, 100].map(pct => (
+                <button
+                  key={pct}
+                  type="button"
+                  className={`btn-pct ${(m.power_limit_pct ?? 100) === pct ? 'active' : ''}`}
+                  onClick={() => sendCmd({ action: 'SET_POWER_LIMIT', value: pct })}
+                  disabled={cmdBusy}
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
+            <small className="pitwall-hint">Limits peak high-voltage inverter output wattage.</small>
+          </div>
+        </div>
+
+        {/* DTC Injection and Clear Console */}
+        <div className="dtc-console-strip">
+          <div className="dtc-console-header">
+            <div className="pitwall-label"><AlertTriangle size={15} style={{ color: '#FF4D6D' }} /> Remote Diagnostic Fault (DTC) Console</div>
+            <button
+              type="button"
+              className="btn-clear-dtc"
+              onClick={() => sendCmd({ action: 'CLEAR_DTC' })}
+              disabled={cmdBusy}
+            >
+              <Check size={14} /> CLEAR ALL FAULTS
+            </button>
+          </div>
+
+          <div className="dtc-quick-actions">
+            <span className="dtc-quick-label">SIMULATE FAULT:</span>
+            <button
+              type="button"
+              className="btn-dtc-tag"
+              onClick={() => sendCmd({ action: 'INJECT_DTC', code: 'P0A38', desc: 'Motor Core Overheat' })}
+              disabled={cmdBusy}
+            >
+              + P0A38 (Motor Overheat)
+            </button>
+            <button
+              type="button"
+              className="btn-dtc-tag"
+              onClick={() => sendCmd({ action: 'INJECT_DTC', code: 'P0A80', desc: 'Pack Degradation' })}
+              disabled={cmdBusy}
+            >
+              + P0A80 (Pack Degradation)
+            </button>
+            <button
+              type="button"
+              className="btn-dtc-tag"
+              onClick={() => sendCmd({ action: 'INJECT_DTC', code: 'C1A20', desc: 'Inverter Comms Timeout' })}
+              disabled={cmdBusy}
+            >
+              + C1A20 (Inverter Timeout)
+            </button>
+          </div>
+
+          {cmdStatus && (
+            <div className="cmd-status-toast">
+              🟢 Telecommand dispatched: <code>{JSON.stringify(cmdStatus)}</code>
+            </div>
+          )}
+        </div>
+      </section>
 
       <p className="footnote">
         {isStream ? 'Source: high-frequency UDP ring buffer (<15ms latency, 20 Hz F1 push).' : simulated ? 'Simulated benchmark dataset; formula-generated responses.' : 'Source: onboard PostgreSQL telemetry database.'}
