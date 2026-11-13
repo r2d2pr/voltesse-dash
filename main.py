@@ -244,16 +244,33 @@ class VoltesseApp:
             return
         self._last_udp_broadcast = now
         try:
-            speed_kmh = getattr(record, "speed_kmh", 0.0) or 0.0
-            power_kw = getattr(record, "battery_power_kw", 0.0) or 0.0
+            speed_kmh = float(getattr(record, "speed_kmh", 0.0) or 0.0)
+            power_kw = float(getattr(record, "battery_power_kw", 0.0) or 0.0)
+            soc = float(getattr(record, "battery_soc", 0.0) or 0.0)
+            mot_c = float(getattr(record, "motor_temp_c", 0.0) or 0.0)
+            inv_c = float(getattr(record, "inverter_temp_c", 0.0) or 0.0)
+            bat_c = float(getattr(record, "battery_temp_c", 0.0) or 0.0)
+            mot_f = round((mot_c * 9.0 / 5.0) + 32.0, 1)
+            inv_f = round((inv_c * 9.0 / 5.0) + 32.0, 1)
+            bat_f = round((bat_c * 9.0 / 5.0) + 32.0, 1)
             payload = json.dumps({
                 "speed": round(speed_kmh * 0.621371, 1),
                 "rpm": int(getattr(record, "motor_rpm", 0) or 0),
-                "battery": round(getattr(record, "battery_soc", 0.0) or 0.0, 1),
-                "temperature": round(getattr(record, "motor_temp_c", 0.0) or 0.0, 1),
+                "battery": round(soc, 1),
+                "temperature": mot_f,
+                "motor_temp_f": mot_f,
+                "inverter_temp_f": inv_f,
+                "battery_temp_f": bat_f,
                 "power": round(power_kw * 1000.0),
-                "gear": getattr(record, "gear", "P") or "P",
+                "power_kw": round(power_kw, 2),
+                "voltage": round(float(getattr(record, "battery_voltage", 0.0) or 0.0), 1),
+                "current": round(float(getattr(record, "battery_current", 0.0) or 0.0), 1),
+                "throttle_pct": round(float(getattr(record, "throttle_pct", 0.0) or 0.0), 1),
+                "brake_pct": round(float(getattr(record, "brake_pct", 0.0) or 0.0), 1),
+                "gear": getattr(record, "gear", "D") or "D",
+                "transmission_mode": getattr(record, "transmission_mode", "AUTO") or "AUTO",
                 "drive_mode": getattr(record, "drive_mode", "DRIVE") or "DRIVE",
+                "est_range_mi": int(round(soc * 2.6)),
                 "timestamp": now,
                 "mode": self.current_mode,
             }).encode("utf-8")

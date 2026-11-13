@@ -42,8 +42,9 @@ class Login(BaseModel):
     password: str = Field(min_length=1, max_length=1024)
 
 class Preferences(BaseModel):
-    warning_temp: int = Field(ge=40, le=110)
-    warning_battery: int = Field(ge=5, le=40)
+    warning_temp: int = Field(default=160, ge=100, le=250)
+    warning_battery: int = Field(default=20, ge=5, le=40)
+    palette: str = Field(default='mint')
 
 
 def connect(settings):
@@ -76,7 +77,7 @@ def create_app(settings: Settings | None = None):
     # In-memory real-time state (<15ms latency push)
     latest_live: dict | None = None
     last_udp_time: float = 0.0
-    temp_ring_buffer: deque = deque(maxlen=60)
+    trace_ring_buffer: deque = deque(maxlen=60)
     active_websockets: set[WebSocket] = set()
 
     async def broadcast_ws(frame_dict: dict):
@@ -96,9 +97,15 @@ def create_app(settings: Settings | None = None):
         now = time.time()
         latest_live = frame
         last_udp_time = now
-        temp_ring_buffer.append({
+        mot_temp_f = frame.get("motor_temp_f", frame.get("temperature", 0.0))
+        trace_ring_buffer.append({
             "seconds": round(now % 60, 1),
-            "temperature": frame.get("temperature", 0.0)
+            "speed": frame.get("speed", 0.0),
+            "rpm": frame.get("rpm", 0),
+            "throttle": frame.get("throttle_pct", 0.0),
+            "brake": frame.get("brake_pct", 0.0),
+            "power_kw": frame.get("power_kw", round(frame.get("power", 0) / 1000.0, 2)),
+            "temperature": mot_temp_f,
         })
         live_payload = {
             "mode": frame.get("mode", "RACE"),
@@ -110,12 +117,22 @@ def create_app(settings: Settings | None = None):
                 "speed": frame.get("speed", 0.0),
                 "rpm": frame.get("rpm", 0),
                 "battery": frame.get("battery", 0.0),
-                "temperature": frame.get("temperature", 0.0),
+                "temperature": mot_temp_f,
+                "motor_temp_f": mot_temp_f,
+                "inverter_temp_f": frame.get("inverter_temp_f", 0.0),
+                "battery_temp_f": frame.get("battery_temp_f", 0.0),
                 "power": frame.get("power", 0),
-                "gear": frame.get("gear", "P"),
+                "power_kw": frame.get("power_kw", round(frame.get("power", 0) / 1000.0, 2)),
+                "voltage": frame.get("voltage", 0.0),
+                "current": frame.get("current", 0.0),
+                "throttle_pct": frame.get("throttle_pct", 0.0),
+                "brake_pct": frame.get("brake_pct", 0.0),
+                "gear": frame.get("gear", "D"),
+                "transmission_mode": frame.get("transmission_mode", "AUTO"),
                 "drive_mode": frame.get("drive_mode", "DRIVE"),
+                "est_range_mi": frame.get("est_range_mi", 0),
             },
-            "history": list(temp_ring_buffer)
+            "history": list(trace_ring_buffer)
         }
         try:
             loop = asyncio.get_running_loop()
@@ -264,17 +281,19 @@ def create_app(settings: Settings | None = None):
     @app.get('/api/settings')
     def get_settings(user: User):
         with connect(settings) as conn:
-            row = conn.execute('SELECT warning_temp,warning_battery FROM technician_preferences WHERE technician_id=%s',
+            row = conn.execute('SELECT warning_temp,warning_battery,palette FROM technician_preferences WHERE technician_id=%s',
                                (user['technician_id'],)).fetchone()
-        return row or {'warning_temp': 60, 'warning_battery': 20}
+        return row or {'warning_temp': 160, 'warning_battery': 20, 'palette': 'mint'}
 
     @app.put('/api/settings')
     def put_settings(body: Preferences, user: User):
         with connect(settings) as conn:
-            conn.execute('''INSERT INTO technician_preferences VALUES (%s,%s,%s)
+            conn.execute('''INSERT INTO technician_preferences (technician_id, warning_temp, warning_battery, palette)
+                VALUES (%s,%s,%s,%s)
                 ON CONFLICT (technician_id) DO UPDATE SET warning_temp=EXCLUDED.warning_temp,
-                warning_battery=EXCLUDED.warning_battery''',
-                (user['technician_id'], body.warning_temp, body.warning_battery))
+                warning_battery=EXCLUDED.warning_battery,
+                palette=EXCLUDED.palette''',
+                (user['technician_id'], body.warning_temp, body.warning_battery, body.palette))
         return body
 
     @app.websocket('/api/ws/telemetry')
@@ -283,6 +302,7 @@ def create_app(settings: Settings | None = None):
         active_websockets.add(websocket)
         now = time.time()
         if latest_live and (now - last_udp_time) <= 3.0:
+            mot_temp_f = latest_live.get("motor_temp_f", latest_live.get("temperature", 0.0))
             init_payload = {
                 "mode": latest_live.get("mode", "RACE"),
                 "status": "LIVE (F1 STREAM · 20 Hz)",
@@ -293,12 +313,22 @@ def create_app(settings: Settings | None = None):
                     "speed": latest_live.get("speed", 0.0),
                     "rpm": latest_live.get("rpm", 0),
                     "battery": latest_live.get("battery", 0.0),
-                    "temperature": latest_live.get("temperature", 0.0),
+                    "temperature": mot_temp_f,
+                    "motor_temp_f": mot_temp_f,
+                    "inverter_temp_f": latest_live.get("inverter_temp_f", 0.0),
+                    "battery_temp_f": latest_live.get("battery_temp_f", 0.0),
                     "power": latest_live.get("power", 0),
-                    "gear": latest_live.get("gear", "P"),
+                    "power_kw": latest_live.get("power_kw", round(latest_live.get("power", 0) / 1000.0, 2)),
+                    "voltage": latest_live.get("voltage", 0.0),
+                    "current": latest_live.get("current", 0.0),
+                    "throttle_pct": latest_live.get("throttle_pct", 0.0),
+                    "brake_pct": latest_live.get("brake_pct", 0.0),
+                    "gear": latest_live.get("gear", "D"),
+                    "transmission_mode": latest_live.get("transmission_mode", "AUTO"),
                     "drive_mode": latest_live.get("drive_mode", "DRIVE"),
+                    "est_range_mi": latest_live.get("est_range_mi", 0),
                 },
-                "history": list(temp_ring_buffer)
+                "history": list(trace_ring_buffer)
             }
             try:
                 await websocket.send_text(json.dumps(init_payload))
@@ -317,29 +347,63 @@ def create_app(settings: Settings | None = None):
         if settings.mode == 'SIMULATION':
             values = live_metrics(t)
             times, temps = live_temperature_history(t)
+            mot_f = round(values['temperature'] * 9.0 / 5.0 + 32.0, 1)
+            power_w = round(values['speed'] * 180)
             return {'mode': 'SIMULATION', 'status': 'Simulated vehicle data', 'stale': False,
-                    'metrics': values | {'power': round(values['speed'] * 180)},
-                    'history': [{'seconds': x, 'temperature': y} for x, y in zip(times, temps)],
+                    'metrics': {
+                        'speed': values['speed'],
+                        'rpm': values['rpm'],
+                        'battery': values['battery'],
+                        'temperature': mot_f,
+                        'motor_temp_f': mot_f,
+                        'inverter_temp_f': round(mot_f - 12.0, 1),
+                        'battery_temp_f': round(mot_f - 24.0, 1),
+                        'power': power_w,
+                        'power_kw': round(power_w / 1000.0, 2),
+                        'voltage': 382.0,
+                        'current': round(power_w / 382.0, 1),
+                        'throttle_pct': round(min(100.0, values['speed'] * 1.2), 1),
+                        'brake_pct': 0.0,
+                        'gear': 'D',
+                        'transmission_mode': 'AUTO',
+                        'drive_mode': 'DRIVE',
+                        'est_range_mi': int(round(values['battery'] * 2.6)),
+                    },
+                    'history': [{'seconds': x, 'temperature': round(y * 9.0 / 5.0 + 32.0, 1),
+                                 'speed': values['speed'], 'rpm': values['rpm'],
+                                 'throttle': round(min(100.0, values['speed'] * 1.2), 1), 'brake': 0.0,
+                                 'power_kw': round(power_w / 1000.0, 2)} for x, y in zip(times, temps)],
                     'timestamp': None}
 
         # Fast path: in-memory live UDP stream (<15ms latency, zero DB load)
         now_ts = time.time()
         if latest_live and (now_ts - last_udp_time) <= 3.0:
+            mot_temp_f = latest_live.get("motor_temp_f", latest_live.get("temperature", 0.0))
             return {
                 'mode': latest_live.get('mode', 'DATABASE'),
                 'status': 'LIVE (F1 STREAM · 20 Hz)',
                 'stale': False,
                 'timestamp': datetime.fromtimestamp(latest_live.get('timestamp', now_ts), tz=timezone.utc).isoformat(),
                 'source_type': 'LIVE_UDP',
-                'history': list(temp_ring_buffer),
+                'history': list(trace_ring_buffer),
                 'metrics': {
                     'speed': latest_live.get('speed', 0.0),
                     'rpm': latest_live.get('rpm', 0),
                     'battery': latest_live.get('battery', 0.0),
-                    'temperature': latest_live.get('temperature', 0.0),
+                    'temperature': mot_temp_f,
+                    'motor_temp_f': mot_temp_f,
+                    'inverter_temp_f': latest_live.get('inverter_temp_f', 0.0),
+                    'battery_temp_f': latest_live.get('battery_temp_f', 0.0),
                     'power': latest_live.get('power', 0),
-                    'gear': latest_live.get('gear', 'P'),
+                    'power_kw': latest_live.get('power_kw', round(latest_live.get('power', 0) / 1000.0, 2)),
+                    'voltage': latest_live.get('voltage', 0.0),
+                    'current': latest_live.get('current', 0.0),
+                    'throttle_pct': latest_live.get('throttle_pct', 0.0),
+                    'brake_pct': latest_live.get('brake_pct', 0.0),
+                    'gear': latest_live.get('gear', 'D'),
+                    'transmission_mode': latest_live.get('transmission_mode', 'AUTO'),
                     'drive_mode': latest_live.get('drive_mode', 'DRIVE'),
+                    'est_range_mi': latest_live.get('est_range_mi', 0),
                 }
             }
 
@@ -350,14 +414,35 @@ def create_app(settings: Settings | None = None):
             if not latest:
                 return {'mode': 'DATABASE', 'status': 'No vehicle readings available', 'metrics': None, 'history': [], 'stale': True}
             rows = conn.execute('''SELECT extract(epoch FROM ("timestamp" - %s::timestamptz)) AS seconds,
-                motor_temperature AS temperature FROM telemetry_log WHERE session_id=%s
+                round((motor_temperature * 9.0 / 5.0) + 32.0, 1) AS temperature,
+                speed_mph AS speed, motor_rpm AS rpm, coalesce(throttle_pct, 0.0) AS throttle,
+                coalesce(brake_pct, 0.0) AS brake, round(power_draw_watts / 1000.0, 2) AS power_kw
+                FROM telemetry_log WHERE session_id=%s
                 AND "timestamp" BETWEEN %s::timestamptz - interval '60 seconds' AND %s::timestamptz
                 ORDER BY "timestamp"''', (latest['timestamp'], latest['session_id'], latest['timestamp'], latest['timestamp'])).fetchall()
         stale = (datetime.now(timezone.utc) - latest['timestamp']).total_seconds() > 5
+        mot_f = round(latest['motor_temperature'] * 9.0 / 5.0 + 32.0, 1) if latest['motor_temperature'] is not None else 0.0
+        inv_c = latest['inverter_temp_c'] if 'inverter_temp_c' in latest and latest['inverter_temp_c'] is not None else None
+        bat_c = latest['battery_temp_c'] if 'battery_temp_c' in latest and latest['battery_temp_c'] is not None else None
+        inv_f = round(inv_c * 9.0 / 5.0 + 32.0, 1) if inv_c is not None else round(mot_f - 10.0, 1)
+        bat_f = round(bat_c * 9.0 / 5.0 + 32.0, 1) if bat_c is not None else round(mot_f - 22.0, 1)
+        power_w = float(latest['power_draw_watts'] or 0.0)
+        power_kw = round(power_w / 1000.0, 2)
+        soc = float(latest['battery_percent'] or 0.0)
+        est_range_mi = int(round(soc * 2.6))
         return {'mode': 'DATABASE', 'status': latest['signal_status'] or 'Database telemetry', 'stale': stale,
                 'timestamp': latest['timestamp'], 'source_type': latest['source_type'], 'history': rows,
                 'metrics': {'speed': latest['speed_mph'], 'rpm': latest['motor_rpm'], 'battery': latest['battery_percent'],
-                            'temperature': latest['motor_temperature'], 'power': latest['power_draw_watts']}}
+                            'temperature': mot_f, 'motor_temp_f': mot_f, 'inverter_temp_f': inv_f, 'battery_temp_f': bat_f,
+                            'power': power_w, 'power_kw': power_kw,
+                            'voltage': round(float(latest['battery_voltage_v'] or 0.0), 1) if 'battery_voltage_v' in latest else 0.0,
+                            'current': round(float(latest['battery_current_a'] or 0.0), 1) if 'battery_current_a' in latest else 0.0,
+                            'throttle_pct': round(float(latest['throttle_pct'] or 0.0), 1) if 'throttle_pct' in latest else 0.0,
+                            'brake_pct': round(float(latest['brake_pct'] or 0.0), 1) if 'brake_pct' in latest else 0.0,
+                            'gear': latest.get('gear') or 'D',
+                            'transmission_mode': latest.get('transmission_mode') or 'AUTO',
+                            'drive_mode': latest.get('drive_mode') or 'DRIVE',
+                            'est_range_mi': est_range_mi}}
 
     @app.get('/api/sessions')
     def sessions(user: User):

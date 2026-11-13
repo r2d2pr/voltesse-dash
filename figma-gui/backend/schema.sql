@@ -12,6 +12,11 @@ CREATE TABLE IF NOT EXISTS web_login_throttle (
 );
 CREATE TABLE IF NOT EXISTS technician_preferences (
     technician_id INT PRIMARY KEY REFERENCES technician_user(technician_id) ON DELETE CASCADE,
-    warning_temp INT NOT NULL DEFAULT 60 CHECK (warning_temp BETWEEN 40 AND 110),
-    warning_battery INT NOT NULL DEFAULT 20 CHECK (warning_battery BETWEEN 5 AND 40)
+    warning_temp INT NOT NULL DEFAULT 160 CHECK (warning_temp BETWEEN 100 AND 250),
+    warning_battery INT NOT NULL DEFAULT 20 CHECK (warning_battery BETWEEN 5 AND 40),
+    palette TEXT NOT NULL DEFAULT 'mint'
 );
+ALTER TABLE technician_preferences DROP CONSTRAINT IF EXISTS technician_preferences_warning_temp_check;
+ALTER TABLE technician_preferences ADD CONSTRAINT technician_preferences_warning_temp_check CHECK (warning_temp BETWEEN 100 AND 250);
+ALTER TABLE technician_preferences ALTER COLUMN warning_temp SET DEFAULT 160;
+ALTER TABLE technician_preferences ADD COLUMN IF NOT EXISTS palette TEXT NOT NULL DEFAULT 'mint';
