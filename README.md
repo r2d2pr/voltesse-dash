@@ -168,6 +168,39 @@ streamlit run technician-gui/app.py
 - **Sessions Channel**: Historical timing-board log with session duration, peak thermals (`°F`), max speed (`MPH`), and total distance (`mi`).
 - **Settings Channel**: Calibration of motor thermal warning limit (`110°F`–`230°F`, default `160°F`), low battery alert threshold (`5%`–`40%`, default `20%`), and database link diagnostics.
 
+
+---
+
+## Embedded & Raspberry Pi Startup Services (Systemd)
+
+Systemd unit definitions are located in `services/` for running the driver cockpit and technician portal automatically on boot (e.g. Raspberry Pi with 800×480 touchscreen):
+- `services/voltesse-dash.service`: Fullscreen kiosk launcher via `cage` Wayland compositor running the PyQt6 cluster GUI.
+- `services/voltesse-technician.service`: Streamlit technician web interface running on port 8501.
+
+### Quick Setup on Raspberry Pi:
+
+```bash
+# 1. Copy service files to systemd directory
+sudo cp services/voltesse-*.service /etc/systemd/system/
+
+# 2. Reload systemd daemon
+sudo systemctl daemon-reload
+
+# 3. Enable and start services on boot
+sudo systemctl enable --now voltesse-dash.service
+sudo systemctl enable --now voltesse-technician.service
+```
+
+### Monitoring & Logs:
+
+```bash
+# Cockpit GUI logs
+journalctl -u voltesse-dash.service -f
+
+# Technician Portal logs
+journalctl -u voltesse-technician.service -f
+```
+
 ---
 
 ## Running Tests
