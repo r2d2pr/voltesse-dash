@@ -281,7 +281,7 @@ class SpeedometerDialWidget(QWidget):
         self.max_val = max_val
         self.update()
 
-    def set_value(self, value: float, sub_val: str = "") -> None:
+    def set_value(self, value: float, sub_val: str = "", trigger_update: bool = True) -> None:
         self.current_val = max(self.min_val, min(self.max_val, value))
         if sub_val:
             self.sub_val = str(sub_val)
@@ -290,7 +290,8 @@ class SpeedometerDialWidget(QWidget):
                 self.motor_rpm = max(0, int(float(clean_rpm)))
             except (ValueError, TypeError):
                 pass
-        self.update()
+        if trigger_update:
+            self.update()
 
     def set_motor_rpm(self, rpm: int) -> None:
         self.motor_rpm = max(0, int(rpm))
@@ -306,6 +307,7 @@ class SpeedometerDialWidget(QWidget):
         steering_angle: float = 0.0,
         transmission_mode: str = "AUTO",
         motor_rpm: Optional[int] = None,
+        trigger_update: bool = True,
     ) -> None:
         self.throttle_pct = throttle
         self.brake_pct = brake
@@ -316,7 +318,8 @@ class SpeedometerDialWidget(QWidget):
         if motor_rpm is not None:
             self.motor_rpm = max(0, int(motor_rpm))
             self.sub_val = str(self.motor_rpm)
-        self.update()
+        if trigger_update:
+            self.update()
 
     def set_aux_telemetry(
         self,
@@ -326,6 +329,7 @@ class SpeedometerDialWidget(QWidget):
         trip_dist_mi: float = 9999.0,
         battery_voltage: float = 398.0,
         battery_power_kw: float = 42.0,
+        trigger_update: bool = True,
     ) -> None:
         """Sets auxiliary battery, thermal, and trip distance telemetry for OLED binnacle."""
         self.battery_soc = max(0.0, min(100.0, float(soc)))
@@ -334,7 +338,8 @@ class SpeedometerDialWidget(QWidget):
         self.trip_dist_mi = max(0.0, float(trip_dist_mi))
         self.battery_voltage = float(battery_voltage)
         self.battery_power_kw = float(battery_power_kw)
-        self.update()
+        if trigger_update:
+            self.update()
 
     def set_cluster_theme(self, theme: str) -> None:
         """Switches cluster rendering theme ('OLED' or 'CLASSIC')."""
@@ -4167,8 +4172,8 @@ class VoltesseDashboard(QMainWindow):
         is_imp = True
         disp_speed = record.speed_kmh * 0.621371
 
-        # Central Speedometer Dial
-        self.speed_gauge.set_value(disp_speed, sub_val=str(record.motor_rpm))
+        # Central Speedometer Dial (Batch update properties and trigger single repaint)
+        self.speed_gauge.set_value(disp_speed, sub_val=str(record.motor_rpm), trigger_update=False)
         self.speed_gauge.set_pedals_and_gear(
             throttle=record.throttle_pct,
             brake=record.brake_pct,
@@ -4176,6 +4181,7 @@ class VoltesseDashboard(QMainWindow):
             mode=record.drive_mode,
             steering_angle=record.steering_angle,
             transmission_mode=trans_mode,
+            trigger_update=False,
         )
         if hasattr(self.speed_gauge, "set_aux_telemetry"):
             disp_dist = record.trip_distance_km * 0.621371
@@ -4186,7 +4192,9 @@ class VoltesseDashboard(QMainWindow):
                 trip_dist_mi=disp_dist,
                 battery_voltage=getattr(record, "battery_voltage", 398.0),
                 battery_power_kw=getattr(record, "battery_power_kw", 42.0),
+                trigger_update=False,
             )
+        self.speed_gauge.update()
 
         # Compact Speed Pods (for non-speed hero views)
         for pod in getattr(self, "compact_speed_pods", [self.compact_speed_widget]):
