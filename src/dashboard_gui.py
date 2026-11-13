@@ -491,25 +491,80 @@ class SpeedometerDialWidget(QWidget):
             painter.drawText(pill_rect.adjusted(10, 0, -10, 0), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"⚠️ FAULT: {text}")
 
         elif active_dtcs:
-            # 2. Persistent compact MIL indicator in bottom-left corner
-            first_w = active_dtcs[0]
-            count_str = f" [{len(active_dtcs)}]" if len(active_dtcs) > 1 else ""
-            label_text = f"⚠️ DTC{count_str}: {first_w}"
+            # 2. Persistent telltale symbol ONLY (Check Engine / MIL telltale, zero text box)
+            sym_x = 24.0
+            sym_y = h - 42.0
+            sym_w = 30.0
+            sym_h = 22.0
 
-            pill_w = max(180.0, min(280.0, w * 0.32))
-            pill_rect = QRectF(margin_x, margin_y, pill_w, pill_h)
+            mil_col = QColor("#FF9F1C")  # ISO 7000-1393 Automotive MIL Amber
 
-            bg_col = QColor(22, 6, 9, 215)
-            border_col = QColor(255, 77, 109, 180)
+            # Ambient telltale lamp glow
+            glow_grad = QRadialGradient(QPointF(sym_x + 14.0, sym_y + 11.0), 22.0)
+            glow_grad.setColorAt(0.0, QColor(255, 159, 28, 95))
+            glow_grad.setColorAt(0.55, QColor(255, 159, 28, 25))
+            glow_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
+            painter.setBrush(QBrush(glow_grad))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawEllipse(QPointF(sym_x + 14.0, sym_y + 11.0), 22.0, 18.0)
 
-            painter.setBrush(QBrush(bg_col))
-            painter.setPen(QPen(border_col, 1.2))
-            painter.drawRoundedRect(pill_rect, 6.0, 6.0)
+            # Check Engine icon silhouette
+            bx = sym_x + 5.0
+            by = sym_y + 5.0
+            bw = 18.0
+            bh = 12.0
 
-            painter.setPen(QColor("#FFA3B4"))
-            font = QFont("Segoe UI", max(8, min(10, int(pill_h * 0.36))), QFont.Weight.Bold)
-            painter.setFont(font)
-            painter.drawText(pill_rect.adjusted(8, 0, -8, 0), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, label_text)
+            path = QPainterPath()
+            # Top air intake snout
+            path.moveTo(bx + 3.0, by)
+            path.lineTo(bx + 3.0, by - 3.5)
+            path.lineTo(bx + 8.5, by - 3.5)
+            path.lineTo(bx + 8.5, by)
+
+            # Top-right pipe/manifold bump
+            path.lineTo(bx + 13.5, by)
+            path.lineTo(bx + 13.5, by - 2.0)
+            path.lineTo(bx + 16.0, by - 2.0)
+            path.lineTo(bx + 16.0, by + 2.0)
+
+            # Right engine housing
+            path.lineTo(bx + bw, by + 3.0)
+            path.lineTo(bx + bw + 3.5, by + 3.0)
+            path.lineTo(bx + bw + 3.5, by + 9.0)
+            path.lineTo(bx + bw, by + 9.0)
+            path.lineTo(bx + bw, by + bh)
+
+            # Bottom sump
+            path.lineTo(bx, by + bh)
+
+            # Left fan/pulley snout
+            path.lineTo(bx, by + 9.0)
+            path.lineTo(bx - 3.5, by + 9.0)
+            path.lineTo(bx - 3.5, by + 3.5)
+            path.lineTo(bx, by + 3.5)
+            path.closeSubpath()
+
+            painter.setBrush(QBrush(mil_col))
+            painter.setPen(QPen(QColor(255, 225, 170), 1.0))
+            painter.drawPath(path)
+
+            # Inner lightning symbol
+            bolt = QPolygonF([
+                QPointF(bx + 9.5, by + 2.5),
+                QPointF(bx + 6.5, by + 6.5),
+                QPointF(bx + 9.5, by + 6.5),
+                QPointF(bx + 8.5, by + 10.5),
+                QPointF(bx + 12.0, by + 5.5),
+                QPointF(bx + 9.5, by + 5.5),
+            ])
+            painter.setBrush(QBrush(QColor(18, 9, 3)))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawPolygon(bolt)
+
+            if len(active_dtcs) > 1:
+                painter.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+                painter.setPen(mil_col)
+                painter.drawText(QRectF(bx + bw + 5.0, by - 2.0, 16.0, 14.0), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, f"{len(active_dtcs)}")
 
         painter.restore()
 
@@ -729,44 +784,49 @@ class SpeedometerDialWidget(QWidget):
         painter.setPen(QPen(self.palette.secondary, 1.5))
         painter.drawEllipse(QPointF(cx, cy), hub_r, hub_r)
 
-        # Refined Vertical Temperature Sub-Gauge on Right Flank of Left Pod (Zero Overlap)
-        sub_x = cx + r * 0.50
+        # Refined Vertical Temperature Sub-Gauge on Right Flank of Left Pod (Generously Spaced, Zero Overlap)
+        sub_x = cx + r * 0.54
         bar_top_y = cy - r * 0.18
         bar_bot_y = cy + r * 0.48
         bar_h = bar_bot_y - bar_top_y
 
+        # 1. Temperature Graduation Labels (Separated with 10px+ clean margin from the bar line)
+        lbl_w = r * 0.22
+        lbl_gap = max(9.0, r * 0.08)  # Generous breathing gap
+        lbl_x = sub_x - lbl_gap - lbl_w
+
         painter.setFont(QFont("Segoe UI", max(5, min(9, int(r * 0.068))), QFont.Weight.Bold))
         painter.setPen(COLOR_TEXT_MUTED)
-        painter.drawText(QRectF(sub_x - r * 0.24, bar_top_y - 8, r * 0.22, 12), Qt.AlignmentFlag.AlignRight, "320")
-        painter.drawText(QRectF(sub_x - r * 0.24, cy + r * 0.12 - 6, r * 0.22, 12), Qt.AlignmentFlag.AlignRight, "200")
-        painter.drawText(QRectF(sub_x - r * 0.24, bar_bot_y - 8, r * 0.22, 12), Qt.AlignmentFlag.AlignRight, "100")
+        painter.drawText(QRectF(lbl_x, bar_top_y - 7, lbl_w, 14), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, "320")
+        painter.drawText(QRectF(lbl_x, cy + r * 0.12 - 7, lbl_w, 14), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, "200")
+        painter.drawText(QRectF(lbl_x, bar_bot_y - 7, lbl_w, 14), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, "100")
 
-        # Vector Thermometer Icon + °F Label
+        # 2. Vector Thermometer Icon + °F Label (Positioned cleanly at top header, completely clear of bar)
         motor_temp_f = self.motor_temp_c * 9.0 / 5.0 + 32.0
         pip_col = COLOR_RED if motor_temp_f >= 220 else (COLOR_AMBER if motor_temp_f >= 180 else self.palette.primary)
 
-        thermo_stem_x = sub_x - r * 0.14
-        thermo_top_y = cy + r * 0.24
+        hdr_y = bar_top_y - 18.0
+        thermo_stem_x = sub_x - 14.0
         painter.setBrush(QBrush(pip_col))
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(QRectF(thermo_stem_x - 1.2, thermo_top_y, 2.4, 7.0), 1.0, 1.0)
-        painter.drawEllipse(QPointF(thermo_stem_x, thermo_top_y + 8.5), 2.5, 2.5)
+        painter.drawRoundedRect(QRectF(thermo_stem_x - 1.2, hdr_y, 2.4, 7.0), 1.0, 1.0)
+        painter.drawEllipse(QPointF(thermo_stem_x, hdr_y + 8.5), 2.5, 2.5)
 
         painter.setFont(QFont("Segoe UI", max(6, min(9, int(r * 0.075))), QFont.Weight.Bold))
         painter.setPen(pip_col)
-        painter.drawText(QRectF(sub_x - r * 0.10, cy + r * 0.23, r * 0.14, 12), Qt.AlignmentFlag.AlignLeft, "°F")
+        painter.drawText(QRectF(thermo_stem_x - 28.0, hdr_y - 1, 24.0, 14), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, "°F")
 
-        # Vertical Track & Tick Marks
+        # 3. Vertical Track & Tick Marks
         painter.setPen(QPen(QColor(10, 28, 20, 220), 2.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         painter.drawLine(QPointF(sub_x, bar_top_y), QPointF(sub_x, bar_bot_y))
 
-        # Horizontal Ticks
+        # Horizontal Ticks (Pointing into flank)
         painter.setPen(QPen(QColor(18, 50, 38, 200), 1.0))
         painter.drawLine(QPointF(sub_x, bar_top_y), QPointF(sub_x + 4, bar_top_y))
         painter.drawLine(QPointF(sub_x, cy + r * 0.12), QPointF(sub_x + 3, cy + r * 0.12))
         painter.drawLine(QPointF(sub_x, bar_bot_y), QPointF(sub_x + 4, bar_bot_y))
 
-        # Dynamic Fluid Level Line & Floating Pip
+        # 4. Dynamic Fluid Level Line & Floating Pip
         t_frac = min(1.0, max(0.0, (motor_temp_f - 100.0) / 220.0))
         cur_temp_y = bar_bot_y - (bar_h * t_frac)
         painter.setPen(QPen(pip_col, 2.8, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
@@ -1109,71 +1169,100 @@ class SpeedometerDialWidget(QWidget):
         painter.setPen(QPen(QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 70), 1.0))
         painter.drawEllipse(QPointF(cx, cy), base_r, base_r)
 
-        # 7. Curved Vertical Ribbon Meter on Right Flank (ACCEL / BRAKE)
-        ribbon_r = r * 1.07
-        ribbon_rect = QRectF(cx - ribbon_r, cy - ribbon_r, ribbon_r * 2, ribbon_r * 2)
+        # 7. Precision Vertical Pedal Input Meter (ACCEL / BRAKE)
+        # Positioned in the clear bridge between Center Pod and Right Pod (Zero Circle Collision)
+        meter_x = cx + r * 1.09
+        bar_len = r * 0.38
+        top_y = cy - bar_len
+        bot_y = cy + bar_len
 
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.setPen(QPen(QColor(10, 28, 20, 220), max(3.5, r * 0.026), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-        painter.drawArc(ribbon_rect, int(32.0 * 16), int(-64.0 * 16))
+        # Background Track (Top=Accel, Bottom=Brake)
+        painter.setPen(QPen(QColor(10, 28, 20, 220), 4.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawLine(QPointF(meter_x, cy), QPointF(meter_x, top_y))
 
-        m_x1 = cx + ribbon_r - (r * 0.035)
-        m_x2 = cx + ribbon_r + (r * 0.035)
+        painter.setPen(QPen(QColor(28, 8, 12, 220), 4.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawLine(QPointF(meter_x, cy), QPointF(meter_x, bot_y))
+
+        # Center Neutral Hash Tick (0%)
         painter.setPen(QPen(COLOR_TEXT_PRIMARY, 1.5))
-        painter.drawLine(QPointF(m_x1, cy), QPointF(m_x2, cy))
+        painter.drawLine(QPointF(meter_x - 5, cy), QPointF(meter_x + 5, cy))
 
-        a_rad = -math.radians(38.0)
-        a_x = cx + math.cos(a_rad) * (ribbon_r * 1.02)
-        a_y = cy + math.sin(a_rad) * (ribbon_r * 1.02)
-        painter.setFont(QFont("Segoe UI", max(6, min(10, int(r * 0.065))), QFont.Weight.Bold))
-        painter.setPen(self.palette.primary)
-        painter.drawText(QRectF(a_x - 10, a_y - 12, 45, 14), Qt.AlignmentFlag.AlignLeft, "ACCEL")
-
-        b_rad = -math.radians(-38.0)
-        b_x = cx + math.cos(b_rad) * (ribbon_r * 1.02)
-        b_y = cy + math.sin(b_rad) * (ribbon_r * 1.02)
-        painter.setFont(QFont("Segoe UI", max(6, min(10, int(r * 0.065))), QFont.Weight.Bold))
-        painter.setPen(COLOR_RED)
-        painter.drawText(QRectF(b_x - 10, b_y - 2, 45, 14), Qt.AlignmentFlag.AlignLeft, "BRAKE")
-
+        # Active ACCEL (Throttle) Fill: fills upward from center neutral line
         if self.throttle_pct > 0.5:
-            thr_span = 30.0 * (self.throttle_pct / 100.0)
-            painter.setPen(QPen(self.palette.primary, max(3.5, r * 0.026), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-            painter.drawArc(ribbon_rect, int(0 * 16), int(thr_span * 16))
+            thr_ratio = min(1.0, self.throttle_pct / 100.0)
+            cur_thr_y = cy - (bar_len * thr_ratio)
+            painter.setPen(QPen(self.palette.primary, 4.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            painter.drawLine(QPointF(meter_x, cy), QPointF(meter_x, cur_thr_y))
 
-            pip_rad = -math.radians(thr_span)
-            px = cx + math.cos(pip_rad) * ribbon_r
-            py = cy + math.sin(pip_rad) * ribbon_r
+            # Floating Tip Pip
             painter.setBrush(QBrush(COLOR_TEXT_PRIMARY))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawEllipse(QPointF(px, py), 2.5, 2.5)
+            painter.setPen(QPen(self.palette.primary, 1.2))
+            painter.drawEllipse(QPointF(meter_x, cur_thr_y), 2.5, 2.5)
+
+        # Active BRAKE Fill: fills downward from center neutral line
         elif self.brake_pct > 0.5:
-            brk_span = -30.0 * (self.brake_pct / 100.0)
-            painter.setPen(QPen(COLOR_RED, max(3.5, r * 0.026), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-            painter.drawArc(ribbon_rect, int(0 * 16), int(brk_span * 16))
+            brk_ratio = min(1.0, self.brake_pct / 100.0)
+            cur_brk_y = cy + (bar_len * brk_ratio)
+            painter.setPen(QPen(COLOR_RED, 4.5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            painter.drawLine(QPointF(meter_x, cy), QPointF(meter_x, cur_brk_y))
 
-            pip_rad = -math.radians(brk_span)
-            px = cx + math.cos(pip_rad) * ribbon_r
-            py = cy + math.sin(pip_rad) * ribbon_r
+            # Floating Tip Pip
             painter.setBrush(QBrush(COLOR_TEXT_PRIMARY))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawEllipse(QPointF(px, py), 2.5, 2.5)
+            painter.setPen(QPen(COLOR_RED, 1.2))
+            painter.drawEllipse(QPointF(meter_x, cur_brk_y), 2.5, 2.5)
 
-        # 8. Bottom Center Readouts (Gear, Drive Mode, Odometer - Balanced & Centered)
-        gear_y = cy + r * 0.80
-        badge_w = r * 0.30
-        painter.setFont(QFont("Segoe UI", max(8, min(14, int(r * 0.090))), QFont.Weight.Bold))
-        painter.setPen(self.palette.secondary)
-        painter.drawText(QRectF(cx - r * 0.42, gear_y, badge_w, 18), Qt.AlignmentFlag.AlignRight, self.active_gear)
+        # Labels (Completely clear of middle circle and right pod)
+        lbl_font = QFont("Segoe UI", max(6, min(9, int(r * 0.065))), QFont.Weight.Bold)
+        painter.setFont(lbl_font)
 
-        mode_char = self.drive_mode[0] if self.drive_mode else "D"
+        # ACCEL Header Label
+        accel_text = f"ACC {int(self.throttle_pct)}%" if self.throttle_pct > 1.0 else "ACCEL"
+        painter.setPen(self.palette.primary if self.throttle_pct > 1.0 else QColor(self.palette.primary.red(), self.palette.primary.green(), self.palette.primary.blue(), 180))
+        painter.drawText(QRectF(meter_x - 30, top_y - 18, 60, 14), Qt.AlignmentFlag.AlignCenter, accel_text)
+
+        # BRAKE Footer Label
+        brake_text = f"BRK {int(self.brake_pct)}%" if self.brake_pct > 1.0 else "BRAKE"
+        painter.setPen(COLOR_RED if self.brake_pct > 1.0 else QColor(255, 77, 109, 180))
+        painter.drawText(QRectF(meter_x - 30, bot_y + 4, 60, 14), Qt.AlignmentFlag.AlignCenter, brake_text)
+
+        # 8. Bottom Center Readouts: Gear Pill & Odometer (Cleanly Spaced Inside Dial, Zero Circle Overlap)
+        # 8a. Sculpted Glass Gear & Drive Mode Pill
+        pill_w = max(84.0, r * 0.58)
+        pill_h = max(20.0, r * 0.15)
+        pill_x = cx - (pill_w / 2.0)
+        pill_y = cy + r * 0.38
+        pill_rect = QRectF(pill_x, pill_y, pill_w, pill_h)
+
+        painter.setBrush(QBrush(QColor(6, 18, 14, 220)))
+        painter.setPen(QPen(QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 140), 1.0))
+        painter.drawRoundedRect(pill_rect, pill_h / 2.0, pill_h / 2.0)
+
+        # Gear (Left side of pill: bold, prominent)
+        gear_font = QFont("Segoe UI", max(9, min(13, int(pill_h * 0.52))), QFont.Weight.Bold)
+        painter.setFont(gear_font)
         painter.setPen(self.palette.primary)
-        painter.drawText(QRectF(cx - r * 0.07, gear_y, r * 0.14, 18), Qt.AlignmentFlag.AlignCenter, mode_char)
+        painter.drawText(QRectF(pill_x + 8, pill_y, pill_w * 0.45 - 8, pill_h), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, self.active_gear)
 
-        odo_str = f"{int(round(self.trip_dist_mi)):05d} mi"
-        painter.setFont(QFont("Segoe UI", max(7, min(12, int(r * 0.074))), QFont.Weight.Bold))
+        # Divider pip
+        painter.setPen(QPen(QColor(self.palette.secondary.red(), self.palette.secondary.green(), self.palette.secondary.blue(), 100), 1.0))
+        painter.drawLine(QPointF(cx, pill_y + 4), QPointF(cx, pill_y + pill_h - 4))
+
+        # Drive Mode (Right side of pill)
+        mode_font = QFont("Segoe UI", max(7, min(10, int(pill_h * 0.42))), QFont.Weight.Bold)
+        mode_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
+        painter.setFont(mode_font)
         painter.setPen(self.palette.highlight)
-        painter.drawText(QRectF(cx + r * 0.12, gear_y, r * 0.42, 18), Qt.AlignmentFlag.AlignLeft, odo_str)
+        mode_str = self.drive_mode if self.drive_mode else "DRIVE"
+        painter.drawText(QRectF(cx + 8, pill_y, pill_w * 0.50 - 12, pill_h), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, mode_str)
+
+        # 8b. Odometer Readout (Centered below gear pill with 38+ pixels margin to bottom circle)
+        odo_y = cy + r * 0.60
+        odo_str = f"{int(round(self.trip_dist_mi)):05d} mi"
+        odo_font = QFont("Segoe UI", max(8, min(12, int(r * 0.076))), QFont.Weight.Bold)
+        odo_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
+        painter.setFont(odo_font)
+        painter.setPen(COLOR_TEXT_PRIMARY)
+        painter.drawText(QRectF(cx - r * 0.40, odo_y, r * 0.80, 18), Qt.AlignmentFlag.AlignCenter, odo_str)
 
     def _paint_classic_theme(self, painter: QPainter, w: int, h: int) -> None:
         """Renders Classic Dial Theme (shift LED light strip removed)."""
